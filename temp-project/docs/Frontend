@@ -1,0 +1,108 @@
+# Frontend Architecture & Conventions
+
+This document serves as the single source of truth for our HNNT React Native front-end. It covers wiring, file structure, dependencies, naming conventions, and best practices. Keep this document up to date as the codebase evolves.
+
+---
+
+## 1. Project Structure
+```
+src/
+├── App.tsx                             # Root component; conditionally renders Auth vs. App navigator
+├── assets/                             # Static assets (images, icons)
+├── components/                         # Reusable UI components
+│   ├── Button.tsx                      # Primary/secondary/link button
+│   ├── Header.tsx                      # Configurable app header
+│   ├── ChatBubble.tsx                  # Message bubble with optional attachments
+│   ├── ChatInput.tsx                   # Input row + attach + send logic
+│   ├── ImageAttachment.tsx             # Thumbnail with remove for chat attachments
+│   ├── SituationshipCard.tsx           # Card UI for situationships
+│   ├── SituationshipListView.tsx       # Presentational wrapper for list items
+│   ├── SituationshipList.tsx           # Draggable/static list container
+│   ├── VotingControls.tsx              # Guest voting UI + paywall CTA
+│   └── ChatBubble.tsx                  # AI/user chat message bubble
+├── navigation/                         # React Navigation setup
+│   ├── AuthNavigator.tsx               # Onboarding & login flows
+│   ├── AppNavigator.tsx                # Main tabs & stacks
+│   └── ShareNavigator.tsx              # Deep-linking for shared lists
+├── screens/                            # Screen-level components (pages)
+│   ├── OnboardingScreen.tsx            # First-run UX
+│   ├── ProfileScreen.tsx               # Profile & privacy
+│   ├── SituationshipListScreen.tsx     # Owner’s ranking list
+│   ├── SharedListScreen.tsx            # Guest voting view
+│   ├── SituationshipDetailScreen.tsx   # AI chat per person
+│   ├── ChatScreen.tsx                  # Full chat interface
+│   ├── ShareScreen.tsx                 # Social share flow
+│   ├── VoteResultScreen.tsx            # Friend feedback aggregation
+│   └── SettingsScreen.tsx              # App settings
+├── context/                            # Custom React hooks & providers
+│   ├── useSituationships.ts            # List state, permissions, reordering
+│   ├── useVoting.ts                    # Vote submission + subscriptions
+│   ├── useAttachments.ts               # Image attach mgmt in chat input
+│   └── useOCR.ts                       # Send images to OCR & return text
+├── styles/                             # Design tokens & style constants
+│   ├── colors.ts                       # Palette
+│   ├── typography.ts                   # Font sizes & weights
+│   └── spacing.ts                      # Spacing scales
+└── utils/                              # Shared utilities
+    ├── api.ts                          # Apollo/GraphQL client & queries/mutations
+    ├── auth.ts                         # OAuth helpers (SnapKit, TikTok)
+    └── permissions.ts                  # Feature-flag gating (paywall checks)
+```  
+
+### Notes
+- **One file per component**: keep logic modular and single-responsibility.  
+- **Screens vs. Components**: screens orchestrate layout/navigation; components are purely UI or low-level behaviors.
+
+---
+
+## 2. Key Dependencies
+- **React Native & Expo**: cross-platform UI
+- **@react-navigation/**: navigation stacks, tabs, deep links
+- **react-native-draggable-flatlist**: drag-and-drop ranking
+- **expo-image-picker**, **expo-camera**: image selection & capture
+- **expo-image-manipulator**: client-side cropping/resizing
+- **Apollo Client** (or AWS Amplify): GraphQL data layer
+- **@expo/vector-icons**: iconography (Ionicons, MaterialIcons)
+- **axios** / built-in fetch: HTTP for OCR
+
+> Install via `yarn add react-native-draggable-flatlist expo-image-picker expo-camera expo-image-manipulator @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs apollo-client @apollo/react-hooks @expo/vector-icons axios`
+
+---
+
+## 3. Naming Conventions
+- **Components**: `PascalCase.tsx` (e.g. `ChatBubble.tsx`)  
+- **Hooks**: `useCamelCase.ts` (e.g. `useSituationships.ts`)  
+- **Screens**: `PascalCaseScreen.tsx` (e.g. `ChatScreen.tsx`)  
+- **Contexts**: `ContextNameContext.tsx` / `useName.ts`  
+- **Styles**: singular token files (`colors.ts`, `spacing.ts`)  
+- **Utils**: lowercase names for helper files (`api.ts`, `auth.ts`)  
+
+---
+
+## 4. Data Flow & Wiring
+1. **`App.tsx`** checks auth state via `useAuth` and renders `AuthNavigator` or `AppNavigator`.  
+2. **Navigators** define routes; screens import & use components and hooks.  
+3. **Hooks** handle business logic, state, and GraphQL operations, exposing data & actions to components.  
+4. **Components** receive props, call hook actions (e.g. `reorder`, `submitVote`, `addAttachment`, `submitOCR`), and render UI.  
+5. **GraphQL layer**: `api.ts` centralizes queries, mutations, and subscriptions—hooks import from here.  
+
+---
+
+## 5. Styling & Theming
+- **Design Tokens**: use `styles/colors.ts`, `typography.ts`, and `spacing.ts`.  
+- **Themed Styles**: components can use `useColorScheme()` to toggle dark/light.  
+- **Reusable Styles**: avoid inline styles; prefer StyleSheet objects.  
+
+---
+
+## 6. Best Practices
+- **Optimistic UI**: use Apollo optimistic responses for reorders and votes.  
+- **Error Boundaries**: wrap screens in an `ErrorBoundary` to catch crashes.  
+- **Loading States**: provide skeletons or spinners when fetching critical data.  
+- **Modular Code**: split logic into hooks; UI into small components.  
+- **Documentation**: update this doc alongside code changes.  
+
+---
+
+*This document is a living reference—please refine as the codebase grows.*
+
