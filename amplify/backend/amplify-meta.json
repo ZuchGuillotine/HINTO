@@ -1,0 +1,78 @@
+{
+  "providers": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-hinto-dev-8595d-authRole",
+      "UnauthRoleArn": "arn:aws:iam::304783065551:role/amplify-hinto-dev-8595d-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::304783065551:role/amplify-hinto-dev-8595d-authRole",
+      "Region": "us-west-2",
+      "DeploymentBucketName": "amplify-hinto-dev-8595d-deployment",
+      "UnauthRoleName": "amplify-hinto-dev-8595d-unauthRole",
+      "StackName": "amplify-hinto-dev-8595d",
+      "StackId": "arn:aws:cloudformation:us-west-2:304783065551:stack/amplify-hinto-dev-8595d/67c24270-2fac-11f0-b77b-02288b0df73d",
+      "AmplifyAppId": "dyne7qg2qkhy8"
+    }
+  },
+  "api": {
+    "hinto": {
+      "service": "AppSync",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [
+        {
+          "category": "auth",
+          "resourceName": "hinto1dd950d1",
+          "attributes": [
+            "UserPoolId"
+          ]
+        }
+      ],
+      "output": {
+        "authConfig": {
+          "defaultAuthentication": {
+            "authenticationType": "AMAZON_COGNITO_USER_POOLS",
+            "userPoolConfig": {
+              "userPoolId": "authhinto1dd950d1"
+            }
+          },
+          "additionalAuthenticationProviders": []
+        }
+      },
+      "lastPushTimeStamp": "2025-05-13T04:32:29.894Z",
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-hinto-dev-8595d-deployment/amplify-cfn-templates/api/cloudformation-template.json",
+        "logicalId": "apihinto"
+      }
+    }
+  },
+  "auth": {
+    "hinto1dd950d1": {
+      "service": "Cognito",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [],
+      "customAuth": false,
+      "frontendAuthConfig": {
+        "socialProviders": [
+          "FACEBOOK",
+          "GOOGLE"
+        ],
+        "usernameAttributes": [],
+        "signupAttributes": [],
+        "passwordProtectionSettings": {
+          "passwordPolicyMinLength": 8,
+          "passwordPolicyCharacters": []
+        },
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-hinto-dev-8595d-deployment/amplify-cfn-templates/auth/hinto1dd950d1-cloudformation-template.json",
+        "logicalId": "authhinto1dd950d1"
+      },
+      "lastPushTimeStamp": "2025-05-13T04:32:29.930Z"
+    }
+  }
+}
