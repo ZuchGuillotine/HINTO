@@ -39,6 +39,22 @@
 
 ---
 
+**Progress Update (Week 0, Day 2):**
+- AWS Amplify environment initialized with Cognito user pool
+- Configured custom authentication flow with:
+  - Email/password login
+  - OAuth support (Google, Snapchat, TikTok ready)
+  - Custom attributes (age verification, invite code)
+  - Lambda triggers for validation and profile setup
+- Set up hosted UI with custom domain prefix
+- Created Lambda functions for:
+  - Pre-signup validation
+  - Post-confirmation profile setup
+  - Pre-token generation
+- Next steps: Implement Lambda functions, set up S3 storage
+
+---
+
 ### 🛠️ Sprint 1 (Core Data & Auth) — *Weeks 1–2*
 
 | ID     | Task                                                      | Pts | Owner | Status |
