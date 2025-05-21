@@ -1,0 +1,17 @@
+{
+  "providers": [
+    "awscloudformation"
+  ],
+  "projectName": "HINTO",
+  "version": "3.1",
+  "frontend": "javascript",
+  "javascript": {
+    "framework": "react-native",
+    "config": {
+      "SourceDir": "/Users/benjamincox/Downloads/HINTO/",
+      "DistributionDir": "web-build",
+      "BuildCommand": "npm run build",
+      "StartCommand": "npm run build start"
+    }
+  }
+}

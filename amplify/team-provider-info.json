@@ -1,0 +1,39 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-hinto-dev-8595d-authRole",
+      "UnauthRoleArn": "arn:aws:iam::304783065551:role/amplify-hinto-dev-8595d-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::304783065551:role/amplify-hinto-dev-8595d-authRole",
+      "Region": "us-west-2",
+      "DeploymentBucketName": "amplify-hinto-dev-8595d-deployment",
+      "UnauthRoleName": "amplify-hinto-dev-8595d-unauthRole",
+      "StackName": "amplify-hinto-dev-8595d",
+      "StackId": "arn:aws:cloudformation:us-west-2:304783065551:stack/amplify-hinto-dev-8595d/67c24270-2fac-11f0-b77b-02288b0df73d",
+      "AmplifyAppId": "dyne7qg2qkhy8",
+      "AuthTriggerTemplateURL": "https://s3.amazonaws.com/amplify-hinto-dev-8595d-deployment/amplify-cfn-templates/auth/auth-trigger-cloudformation-template.json"
+    },
+    "categories": {
+      "auth": {
+        "HITNOauth": {
+          "facebookAppId": "2033331813827444",
+          "googleClientId": "798510659255-2p2fnrcnii2kta3gootr007q9s2k7jbn.apps.googleusercontent.com"
+        },
+        "userPoolGroups": {}
+      },
+      "function": {
+        "HITNOauthPostConfirmation": {
+          "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
+          "s3Key": "amplify-builds/HITNOauthPostConfirmation-5638426935574f596d79-build.zip"
+        },
+        "HITNOauthPreSignup": {
+          "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
+          "s3Key": "amplify-builds/HITNOauthPreSignup-6f7a67544b674468625a-build.zip"
+        },
+        "HITNOauthPreTokenGeneration": {
+          "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
+          "s3Key": "amplify-builds/HITNOauthPreTokenGeneration-4a325a6e2b546e2f3079-build.zip"
+        }
+      }
+    }
+  }
+}
