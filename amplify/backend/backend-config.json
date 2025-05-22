@@ -154,5 +154,12 @@
         }
       ]
     }
+  },
+  "storage": {
+    "HITNOmedia": {
+      "dependsOn": [],
+      "providerPlugin": "awscloudformation",
+      "service": "S3"
+    }
   }
 }

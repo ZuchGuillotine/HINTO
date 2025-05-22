@@ -39,8 +39,10 @@
 
 ---
 
-**Progress Update (Week 0, Day 2):**
-- AWS Amplify environment initialized with Cognito user pool
+**Progress Update (Week 0, Day 3):**
+- AWS Amplify environment initialized with Cognito user pool and S3 storage.
+  - S3 bucket (`hitnomediamvp8595d-dev`) created for media.
+  - Lambda function `HITNOauthPostConfirmation` permissions updated for S3 access.
 - Configured custom authentication flow with:
   - Email/password login
   - OAuth support (Google, Snapchat, TikTok ready)
@@ -51,7 +53,11 @@
   - Pre-signup validation
   - Post-confirmation profile setup
   - Pre-token generation
-- Next steps: Implement Lambda functions, set up S3 storage
+- Next steps: 
+  - Implement Lambda functions
+  - Configure social provider credentials (Snapchat, TikTok, Google)
+  - Define S3 bucket folder structure (e.g., `public/avatars/`) and CORS configuration.
+  - Set up AppSync GraphQL API and DynamoDB tables.
 
 ---
 

@@ -33,6 +33,9 @@
           "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
           "s3Key": "amplify-builds/HITNOauthPreTokenGeneration-4a325a6e2b546e2f3079-build.zip"
         }
+      },
+      "storage": {
+        "HITNOmedia": {}
       }
     }
   }

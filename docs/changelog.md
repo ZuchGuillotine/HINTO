@@ -1,5 +1,14 @@
 # Changelog
 
+## [Week 0, Day 3] (S3 Setup)
+
+- Added S3 storage (`HITNOmedia`) for media assets using Amplify CLI.
+  - Configured bucket `hitnomediamvp8595d-dev`.
+  - Set permissions for authenticated users (CRUD).
+  - Updated `HITNOauthPostConfirmation` Lambda function IAM policy to allow S3 actions on the bucket.
+- Resolved naming inconsistencies between S3 resources and other Amplify resources.
+- Successfully pushed S3 and Lambda permission updates to AWS environment.
+
 ## [Week 0, Day 2]
 
 - Initialized AWS Amplify environment with Cognito user pool

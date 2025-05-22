@@ -1,0 +1,13 @@
+{
+  "resourceName": "HITNOmedia",
+  "policyUUID": "e62ac266",
+  "bucketName": "hitnomediamvp",
+  "storageAccess": "auth",
+  "guestAccess": [],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE"
+}

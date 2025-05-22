@@ -13,6 +13,9 @@
   - Cognito user pool created with custom authentication flow
   - Lambda functions scaffolded for user management
   - Hosted UI configured with custom domain
+  - S3 storage (`HITNOmedia`, bucket `hitnomediamvp8595d-dev`) configured for media assets (e.g., avatars)
+    - Authenticated user access with CRUD permissions.
+    - `HITNOauthPostConfirmation` Lambda function updated with S3 permissions.
   - Authentication flow ready for:
     - Email/password login
     - OAuth providers (Google, Snapchat, TikTok)
@@ -20,9 +23,10 @@
     - Profile management
   - Next steps:
     - Implement Lambda function logic
-    - Set up S3 storage
-    - Configure social provider credentials
+    - Configure social provider credentials (Snapchat, TikTok, Google)
+    - Set up AppSync GraphQL API and DynamoDB tables
+    - Define S3 bucket folder structure (e.g., for avatars) and CORS configuration
 
 ---
 
-*Last updated: Week 0, Day 2 (Updated)* 
+*Last updated: Week 0, Day 3 (S3 Setup)* 

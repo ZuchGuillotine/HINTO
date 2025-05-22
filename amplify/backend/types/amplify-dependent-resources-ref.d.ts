@@ -40,5 +40,11 @@ export type AmplifyDependentResourcesAttributes = {
       "Name": "string",
       "Region": "string"
     }
+  },
+  "storage": {
+    "HITNOmedia": {
+      "BucketName": "string",
+      "Region": "string"
+    }
   }
 }
