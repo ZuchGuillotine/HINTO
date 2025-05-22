@@ -20,10 +20,10 @@
 
 | ID     | Task                          | Pts | Owner | Status |
 | ------ | ----------------------------- | --- | ----- | ------ |
-|  BL‑01 | Instagram story share intent  |  M  |       |  \[ ]  |
-|  BL‑02 | TikTok OAuth login            |  M  |       |  \[ ]  |
-|  BL‑03 | Internationalization scaffold |  L  |       |  \[ ]  |
-|  BL‑04 | Public web poll for Pro users |  M  |       |  \[ ]  |
+|  BL‑01 | Instagram story share intent  |  M  |      |  [ ]  |
+|  BL‑02 | TikTok OAuth login            |  M  |      |  [ ]  |
+|  BL‑03 | Internationalization scaffold |  L  |      |  [ ]  |
+|  BL‑04 | Public web poll for Pro users |  M  |      |  [ ]  |
 
 ---
 
@@ -45,16 +45,29 @@
   - Set up secure credential storage in SSM Parameter Store
   - Configured IAM roles and permissions
   - Integrated with Cognito user pool (us-west-2_G1vzYe7Fm)
-- Next steps for Snap OAuth:
-  - Set up API Gateway endpoints
-  - Configure custom domain
-  - Update Snap Developer Portal
-  - Test authentication flow
+- Instagram OAuth implementation:
+  - Configured Meta App ID (2033331813827444) in Cognito for Instagram login
+  - Added Instagram login button to onboarding screen
+  - Integrated with Amplify Auth using Meta platform (Facebook provider with Instagram scopes)
+  - Ready for testing with configured callback URLs
+  - Note: Using Instagram login instead of Facebook for better user experience
+- Amplify Backend Updates:
+  - Deployed updated GraphQL schema with User, Situationship, Vote, Report, and InviteToken models
+  - Updated Lambda functions for auth flow (PostConfirmation, PreSignup, PreTokenGeneration)
+  - Configured S3 storage (HITNOmedia) for media assets
+  - GraphQL API endpoint deployed: https://4b5xcv6m6vendkjb2skswpao6u.appsync-api.us-west-2.amazonaws.com/graphql
+  - Note: Added field-level authorization warnings for User, Situationship, and InviteToken models
+- Next steps for OAuth:
+  - Set up API Gateway endpoints for Snap OAuth
+  - Configure custom domain for API Gateway
+  - Update Snap Developer Portal with callback URL
+  - Test authentication flows end-to-end
 - Remaining tasks:
   - Complete Google OAuth configuration
   - Set up TikTok OAuth (pending credentials)
   - Configure AppSync and DynamoDB
   - Implement remaining Lambda functions
+  - Address field-level authorization warnings in GraphQL schema
 
 ---
 

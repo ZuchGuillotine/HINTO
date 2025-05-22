@@ -33,20 +33,34 @@ flowchart LR
 
 *Data flows: client ↔ GraphQL API ↔ datastore/functions ↔ external services.*
 
+**Current Deployment:**
+- GraphQL Endpoint: https://4b5xcv6m6vendkjb2skswpao6u.appsync-api.us-west-2.amazonaws.com/graphql
+- Region: us-west-2
+- Environment: dev
+- Transformer Version: 2
+
 ---
 
 ## 3  AWS Resources & Services
 
-| Resource                         | Purpose                                                   |
-| -------------------------------- | --------------------------------------------------------- |
-| **Cognito User Pool**            | OAuth federation: Snapchat, TikTok, Google; JWT issuance. |
-| **AppSync GraphQL API**          | Single endpoint for queries, mutations, subscriptions.    |
-| **DynamoDB**                     | Stores Users, Situationships, Votes, Reports.             |
-| **S3 Bucket**                    | Stores shareable PNGs & optional avatar images (via PC).  |
-| **Lambda Functions**             | AI Chat proxy, Payment verification, Content moderation.  |
-| **CloudWatch Logs**              | Lambda & AppSync resolver logs; metrics & alarms.         |
-| **IAM Roles & Policies**         | Least-privilege access for functions, AppSync, S3.        |
-| **Amplify CLI / CloudFormation** | IaC definitions for all above.                            |
+| Resource                         | Purpose                                                   | Status |
+| -------------------------------- | --------------------------------------------------------- | ------ |
+| **Cognito User Pool**            | OAuth federation: Snapchat, TikTok, Google; JWT issuance. | ✅     |
+| **AppSync GraphQL API**          | Single endpoint for queries, mutations, subscriptions.    | ✅     |
+| **DynamoDB**                     | Stores Users, Situationships, Votes, Reports.             | 🔄     |
+| **S3 Bucket**                    | Stores shareable PNGs & optional avatar images (via PC).  | ✅     |
+| **Lambda Functions**             | AI Chat proxy, Payment verification, Content moderation.  | 🔄     |
+| **CloudWatch Logs**              | Lambda & AppSync resolver logs; metrics & alarms.         | ✅     |
+| **IAM Roles & Policies**         | Least-privilege access for functions, AppSync, S3.        | ✅     |
+| **Amplify CLI / CloudFormation** | IaC definitions for all above.                            | ✅     |
+
+**Legend:** ✅ Deployed, 🔄 In Progress, [ ] Pending
+
+**Known Issues:**
+- Field-level authorization warnings for User, Situationship, and InviteToken models
+  - Models affected: User (owner), Situationship (owner), InviteToken (ownerId)
+  - Action required: Review and implement field-level authorization rules
+  - Reference: https://docs.amplify.aws/cli/graphql/authorization-rules/#per-user--owner-based-data-access
 
 ---
 
@@ -169,141 +183,4 @@ type InviteToken @model @auth(rules: [
 | `generateInviteToken` | Mutation     | `InviteToken`     | owner              |
 | `createVote`          | Mutation     | `Vote`            | ANY authenticated  |
 | `listVotesByTarget`   | Query        | `[Vote]`          | targetUserId owner |
-| `onCreateVote`        | Subscription | `Vote`            | targetUserId owner |
-| `createReport`        | Mutation     | `Report`          | authenticated      |
-| `listReports`         | Query        | `[Report]`        | IAM (admin)        |
-
-*Note: Amplify automatically generates resolvers for @model types; customize via `amplify override api` if needed.*
-
----
-
-## 7  Lambda Functions & Implementation
-
-### 7.1  chatHandler (AI Proxy)
-
-* **Trigger:** AppSync Resolver (function pipeline after user sends AI message).
-* **Handler logic:**
-
-  1. Extract `situationshipId`, `message` from event.
-  2. Retrieve context summary if stored (optional future).
-  3. Call Baseten/OpenAI endpoint with system + user prompt.
-  4. Validate response via moderationHook invocation (async or sync).
-  5. Return `chatResponse` text.
-* **Env vars:** `API_KEY`, `MODEL_NAME`, `MODERATION_LAMBDA_ARN`.
-* **Timeout:** 20s; **Memory:** 512MB.
-
-### 7.2  moderationHook (Content Filter)
-
-* **Trigger:** Lambda invoked by chatHandler or as pre-resolver mapping template.
-* **Handler logic:**
-
-  1. Receive text payload.
-  2. Call OpenAI Moderation API.
-  3. If flagged, throw error with code `Moderation.Library`, else return pass.
-* **Env vars:** `OPENAI_API_KEY`.
-* **Timeout:** 5s.
-
-### 7.3  paymentVerifier (IAP Receipt)
-
-* **Trigger:** AppSync Mutation `verifyPurchase`.
-* **Handler logic:**
-
-  1. Accept `receiptData`, `platform`.
-  2. Call Apple/Google receipt verification endpoint.
-  3. On success, update User.plan attribute in DynamoDB via AppSync mutation.
-  4. Return subscription status.
-* **Env vars:** `APPLE_SHARED_SECRET`, `GOOGLE_SERVICE_ACCOUNT`.
-* **Timeout:** 15s.
-
-### 7.4  snapAuthHandler (Custom OAuth Flow)
-
-* **Trigger:** API Gateway endpoints (`/auth/snap/init` and `/auth/snap/callback`).
-* **Purpose:** Custom OAuth implementation for Snapchat login, bypassing Cognito's built-in OAuth.
-* **Handler logic:**
-
-  1. **Init Flow** (`/auth/snap/init`):
-     - Generate secure state parameter
-     - Construct Snap OAuth URL with client ID and scopes
-     - Redirect user to Snap authorization page
-  2. **Callback Flow** (`/auth/snap/callback`):
-     - Validate state parameter
-     - Exchange code for access token via Snap API
-     - Fetch user info from Snap
-     - Create/update Cognito user with Snap attributes
-     - Return JWT tokens for app authentication
-* **Env vars:** `USER_POOL_ID` (Cognito User Pool ID).
-* **Secrets:** Snap credentials stored in SSM Parameter Store (`/hinto/snap/*`).
-* **Timeout:** 30s; **Memory:** 256MB.
-* **IAM Role:** `HITNOauthSnapAuth-dev-role` with:
-  - Cognito access (user management)
-  - SSM Parameter Store access
-  - CloudWatch Logs
-* **Note:** This custom implementation was chosen over Cognito's built-in OAuth to:
-  1. Support Snap's specific OAuth requirements
-  2. Enable custom user attribute mapping
-  3. Provide more control over the authentication flow
-  4. Allow for future Snap-specific features (e.g., Creative Kit integration)
-
----
-
-## 8  Data Modeling & Indexes
-
-| Table            | PK                            | SK / GSI                     | Notes                          |
-| ---------------- | ----------------------------- | ---------------------------- | ------------------------------ |
-| `User-{userId}`  | PK = `USER#${userId}`         |                              | Single item per user           |
-| `Situationships` | PK = `USER#${owner}`          | GSI1: `CATEGORY#${category}` | GSI1 fetches by tag/category   |
-|                  | SK = `SITU#${id}`             |                              | Sort by creation               |
-| `Votes`          | PK = `TARGET#${targetUserId}` | GSI1: `VOTER#${voterId}`     | Query votes by voter if needed |
-|                  | SK = `VOTE#${id}`             |                              |                                |
-| `InviteTokens`   | PK = `USER#${ownerId}`        |                              | Expire via TTL attribute       |
-| `Reports`        | PK = `REPORT#${id}`           |                              | Admin-only access              |
-
-*Use DynamoDB TTL for InviteToken.expiration and optional stale data.*
-
----
-
-## 9  Infrastructure as Code (Amplify)
-
-1. **Initialize**: `amplify init --appId <AMPLIFY_APP_ID> --env prod`
-2. **Add API**: `amplify add api` → GraphQL → provide `schema.graphql`
-3. **Add Functions**: `amplify add function` for each Lambda (chatHandler, paymentVerifier, moderationHook).
-4. **Set Auth**: `amplify update auth` → enable OAuth providers (SnapKit via custom providers).
-5. **Push**: `amplify push --yes`
-6. **Override**: For custom mapping templates, edit `amplify/backend/api/<apiName>/resolvers`.
-7. **CI/CD**: Integrate `amplify push` into `scripts/deploy.sh` for GitHub Actions.
-
----
-
-## 10  Testing & Validation
-
-* **Unit Tests:** Jest for Lambda handlers (mock external calls).
-* **Integration:** AppSync local simulator (using `amplify mock api`) to test GraphQL flows.
-* **Load:** Simulate concurrent mutations & subscriptions via Artillery.
-* **Security Audit:** Use AWS IAM Access Analyzer to verify least-privilege.
-
----
-
-## 11  CI/CD Pipeline
-
-* **GitHub Actions** workflow stages:
-
-  1. **lint**: `eslint` on /functions & schema.
-  2. **test**: `jest --coverage`.
-  3. **mock**: `amplify mock api --config mock-config.json` + basic GraphQL smoke tests.
-  4. **deploy**: on `main` → `scripts/deploy.sh` (amplify push + CloudFormation wait).
-
----
-
-## 12  Backend Hand-Off Prompt (AI Co-dev)
-
-> **System Context:** You are a backend engineer working with AWS Amplify for HNNT.  Use Node.js 18 in Lambdas, TypeScript optional.  All GraphQL logic via AppSync.
-> **Task:** Implement `createSituationship` resolver pipeline: after DynamoDB write, publish MQTT subscription on `onUpdateSituationship` with updated list.  Ensure `rankIndex` set to end-of-list if absent.
-> **File:** `/backend/graphql/resolvers/Mutation.createSituationship.req.vtl` and `.res.vtl`, plus any pre-function mapping.
-> **Acceptance:** New situationship appears in `listSituationships` query, `onUpdateSituationship` subscription fires within 200ms of mutation.  Respect @auth rules.
-
-Use this template for each backend task, referencing Kan-ban IDs (e.g., `S1-05`).  Follow best practices: idempotent operations, error handling, log structured JSON.
-
----
-
-**Document Owner:** Backend Lead
-**Next Review:** Sprint 1 backend kickoff.
+| `

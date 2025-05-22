@@ -12,5 +12,12 @@
   "triggerTemplate": "PreSignup.json.ejs",
   "triggerEventPath": "PreSignup.event.json",
   "roleName": "HITNOauthPreSignup",
-  "skipEdit": true
+  "skipEdit": true,
+  "permissions": {
+    "api": {
+      "hinto": [
+        "Query"
+      ]
+    }
+  }
 }

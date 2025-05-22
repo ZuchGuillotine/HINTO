@@ -1,0 +1,91 @@
+# Auth directives enforce owner-based and group-based access
+# See @auth in AWS Amplify docs
+
+type User @model @auth(rules: [
+  { allow: owner },
+  { allow: private, provider: iam }
+]) {
+  id: ID!
+  username: String!
+  email: String!
+  avatarUrl: String
+  isPrivate: Boolean! @default(value: "true")
+  mutualsOnly: Boolean! @default(value: "true")
+  plan: SubscriptionPlan @default(value: "FREE")
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum SubscriptionPlan { 
+  FREE 
+  PRO 
+}
+
+type Situationship @model @auth(rules: [
+  { allow: owner },
+  { allow: groups, groupsField: "sharedWith", operations: [read] }
+]) {
+  id: ID!
+  owner: String!                # Cognito userId
+  name: String!
+  emoji: String
+  category: String
+  rankIndex: Int
+  sharedWith: [String]          # friend userIds
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Vote @model @auth(rules: [
+  { allow: owner, ownerField: "voterId", operations: [create] },
+  { allow: owner, ownerField: "targetUserId", operations: [read] }
+]) {
+  id: ID!
+  voterId: String!
+  targetUserId: String!
+  bestId: ID!
+  worstId: ID!
+  comment: String
+  createdAt: AWSDateTime!
+}
+
+type Report @model @auth(rules: [
+  { allow: private, provider: iam }
+]) {
+  id: ID!
+  reporter: String
+  contentId: ID!
+  reason: String!
+  createdAt: AWSDateTime!
+}
+
+type InviteToken @model @auth(rules: [
+  { allow: owner, ownerField: "ownerId" }
+]) {
+  id: ID!
+  ownerId: String!
+  token: String!
+  expiresAt: AWSDateTime!
+}
+
+# Custom queries and mutations beyond @model defaults
+type Query {
+  # Get situationships for a specific user
+  getUserSituationships(userId: ID!): [Situationship] @function(name: "getUserSituationships")
+  
+  # Get votes for a specific situationship
+  getSituationshipVotes(situationshipId: ID!): [Vote] @function(name: "getSituationshipVotes")
+  
+  # Search users by username
+  searchUsers(username: String!): [User] @function(name: "searchUsers")
+}
+
+type Mutation {
+  # Reorder situationships in bulk
+  reorderSituationships(input: ReorderSituationshipsInput!): [Situationship] @function(name: "reorderSituationships")
+}
+
+input ReorderSituationshipsInput {
+  situationshipIds: [ID]!
+  newRankIndices: [Int]!
+}

@@ -12,5 +12,12 @@
   "triggerTemplate": "PreTokenGeneration.json.ejs",
   "triggerEventPath": "PreTokenGeneration.event.json",
   "roleName": "HITNOauthPreTokenGeneration",
-  "skipEdit": true
+  "skipEdit": true,
+  "permissions": {
+    "api": {
+      "hinto": [
+        "Query"
+      ]
+    }
+  }
 }

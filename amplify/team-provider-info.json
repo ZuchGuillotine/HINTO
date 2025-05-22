@@ -23,19 +23,22 @@
       "function": {
         "HITNOauthPostConfirmation": {
           "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
-          "s3Key": "amplify-builds/HITNOauthPostConfirmation-5638426935574f596d79-build.zip"
+          "s3Key": "amplify-builds/HITNOauthPostConfirmation-754e6f53303363716c4c-build.zip"
         },
         "HITNOauthPreSignup": {
           "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
-          "s3Key": "amplify-builds/HITNOauthPreSignup-6f7a67544b674468625a-build.zip"
+          "s3Key": "amplify-builds/HITNOauthPreSignup-4746544d425a7351524e-build.zip"
         },
         "HITNOauthPreTokenGeneration": {
           "deploymentBucketName": "amplify-hinto-dev-8595d-deployment",
-          "s3Key": "amplify-builds/HITNOauthPreTokenGeneration-4a325a6e2b546e2f3079-build.zip"
+          "s3Key": "amplify-builds/HITNOauthPreTokenGeneration-7558712b2b65716a4236-build.zip"
         }
       },
       "storage": {
         "HITNOmedia": {}
+      },
+      "api": {
+        "hinto": {}
       }
     }
   }

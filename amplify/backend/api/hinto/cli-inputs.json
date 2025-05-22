@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "serviceConfiguration": {
+    "apiName": "hinto",
+    "serviceName": "AppSync",
+    "defaultAuthType": {
+      "mode": "AMAZON_COGNITO_USER_POOLS",
+      "cognitoUserPoolId": "authHITNOauth"
+    },
+    "conflictResolution": {},
+    "additionalAuthTypes": [
+      {
+        "mode": "AWS_LAMBDA",
+        "lambdaFunction": "HITNOauthPreTokenGeneration",
+        "ttlSeconds": "300"
+      },
+      {
+        "mode": "AWS_IAM"
+      }
+    ]
+  }
+}

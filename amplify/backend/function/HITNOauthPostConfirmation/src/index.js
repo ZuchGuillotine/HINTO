@@ -1,4 +1,12 @@
-/**
+/* Amplify Params - DO NOT EDIT
+	API_HINTO_GRAPHQLAPIENDPOINTOUTPUT
+	API_HINTO_GRAPHQLAPIIDOUTPUT
+	API_HINTO_USERTABLE_ARN
+	API_HINTO_USERTABLE_NAME
+	ENV
+	REGION
+	STORAGE_HITNOMEDIA_BUCKETNAME
+Amplify Params - DO NOT EDIT *//**
  * @fileoverview
  *
  * This CloudFormation Trigger creates a handler which awaits the other handlers

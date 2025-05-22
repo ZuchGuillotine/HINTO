@@ -26,13 +26,22 @@
     - Secure credential management via SSM Parameter Store
     - IAM roles and permissions configured
     - Integration with Cognito user pool established
+  - GraphQL API Deployment:
+    - Schema deployed with User, Situationship, Vote, Report, and InviteToken models
+    - Endpoint: https://4b5xcv6m6vendkjb2skswpao6u.appsync-api.us-west-2.amazonaws.com/graphql
+    - Updated Lambda functions for auth flow:
+      - `HITNOauthPostConfirmation`: Post-signup user setup
+      - `HITNOauthPreSignup`: Pre-signup validation
+      - `HITNOauthPreTokenGeneration`: Token customization
+    - Note: Field-level authorization warnings for User, Situationship, and InviteToken models need review
   - Next steps:
     - Complete API Gateway setup for Snap OAuth endpoints
     - Configure custom domain for API Gateway
     - Implement remaining social provider integrations
     - Set up AppSync GraphQL API and DynamoDB tables
     - Define S3 bucket folder structure (e.g., for avatars) and CORS configuration
+    - Address field-level authorization warnings in GraphQL schema
 
 ---
 
-*Last updated: Week 0, Day 4 (Snap OAuth Setup)* 
+*Last updated: Week 0, Day 4 (Amplify Backend Deployment)* 

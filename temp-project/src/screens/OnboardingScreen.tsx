@@ -13,17 +13,19 @@
 # Onboarding Screen Design
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, useColorScheme, Alert } from 'react-native';
 import FeatureCard from '../components/FeatureCard';
 import AuthButton from '../components/AuthButton';
 import { useNavigation } from '@react-navigation/native';
+import { handleSocialLogin } from '../utils/auth';
+import type { AuthProvider } from '../components/AuthButton';
 
 const { width } = Dimensions.get('window');
 
 const slides = [
   {
     key: 'welcome',
-    title: "He’s Not Into You",
+    title: "He's Not Into You",
     description: 'Navigate your dating life with clarity.',
   },
   {
@@ -45,6 +47,7 @@ const slides = [
 
 export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation<any>();
   const colorScheme = useColorScheme();
 
@@ -60,9 +63,22 @@ export default function OnboardingScreen() {
     setIndex(i => i - 1);
   };
 
-  const handleAuth = (provider: 'snapchat' | 'tiktok' | 'google' | 'email') => {
-    // TODO: wire up OAuth/email auth logic
-    navigation.replace('SituationshipList');
+  const handleAuth = async (provider: AuthProvider) => {
+    try {
+      setIsLoading(true);
+      await handleSocialLogin(provider);
+      // If login is successful, navigate to the main app
+      navigation.replace('SituationshipList');
+    } catch (error) {
+      console.error('Auth error:', error);
+      Alert.alert(
+        'Login Failed',
+        'Unable to sign in. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -89,12 +105,36 @@ export default function OnboardingScreen() {
 
       {isLast ? (
         <View style={styles.authContainer}>
-          <AuthButton provider="snapchat" onPress={() => handleAuth('snapchat')} />
-          <AuthButton provider="tiktok" onPress={() => handleAuth('tiktok')} />
-          <AuthButton provider="google" onPress={() => handleAuth('google')} />
-          <AuthButton provider="email" onPress={() => handleAuth('email')} label="Continue with Email" />
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginText}>
+          <AuthButton 
+            provider="instagram" 
+            onPress={() => handleAuth('instagram')} 
+            disabled={isLoading}
+          />
+          <AuthButton 
+            provider="snapchat" 
+            onPress={() => handleAuth('snapchat')} 
+            disabled={isLoading}
+          />
+          <AuthButton 
+            provider="tiktok" 
+            onPress={() => handleAuth('tiktok')} 
+            disabled={isLoading}
+          />
+          <AuthButton 
+            provider="google" 
+            onPress={() => handleAuth('google')} 
+            disabled={isLoading}
+          />
+          <AuthButton 
+            provider="email" 
+            onPress={() => handleAuth('email')} 
+            disabled={isLoading}
+          />
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
+          >
+            <Text style={[styles.loginText, isLoading && styles.disabledText]}>
               Already have an account? Login
             </Text>
           </TouchableOpacity>
@@ -146,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   disabledText: {
-    opacity: 0.3,
+    opacity: 0.5,
   },
   authContainer: {
     width: '80%',
