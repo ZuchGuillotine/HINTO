@@ -34,30 +34,27 @@
 |  S0‑01 | Initialize mono‑repo, lint & Husky hooks                 |  S  |      |  ✅  |
 |  S0‑02 | Configure Expo + EAS build pipeline                      |  M  |      |  ✅  |
 |  S0‑03 | Provision AWS Amplify env (AppSync, Cognito, Dynamo, S3) |  M  |      |  🔄  |
-|  S0‑04 | Obtain/secure Snap Kit, Google, TikTok dev creds         |  S  |      |  [ ] |
+|  S0‑04 | Obtain/secure Snap Kit, Google, TikTok dev creds         |  S  |      |  🔄  |
 |  S0‑05 | Add Sentry + Amplitude base SDKs                         |  S  |      |  [ ] |
 
 ---
 
-**Progress Update (Week 0, Day 3):**
-- AWS Amplify environment initialized with Cognito user pool and S3 storage.
-  - S3 bucket (`hitnomediamvp8595d-dev`) created for media.
-  - Lambda function `HITNOauthPostConfirmation` permissions updated for S3 access.
-- Configured custom authentication flow with:
-  - Email/password login
-  - OAuth support (Google, Snapchat, TikTok ready)
-  - Custom attributes (age verification, invite code)
-  - Lambda triggers for validation and profile setup
-- Set up hosted UI with custom domain prefix
-- Created Lambda functions for:
-  - Pre-signup validation
-  - Post-confirmation profile setup
-  - Pre-token generation
-- Next steps: 
-  - Implement Lambda functions
-  - Configure social provider credentials (Snapchat, TikTok, Google)
-  - Define S3 bucket folder structure (e.g., `public/avatars/`) and CORS configuration.
-  - Set up AppSync GraphQL API and DynamoDB tables.
+**Progress Update (Week 0, Day 4):**
+- Snap OAuth implementation in progress:
+  - Created Lambda function `HITNOauthSnapAuth-dev` for OAuth flow
+  - Set up secure credential storage in SSM Parameter Store
+  - Configured IAM roles and permissions
+  - Integrated with Cognito user pool (us-west-2_G1vzYe7Fm)
+- Next steps for Snap OAuth:
+  - Set up API Gateway endpoints
+  - Configure custom domain
+  - Update Snap Developer Portal
+  - Test authentication flow
+- Remaining tasks:
+  - Complete Google OAuth configuration
+  - Set up TikTok OAuth (pending credentials)
+  - Configure AppSync and DynamoDB
+  - Implement remaining Lambda functions
 
 ---
 
@@ -65,13 +62,13 @@
 
 | ID     | Task                                                      | Pts | Owner | Status |
 | ------ | --------------------------------------------------------- | --- | ----- | ------ |
-|  S1‑01 | Snapchat Login (JWT → Cognito)                            |  M  |       |  \[ ]  |
-|  S1‑02 | Google Sign‑in flow                                       |  M  |       |  \[ ]  |
-|  S1‑03 | Age‑gate + invite‑code gate                               |  S  |       |  \[ ]  |
-|  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |       |  \[ ]  |
-|  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |       |  \[ ]  |
-|  S1‑06 | Situationship add/edit/delete UI                          |  M  |       |  \[ ]  |
-|  S1‑07 | Local/optimistic cache sync tests                         |  S  |       |  \[ ]  |
+|  S1‑01 | Snapchat Login (JWT → Cognito)                            |  M  |      |  🔄  |
+|  S1‑02 | Google Sign‑in flow                                       |  M  |      |  [ ]  |
+|  S1‑03 | Age‑gate + invite‑code gate                               |  S  |       |  \[ ]  |
+|  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |       |  \[ ]  |
+|  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |       |  \[ ]  |
+|  S1‑06 | Situationship add/edit/delete UI                          |  M  |       |  \[ ]  |
+|  S1‑07 | Local/optimistic cache sync tests                         |  S  |       |  \[ ]  |
 
 ---
 
@@ -79,11 +76,11 @@
 
 | ID     | Task                                             | Pts | Owner | Status |
 | ------ | ------------------------------------------------ | --- | ----- | ------ |
-|  S2‑01 | Baseten proxy → OpenAI GPT‑4 integration         |  L  |       |  \[ ]  |
-|  S2‑02 | Chat UI (GiftedChat scaffold + typing indicator) |  M  |       |  \[ ]  |
-|  S2‑03 | Streaming response hook                          |  M  |       |  \[ ]  |
-|  S2‑04 | OpenAI Moderation filter service                 |  S  |       |  \[ ]  |
-|  S2‑05 | Rate‑limit per user (10 msgs/day)                |  S  |       |  \[ ]  |
+|  S2‑01 | Baseten proxy → OpenAI GPT‑4 integration         |  L  |      |  [ ]  |
+|  S2‑02 | Chat UI (GiftedChat scaffold + typing indicator) |  M  |      |  [ ]  |
+|  S2‑03 | Streaming response hook                          |  M  |      |  [ ]  |
+|  S2‑04 | OpenAI Moderation filter service                 |  S  |      |  [ ]  |
+|  S2‑05 | Rate‑limit per user (10 msgs/day)                |  S  |      |  [ ]  |
 
 ---
 
@@ -91,11 +88,11 @@
 
 | ID     | Task                                            | Pts | Owner | Status |
 | ------ | ----------------------------------------------- | --- | ----- | ------ |
-|  S3‑01 | Drag‑and‑drop ranking (Reanimated 3)            |  M  |       |  \[ ]  |
-|  S3‑02 | Rank reorder mutation + subscription            |  S  |       |  \[ ]  |
-|  S3‑03 | Shareable PNG generator (Expo + Canvas)         |  L  |       |  \[ ]  |
-|  S3‑04 | Snap Creative Kit share flow                    |  M  |       |  \[ ]  |
-|  S3‑05 | Invite‑link deep‑linking (Branch.io or Amplify) |  M  |       |  \[ ]  |
+|  S3‑01 | Drag‑and‑drop ranking (Reanimated 3)            |  M  |      |  [ ]  |
+|  S3‑02 | Rank reorder mutation + subscription            |  S  |      |  [ ]  |
+|  S3‑03 | Shareable PNG generator (Expo + Canvas)         |  L  |      |  [ ]  |
+|  S3‑04 | Snap Creative Kit share flow                    |  M  |      |  [ ]  |
+|  S3‑05 | Invite‑link deep‑linking (Branch.io or Amplify) |  M  |      |  [ ]  |
 
 ---
 
@@ -103,11 +100,11 @@
 
 | ID     | Task                                    | Pts | Owner | Status |
 | ------ | --------------------------------------- | --- | ----- | ------ |
-|  S4‑01 | Voting mutation + DB model (Best/Worst) |  M  |       |  \[ ]  |
-|  S4‑02 | Friend vote UI (modal)                  |  M  |       |  \[ ]  |
-|  S4‑03 | Real‑time vote aggregation subscription |  M  |       |  \[ ]  |
-|  S4‑04 | Feedback comment input + moderation     |  M  |       |  \[ ]  |
-|  S4‑05 | Results screen w/ bar chart             |  S  |       |  \[ ]  |
+|  S4‑01 | Voting mutation + DB model (Best/Worst) |  M  |      |  [ ]  |
+|  S4‑02 | Friend vote UI (modal)                  |  M  |      |  [ ]  |
+|  S4‑03 | Real‑time vote aggregation subscription |  M  |      |  [ ]  |
+|  S4‑04 | Feedback comment input + moderation     |  M  |      |  [ ]  |
+|  S4‑05 | Results screen w/ bar chart             |  S  |      |  [ ]  |
 
 ---
 
@@ -115,11 +112,11 @@
 
 | ID     | Task                                             | Pts | Owner | Status |
 | ------ | ------------------------------------------------ | --- | ----- | ------ |
-|  S5‑01 | Block/unblock API & UI                           |  S  |       |  \[ ]  |
-|  S5‑02 | Report flow + admin email alert                  |  S  |       |  \[ ]  |
-|  S5‑03 | IAP subscription (Apple/Google) + receipt verify |  L  |       |  \[ ]  |
-|  S5‑04 | Paywall modal + upsell triggers                  |  M  |       |  \[ ]  |
-|  S5‑05 | Feature gating (situations>5, AI cap)            |  S  |       |  \[ ]  |
+|  S5‑01 | Block/unblock API & UI                           |  S  |      |  [ ]  |
+|  S5‑02 | Report flow + admin email alert                  |  S  |      |  [ ]  |
+|  S5‑03 | IAP subscription (Apple/Google) + receipt verify |  L  |      |  [ ]  |
+|  S5‑04 | Paywall modal + upsell triggers                  |  M  |      |  [ ]  |
+|  S5‑05 | Feature gating (situations>5, AI cap)            |  S  |      |  [ ]  |
 
 ---
 
@@ -127,12 +124,12 @@
 
 | ID     | Task                                           | Pts | Owner | Status |
 | ------ | ---------------------------------------------- | --- | ----- | ------ |
-|  S6‑01 | Closed beta TestFlight build + onboard docs    |  S  |       |  \[ ]  |
-|  S6‑02 | QA test cases & bug bash                       |  L  |       |  \[ ]  |
-|  S6‑03 | Push notifications (vote, weekly nudge)        |  M  |       |  \[ ]  |
-|  S6‑04 | Performance & memory audit                     |  M  |       |  \[ ]  |
-|  S6‑05 | Accessibility audit (WCAG AA)                  |  M  |       |  \[ ]  |
-|  S6‑06 | Store listing (screenshots, copy, App Privacy) |  S  |       |  \[ ]  |
+|  S6‑01 | Closed beta TestFlight build + onboard docs    |  S  |      |  [ ]  |
+|  S6‑02 | QA test cases & bug bash                       |  L  |      |  [ ]  |
+|  S6‑03 | Push notifications (vote, weekly nudge)        |  M  |      |  [ ]  |
+|  S6‑04 | Performance & memory audit                     |  M  |      |  [ ]  |
+|  S6‑05 | Accessibility audit (WCAG AA)                  |  M  |      |  [ ]  |
+|  S6‑06 | Store listing (screenshots, copy, App Privacy) |  S  |      |  [ ]  |
 
 ---
 

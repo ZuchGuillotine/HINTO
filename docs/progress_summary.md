@@ -21,12 +21,18 @@
     - OAuth providers (Google, Snapchat, TikTok)
     - Custom validation (age, invite code)
     - Profile management
+  - Snap OAuth implementation in progress:
+    - Lambda function `HITNOauthSnapAuth-dev` created with OAuth flow handlers
+    - Secure credential management via SSM Parameter Store
+    - IAM roles and permissions configured
+    - Integration with Cognito user pool established
   - Next steps:
-    - Implement Lambda function logic
-    - Configure social provider credentials (Snapchat, TikTok, Google)
+    - Complete API Gateway setup for Snap OAuth endpoints
+    - Configure custom domain for API Gateway
+    - Implement remaining social provider integrations
     - Set up AppSync GraphQL API and DynamoDB tables
     - Define S3 bucket folder structure (e.g., for avatars) and CORS configuration
 
 ---
 
-*Last updated: Week 0, Day 3 (S3 Setup)* 
+*Last updated: Week 0, Day 4 (Snap OAuth Setup)* 

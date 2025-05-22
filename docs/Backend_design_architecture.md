@@ -215,6 +215,35 @@ type InviteToken @model @auth(rules: [
 * **Env vars:** `APPLE_SHARED_SECRET`, `GOOGLE_SERVICE_ACCOUNT`.
 * **Timeout:** 15s.
 
+### 7.4  snapAuthHandler (Custom OAuth Flow)
+
+* **Trigger:** API Gateway endpoints (`/auth/snap/init` and `/auth/snap/callback`).
+* **Purpose:** Custom OAuth implementation for Snapchat login, bypassing Cognito's built-in OAuth.
+* **Handler logic:**
+
+  1. **Init Flow** (`/auth/snap/init`):
+     - Generate secure state parameter
+     - Construct Snap OAuth URL with client ID and scopes
+     - Redirect user to Snap authorization page
+  2. **Callback Flow** (`/auth/snap/callback`):
+     - Validate state parameter
+     - Exchange code for access token via Snap API
+     - Fetch user info from Snap
+     - Create/update Cognito user with Snap attributes
+     - Return JWT tokens for app authentication
+* **Env vars:** `USER_POOL_ID` (Cognito User Pool ID).
+* **Secrets:** Snap credentials stored in SSM Parameter Store (`/hinto/snap/*`).
+* **Timeout:** 30s; **Memory:** 256MB.
+* **IAM Role:** `HITNOauthSnapAuth-dev-role` with:
+  - Cognito access (user management)
+  - SSM Parameter Store access
+  - CloudWatch Logs
+* **Note:** This custom implementation was chosen over Cognito's built-in OAuth to:
+  1. Support Snap's specific OAuth requirements
+  2. Enable custom user attribute mapping
+  3. Provide more control over the authentication flow
+  4. Allow for future Snap-specific features (e.g., Creative Kit integration)
+
 ---
 
 ## 8  Data Modeling & Indexes

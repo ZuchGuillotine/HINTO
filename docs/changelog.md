@@ -35,4 +35,21 @@
 - Set up web build configuration for Amplify deployment
 - Added build script to package.json for web export
 - Successfully tested web build output in web-build directory
-- Installed @expo/webpack-config for web platform support 
+- Installed @expo/webpack-config for web platform support
+
+## [Week 0, Day 4] (Snap OAuth Setup)
+
+- Created Lambda function `HITNOauthSnapAuth-dev` for handling Snap OAuth flow:
+  - Implemented OAuth initiation and callback handlers
+  - Set up secure credential storage in SSM Parameter Store
+  - Configured IAM roles and permissions for Lambda execution
+  - Added Cognito integration for user creation/authentication
+- Set up infrastructure for Snap authentication:
+  - Created IAM role `HITNOauthSnapAuth-dev-role` with necessary permissions
+  - Configured SSM parameters for Snap credentials
+  - Integrated with existing Cognito user pool (us-west-2_G1vzYe7Fm)
+- Next steps:
+  - Set up API Gateway endpoints for OAuth flow
+  - Configure custom domain for API Gateway
+  - Update Snap Developer Portal with callback URL
+  - Test authentication flow end-to-end 
