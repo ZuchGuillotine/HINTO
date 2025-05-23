@@ -63,7 +63,7 @@ const CREATE_VOTE_MUTATION = `
   }
 `;
 
-export const SituationshipsProvider: React.FC<SituationshipsProviderProps> = ({ children }) => {
+export const SituationshipsProvider = ({ children }: SituationshipsProviderProps): JSX.Element => {
   const [items, setItems] = useState<Situationship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -157,11 +157,7 @@ export const SituationshipsProvider: React.FC<SituationshipsProviderProps> = ({ 
     canVote,
   };
 
-  return (
-    <SituationshipsContext.Provider value={value}>
-      {children}
-    </SituationshipsContext.Provider>
-  );
+  return React.createElement(SituationshipsContext.Provider, { value }, children);
 };
 
 export const useSituationships = (ownerId?: string, shareToken?: string): SituationshipsContextType => {
@@ -170,4 +166,4 @@ export const useSituationships = (ownerId?: string, shareToken?: string): Situat
     throw new Error('useSituationships must be used within a SituationshipsProvider');
   }
   return context;
-};
+}; 

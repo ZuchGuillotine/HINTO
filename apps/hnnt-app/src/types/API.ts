@@ -35,4 +35,39 @@ export type UpdateUserInput = {
   isPrivate?: boolean;
   mutualsOnly?: boolean;
   plan?: 'FREE' | 'PRO';
+};
+
+export type Situationship = {
+  id: string;
+  owner: string;
+  name: string;
+  emoji?: string | null;
+  category?: string | null;
+  avatarUrl?: string | null;
+  rankIndex?: number | null;
+  sharedWith?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateSituationshipInput = {
+  name: string;
+  emoji?: string | null;
+  category?: string | null;
+  avatarUrl?: string | null;
+  sharedWith?: string[] | null;
+  owner: string;
+};
+
+export type UpdateSituationshipInput = {
+  id: string;
+  name?: string;
+  emoji?: string | null;
+  category?: string | null;
+  avatarUrl?: string | null;
+  sharedWith?: string[] | null;
+};
+
+export type DeleteSituationshipInput = {
+  id: string;
 }; 

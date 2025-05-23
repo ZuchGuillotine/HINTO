@@ -86,7 +86,7 @@
 |  S1‑03 | Age‑gate (13+) + invite‑code gate                           |  S  |      |  🔄  |
 |  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |      |  ✅  |
 |  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |      |  ✅  |
-|  S1‑06 | Situationship add/edit/delete UI                          |  M  |      |  [ ]  |
+|  S1‑06 | Situationship add/edit/delete UI                          |  M  |      |  🔄  |
 |  S1‑07 | Local/optimistic cache sync tests                         |  S  |      |  [ ]  |
 
 ---
