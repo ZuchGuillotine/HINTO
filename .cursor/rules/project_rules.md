@@ -1,11 +1,11 @@
-Project Rules for **HNNT (He’s Not Not Taken / He Is Not The One)**
+Project Rules for **HNNT (He's Not Not Taken / He Is Not The One)**
 *Last updated: 2025-05-12*
 
 ---
 
 ## Overview
 
-HNNT is a **React + TypeScript web/mobile application** that helps young women navigate modern dating via group-chat-style “is-he-into-me?” discussions, social voting, and AI-powered coaching.
+HNNT is a **React + TypeScript web/mobile application** that helps young women navigate modern dating via group-chat-style "is-he-into-me?" discussions, social voting, and AI-powered coaching.
 Key technologies & conventions:
 
 | Layer                       | Tech / Library                                    | Notes                                              |
@@ -23,7 +23,7 @@ Key technologies & conventions:
 | **Lint / Format**           | ESLint (Airbnb + Tailwind plugin) & Prettier      | Enforced via Husky pre-commit                      |
 | **AI Agent Integration**    | OpenAI functions, prompt cascade defined in `/ai` | Use streaming chat endpoints                       |
 
-These rules keep human and AI collaborators in-sync with HNNT’s conventions, architecture, and roadmap.
+These rules keep human and AI collaborators in-sync with HNNT's conventions, architecture, and roadmap.
 
 ---
 
@@ -37,7 +37,7 @@ These rules keep human and AI collaborators in-sync with HNNT’s conventions, a
 
 ---
 
-## Project Context (SYSTEM\_CONTEXT)
+## Project Context (SYSTEM_CONTEXT)
 
 ```txt
 You are a senior full-stack developer on **HNNT**.  
@@ -88,7 +88,7 @@ tasks/
 
 ## Cursor Rule Definitions
 
-Below are the rule blocks read by Cursor’s agent.
+Below are the rule blocks read by Cursor's agent.
 (If you split these into individual YAML files under `.cursor/rules/`, preserve names.)
 
 ### 1. Coding Standards
@@ -260,7 +260,7 @@ actions:
       In agent_mode:
       • Work on tasks listed as `@tasks/in-progress`.
       • Reference docs/architecture.md on every reasoning step.
-      • Log actions and file deltas to docs/status.md under “Agent Log”.
+      • Log actions and file deltas to docs/status.md under "Agent Log".
       • Touch only files matching task glob patterns.
       • Mark task complete → await human approval before merging.
 ```
@@ -273,6 +273,30 @@ actions:
 * **Accessibility** — all interactive elements need `aria-label`s; color contrast AA+.
 * **Performance Budgets** — LCP < 2.5 s on mid-range Android; bundle ≤ 250 kB per route.
 * **LLM Costs** — all agent prompts live in `/ai/prompts`; token budget annotated in comments.
+
+## Amplify Configuration Management
+
+To prevent parameter drift and deployment issues:
+
+1. **Naming Consistency**
+   * Use consistent resource naming across all Amplify files (e.g., `HINTO` vs `HITNO`)
+   * Document resource naming convention in `docs/technical.md`
+   * Never manually edit `amplify/backend/*/build/` files
+
+2. **Parameter Validation**
+   * Run `amplify status` before pushes to detect drift
+   * Keep `team-provider-info.json` in version control
+   * Document all custom parameters in `docs/amplify-params.md`
+
+3. **Deployment Checklist**
+   * Verify `backend-config.json` matches `parameters.json`
+   * Check auth triggers and dependencies are consistent
+   * Run `amplify validate` before pushing changes
+
+4. **Common Pitfalls**
+   * Avoid manual edits to build artifacts
+   * Don't mix CLI and console changes
+   * Keep environment variables in sync with Amplify params
 
 ---
 

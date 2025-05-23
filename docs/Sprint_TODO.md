@@ -33,9 +33,9 @@
 | ------ | -------------------------------------------------------- | --- | ----- | ------ |
 |  S0‑01 | Initialize mono‑repo, lint & Husky hooks                 |  S  |      |  ✅  |
 |  S0‑02 | Configure Expo + EAS build pipeline                      |  M  |      |  ✅  |
-|  S0‑03 | Provision AWS Amplify env (AppSync, Cognito, Dynamo, S3) |  M  |      |  🔄  |
-|  S0‑04 | Obtain/secure Snap Kit, Google, TikTok dev creds         |  S  |      |  🔄  |
-|  S0‑05 | Add Sentry + Amplitude base SDKs                         |  S  |      |  [ ] |
+|  S0‑03 | Provision AWS Amplify env (AppSync, Cognito, Dynamo, S3) |  M  |      |  ✅  |
+|  S0‑04 | Obtain/secure Snap Kit, Google, TikTok (incomplete) dev creds         |  S  |      |  ✅  |
+|  S0‑05 | Add Sentry + Amplitude base SDKs                         |  S  |      |  ⏩  |
 
 ---
 
@@ -83,11 +83,11 @@
 | ------ | --------------------------------------------------------- | --- | ----- | ------ |
 |  S1‑01 | Snapchat Login (JWT → Cognito)                            |  M  |      |  🔄  |
 |  S1‑02 | Google Sign‑in flow                                       |  M  |      |  ✅  |
-|  S1‑03 | Age‑gate + invite‑code gate                               |  S  |       |  \[ ]  |
-|  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |       |  \[ ]  |
-|  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |       |  \[ ]  |
-|  S1‑06 | Situationship add/edit/delete UI                          |  M  |       |  \[ ]  |
-|  S1‑07 | Local/optimistic cache sync tests                         |  S  |       |  \[ ]  |
+|  S1‑03 | Age‑gate + invite‑code gate                               |  S  |      |  [ ]  |
+|  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |      |  [ ]  |
+|  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |      |  ✅  |
+|  S1‑06 | Situationship add/edit/delete UI                          |  M  |      |  [ ]  |
+|  S1‑07 | Local/optimistic cache sync tests                         |  S  |      |  [ ]  |
 
 ---
 
