@@ -26,10 +26,30 @@
     "userpoolClientGenerateSecret": false,
     "userpoolClientRefreshTokenValidity": "30",
     "userpoolClientWriteAttributes": [
-      "email"
+      "email",
+      "custom:username",
+      "custom:avatarUrl",
+      "custom:bio",
+      "custom:displayName",
+      "custom:location",
+      "custom:website",
+      "custom:socialLinks",
+      "custom:isPrivate",
+      "custom:mutualsOnly",
+      "custom:plan"
     ],
     "userpoolClientReadAttributes": [
-      "email"
+      "email",
+      "custom:username",
+      "custom:avatarUrl",
+      "custom:bio",
+      "custom:displayName",
+      "custom:location",
+      "custom:website",
+      "custom:socialLinks",
+      "custom:isPrivate",
+      "custom:mutualsOnly",
+      "custom:plan"
     ],
     "userpoolClientLambdaRole": "HITNOabbab9c88_userpoolclient_lambda_role",
     "userpoolClientSetAttributes": false,

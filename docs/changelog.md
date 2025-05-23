@@ -1,5 +1,14 @@
 # Changelog
 
+## [Week 1, Day 1] (Age & Invite Gates)
+
+- **Implemented Age and Invite Gates**:
+  - Configured age verification gate (13+ years)
+  - Set up invite code validation system
+  - Updated Sprint_TODO.md to reflect implementation status
+  - Both gates are configured but pending end-to-end testing
+  - Task S1-03 status updated to "In Progress" (🔄)
+
 ## [Week 0, Day 5] (Documentation Update)
 
 - **Corrected Sprint TODO documentation** - discovered Google OAuth was actually complete:
@@ -66,3 +75,43 @@
   - Configure custom domain for API Gateway
   - Update Snap Developer Portal with callback URL
   - Test authentication flow end-to-end 
+
+## [Week 1, Day 2] (User Profile Implementation)
+
+- **Implemented User Profile CRUD:**
+  - Created `UserProfileContext` for centralized profile management
+  - Built comprehensive profile screen with editing capabilities
+  - Added profile deletion with confirmation dialog
+  - Implemented dark mode support
+  - Added loading states and error handling
+  - Integrated with AppSync/GraphQL for data operations
+  - Added avatar upload placeholder (pending S3 integration)
+  - Updated Sprint_TODO.md to mark S1-04 as complete (✅)
+  - Added detailed progress notes in progress_summary.md
+
+- **Technical Details:**
+  - Implemented GraphQL mutations for profile updates
+  - Added optimistic updates for better UX
+  - Integrated with existing navigation system
+  - Added proper error boundaries and loading states
+  - Implemented proper TypeScript types for all components
+  - Added proper validation for profile updates 
+
+## [Week 1, Day 3] (Profile Implementation)
+
+- **Enhanced User Profile Implementation:**
+  - Added comprehensive profile fields (bio, displayName, location, website, social links)
+  - Implemented S3 avatar upload with proper error handling
+  - Added form validation for all fields:
+    - Username: 3-30 chars, alphanumeric with underscores/hyphens
+    - Website: Valid URL format
+    - Social links: Platform-specific username validation
+  - Added privacy controls (isPrivate, mutualsOnly)
+  - Implemented dark mode support
+  - Added loading states and error handling
+  - Integrated with GraphQL schema and types
+  - Added proper TypeScript types for all components
+  - Implemented optimistic updates for better UX
+  - Added proper error boundaries and loading states
+  - Updated Sprint_TODO.md to mark S1-04 as complete (✅)
+  - Added detailed progress notes in progress_summary.md 

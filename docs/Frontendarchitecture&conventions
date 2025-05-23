@@ -27,7 +27,7 @@ src/
 ├── screens/                            # Screen-level components (pages)
 │   ├── OnboardingScreen.tsx            # First-run UX
 │   ├── ProfileScreen.tsx               # Profile & privacy
-│   ├── SituationshipListScreen.tsx     # Owner’s ranking list
+│   ├── SituationshipListScreen.tsx     # Owner's ranking list
 │   ├── SharedListScreen.tsx            # Guest voting view
 │   ├── SituationshipDetailScreen.tsx   # AI chat per person
 │   ├── ChatScreen.tsx                  # Full chat interface
@@ -64,8 +64,10 @@ src/
 - **Apollo Client** (or AWS Amplify): GraphQL data layer
 - **@expo/vector-icons**: iconography (Ionicons, MaterialIcons)
 - **axios** / built-in fetch: HTTP for OCR
+- **aws-amplify/storage**: S3 uploads and management
+- **expo-file-system**: local file handling for uploads
 
-> Install via `yarn add react-native-draggable-flatlist expo-image-picker expo-camera expo-image-manipulator @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs apollo-client @apollo/react-hooks @expo/vector-icons axios`
+> Install via `yarn add react-native-draggable-flatlist expo-image-picker expo-camera expo-image-manipulator @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs apollo-client @apollo/react-hooks @expo/vector-icons axios aws-amplify expo-file-system`
 
 ---
 
@@ -84,14 +86,32 @@ src/
 2. **Navigators** define routes; screens import & use components and hooks.  
 3. **Hooks** handle business logic, state, and GraphQL operations, exposing data & actions to components.  
 4. **Components** receive props, call hook actions (e.g. `reorder`, `submitVote`, `addAttachment`, `submitOCR`), and render UI.  
-5. **GraphQL layer**: `api.ts` centralizes queries, mutations, and subscriptions—hooks import from here.  
+5. **GraphQL layer**: `api.ts` centralizes queries, mutations, and subscriptions—hooks import from here.
+6. **Form Handling**:
+   - Use controlled components with local state
+   - Implement real-time validation
+   - Handle loading and error states
+   - Use optimistic updates for better UX
+   - Implement proper TypeScript types for form data
+7. **File Uploads**:
+   - Use `expo-image-picker` for selection
+   - Compress images client-side with `expo-image-manipulator`
+   - Upload to S3 via `aws-amplify/storage`
+   - Handle upload states and errors
+   - Implement proper cleanup
 
 ---
 
 ## 5. Styling & Theming
 - **Design Tokens**: use `styles/colors.ts`, `typography.ts`, and `spacing.ts`.  
 - **Themed Styles**: components can use `useColorScheme()` to toggle dark/light.  
-- **Reusable Styles**: avoid inline styles; prefer StyleSheet objects.  
+- **Reusable Styles**: avoid inline styles; prefer StyleSheet objects.
+- **Form Styles**:
+  - Use consistent input styling
+  - Implement error states
+  - Support dark/light mode
+  - Use proper spacing and typography
+  - Implement loading states
 
 ---
 
@@ -100,7 +120,25 @@ src/
 - **Error Boundaries**: wrap screens in an `ErrorBoundary` to catch crashes.  
 - **Loading States**: provide skeletons or spinners when fetching critical data.  
 - **Modular Code**: split logic into hooks; UI into small components.  
-- **Documentation**: update this doc alongside code changes.  
+- **Documentation**: update this doc alongside code changes.
+- **Form Validation**:
+  - Implement real-time validation
+  - Show clear error messages
+  - Use TypeScript for type safety
+  - Handle all edge cases
+  - Implement proper error recovery
+- **File Uploads**:
+  - Validate file types and sizes
+  - Compress images before upload
+  - Show upload progress
+  - Handle errors gracefully
+  - Clean up temporary files
+- **Type Safety**:
+  - Use proper TypeScript types
+  - Define interfaces for all props
+  - Use strict null checks
+  - Implement proper error types
+  - Document complex types
 
 ---
 

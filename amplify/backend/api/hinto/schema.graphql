@@ -9,11 +9,23 @@ type User @model @auth(rules: [
   username: String!
   email: String!
   avatarUrl: String
+  bio: String
+  displayName: String
+  location: String
+  website: String
+  socialLinks: SocialLinks
   isPrivate: Boolean! @default(value: "true")
   mutualsOnly: Boolean! @default(value: "true")
   plan: SubscriptionPlan @default(value: "FREE")
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+}
+
+type SocialLinks {
+  instagram: String
+  twitter: String
+  snapchat: String
+  tiktok: String
 }
 
 enum SubscriptionPlan { 
