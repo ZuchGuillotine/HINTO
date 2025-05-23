@@ -1,0 +1,24 @@
+npm error code ERESOLVE
+npm error ERESOLVE unable to resolve dependency tree
+npm error
+npm error While resolving: temp-project@1.0.0
+npm error Found: expo@52.0.46
+npm error node_modules/expo
+npm error   expo@"~52.0.46" from the root project
+npm error   peer expo@"*" from @expo/dom-webview@0.1.4
+npm error   node_modules/@expo/dom-webview
+npm error     peerOptional @expo/dom-webview@"*" from expo@52.0.46
+npm error
+npm error Could not resolve dependency:
+npm error peer expo@"^49.0.7 || ^50.0.0-0" from @expo/webpack-config@19.0.1
+npm error node_modules/@expo/webpack-config
+npm error   @expo/webpack-config@"^19.0.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /Users/benjamincox/.npm/_logs/2025-05-22T20_14_02_031Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /Users/benjamincox/.npm/_logs/2025-05-22T20_14_02_031Z-debug-0.log

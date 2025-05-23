@@ -51,6 +51,13 @@
   - Integrated with Amplify Auth using Meta platform (Facebook provider with Instagram scopes)
   - Ready for testing with configured callback URLs
   - Note: Using Instagram login instead of Facebook for better user experience
+- Google OAuth implementation:
+  - ✅ COMPLETE: Configured Google provider in Cognito with client ID (798510659255-2p2fnrcnii2kta3gootr007q9s2k7jbn.apps.googleusercontent.com)
+  - ✅ COMPLETE: Set up proper scopes (openid email profile) and attribute mapping
+  - ✅ COMPLETE: Configured callback URLs (hnnt://, https://www.hnnt.app/auth/callback/)
+  - ✅ COMPLETE: Implemented client-side auth logic with signInWithRedirect
+  - ✅ COMPLETE: Added Google login button to onboarding screen
+  - Ready for end-to-end testing
 - Amplify Backend Updates:
   - Deployed updated GraphQL schema with User, Situationship, Vote, Report, and InviteToken models
   - Updated Lambda functions for auth flow (PostConfirmation, PreSignup, PreTokenGeneration)
@@ -63,7 +70,6 @@
   - Update Snap Developer Portal with callback URL
   - Test authentication flows end-to-end
 - Remaining tasks:
-  - Complete Google OAuth configuration
   - Set up TikTok OAuth (pending credentials)
   - Configure AppSync and DynamoDB
   - Implement remaining Lambda functions
@@ -76,7 +82,7 @@
 | ID     | Task                                                      | Pts | Owner | Status |
 | ------ | --------------------------------------------------------- | --- | ----- | ------ |
 |  S1‑01 | Snapchat Login (JWT → Cognito)                            |  M  |      |  🔄  |
-|  S1‑02 | Google Sign‑in flow                                       |  M  |      |  [ ]  |
+|  S1‑02 | Google Sign‑in flow                                       |  M  |      |  ✅  |
 |  S1‑03 | Age‑gate + invite‑code gate                               |  S  |       |  \[ ]  |
 |  S1‑04 | User profile CRUD (username, avatar, privacy toggles)     |  M  |       |  \[ ]  |
 |  S1‑05 | GraphQL schema v1 (User, Situationship) + Amplify codegen |  M  |       |  \[ ]  |

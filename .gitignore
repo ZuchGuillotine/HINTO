@@ -10,12 +10,17 @@ yarn-error.log
 # React Native
 .expo/
 dist/
+web-build/
+expo-env.d.ts
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 *.orig.*
+
+# Metro
+.metro-health-check*
 
 # IDE
 .idea/
@@ -29,6 +34,12 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Typescript
+*.tsbuildinfo
+
+# Certificates
+*.pem
 
 #amplify-do-not-edit-begin
 amplify/\#current-cloud-backend

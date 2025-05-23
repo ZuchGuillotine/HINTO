@@ -8,10 +8,10 @@
   "javascript": {
     "framework": "react-native",
     "config": {
-      "SourceDir": "/Users/benjamincox/Downloads/HINTO/",
-      "DistributionDir": "web-build",
+      "SourceDir": "/Users/benjamincox/Downloads/HINTO",
+      "DistributionDir": "src/amplifyconfiguration.json",
       "BuildCommand": "npm run build",
-      "StartCommand": "npm run build start"
+      "StartCommand": "npm start"
     }
   }
 }

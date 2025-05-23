@@ -1,3 +1,15 @@
+/**
+    * @description      : 
+    * @author           : 
+    * @group            : 
+    * @created          : 22/05/2025 - 14:32:57
+    * 
+    * MODIFICATION LOG
+    * - Version         : 1.0.0
+    * - Date            : 22/05/2025
+    * - Author          : 
+    * - Modification    : 
+**/
 module.exports = {
   root: true,
   extends: [
