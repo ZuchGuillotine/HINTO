@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { generateClient } from 'aws-amplify/api';
-import { getCurrentUser, signOut as amplifySignOut } from 'aws-amplify/auth';
-import { User } from '../API';
+import { generateClient } from '@aws-amplify/api';
+import { getCurrentUser, signOut as amplifySignOut } from '@aws-amplify/auth';
+import { User } from '../types/API';
 
 const client = generateClient();
 

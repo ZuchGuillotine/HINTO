@@ -9,6 +9,7 @@ interface AuthButtonProps {
   onPress: () => void;
   label?: string;
   style?: ViewStyle;
+  isLoading?: boolean;
   disabled?: boolean;
 }
 
@@ -62,9 +63,11 @@ const AuthButton: React.FC<AuthButtonProps> = ({
   onPress,
   label,
   style,
+  isLoading = false,
   disabled = false,
 }) => {
   const config = getProviderConfig(provider);
+  const isDisabled = disabled || isLoading;
 
   return (
     <TouchableOpacity
@@ -73,12 +76,12 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         {
           backgroundColor: config.backgroundColor,
           borderColor: config.borderColor,
-          opacity: disabled ? 0.5 : 1,
+          opacity: isDisabled ? 0.5 : 1,
         },
         style,
       ]}
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
       activeOpacity={0.7}
     >
       <Ionicons
@@ -95,7 +98,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
           },
         ]}
       >
-        {label || config.defaultLabel}
+        {isLoading ? 'Loading...' : label || config.defaultLabel}
       </Text>
     </TouchableOpacity>
   );

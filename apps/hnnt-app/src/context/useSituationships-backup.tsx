@@ -1,6 +1,18 @@
+/**
+    * @description      : 
+    * @author           : 
+    * @group            : 
+    * @created          : 25/05/2025 - 11:51:26
+    * 
+    * MODIFICATION LOG
+    * - Version         : 1.0.0
+    * - Date            : 25/05/2025
+    * - Author          : 
+    * - Modification    : 
+**/
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { generateClient } from 'aws-amplify/api';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { generateClient } from '@aws-amplify/api';
+import { getCurrentUser } from '@aws-amplify/auth';
 import { Situationship } from '../types/API';
 
 const client = generateClient();

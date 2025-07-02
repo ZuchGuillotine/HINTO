@@ -1,5 +1,5 @@
-import { uploadData, remove } from 'aws-amplify/storage';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { uploadData, remove } from '@aws-amplify/storage';
+import { getCurrentUser } from '@aws-amplify/auth';
 import * as FileSystem from 'expo-file-system';
 
 const AVATAR_PREFIX = 'public/avatars/';

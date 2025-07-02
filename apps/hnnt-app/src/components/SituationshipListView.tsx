@@ -1,70 +1,120 @@
-// src/components/SituationshipList.tsx
+// src/components/SituationshipListView.tsx
 
-import React from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
-import SituationshipListView from './SituationshipListView';
-import VotingControls from './VotingControls';
-import { useSituationships } from '../context/useSituationships';
+import React, { useState, useEffect } from 'react';
+import { View, LayoutChangeEvent } from 'react-native';
+import SituationshipCard, { Situationship } from './SituationshipCard';
 
-export type SituationshipListProps = {
+export interface SituationshipListViewProps {
+  item: Situationship;
+  index: number;
   mode: 'owner' | 'guest';
-  ownerId?: string;
-  shareToken?: string;
-};
+  onVote?: (voteType: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  // Drag and drop props
+  isDragging?: boolean;
+  onDragStart?: (index: number) => void;
+  onDragMove?: (gestureState: { dx: number; dy: number }) => void;
+  onDragEnd?: (fromIndex: number, toIndex: number) => void;
+  canDrag?: boolean;
+  dragOffset?: { x: number; y: number };
+  onLayout?: (event: LayoutChangeEvent) => void;
+  // Animation props
+  isLoading?: boolean;
+  isSelected?: boolean;
+  selectedItems?: string[];
+  isNew?: boolean;
+}
 
-const SituationshipList: React.FC<SituationshipListProps> = ({ mode, ownerId, shareToken }) => {
-  const { items, loading, error, reorder, submitVote, canEdit, canVote } =
-    useSituationships(ownerId, shareToken);
+const SituationshipListView: React.FC<SituationshipListViewProps> = ({
+  item,
+  index,
+  mode,
+  onVote: _onVote,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
+  isDragging,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  canDrag,
+  dragOffset,
+  onLayout,
+  isLoading = false,
+  isSelected = false,
+  selectedItems = [],
+  isNew = false,
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [wasJustCreated, setWasJustCreated] = useState(isNew);
 
-  if (loading) {
-    return <View style={styles.loading} />; // TODO: replace with skeleton
-  }
-  if (error) {
-    return <View style={styles.error} />; // TODO: replace with error UI
-  }
+  // Detect if this is a newly created item based on createdAt timestamp
+  useEffect(() => {
+    if (item.createdAt) {
+      const createdTime = new Date(item.createdAt).getTime();
+      const now = Date.now();
+      const fiveSecondsAgo = now - 5000; // 5 seconds
+      
+      if (createdTime > fiveSecondsAgo) {
+        setWasJustCreated(true);
+        // Reset the "new" state after animation completes
+        const timer = setTimeout(() => {
+          setWasJustCreated(false);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [item.createdAt]);
 
-  const renderDraggableItem = ({ item, index, drag, isActive }: RenderItemParams<any>) => (
-    <SituationshipListView
-      item={item}
-      index={index}
-      mode={mode}
-      drag={mode === 'owner' && canEdit ? drag : undefined}
-      isActive={isActive}
-    />
-  );
+  // Determine if card is selected (from selectedItems array or isSelected prop)
+  const cardIsSelected = isSelected || selectedItems.includes(item.id);
 
-  const renderStaticItem = ({ item, index }: { item: any; index: number }) => (
-    <SituationshipListView item={item} index={index} mode={mode} />
-  );
+  const handlePress = () => {
+    // Handle card press - could navigate to detail view
+    // TODO: Add navigation or callback handling here
+  };
+
+  const handleFocusIn = () => {
+    setIsFocused(true);
+  };
+
+  const handleFocusOut = () => {
+    setIsFocused(false);
+  };
 
   return (
-    <View style={styles.container}>
-      {mode === 'owner' && canEdit ? (
-        <DraggableFlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderDraggableItem}
-          onDragEnd={({ data }) => reorder(data.map((i) => i.id))}
-        />
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderStaticItem}
-        />
-      )}
-      {mode === 'guest' && canVote && (
-        <VotingControls items={items} onSubmit={submitVote} />
-      )}
+    <View
+      onPointerEnter={handleFocusIn}
+      onPointerLeave={handleFocusOut}
+    >
+      <SituationshipCard
+        item={item}
+        index={index}
+        mode={mode}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+        canMoveUp={canMoveUp}
+        canMoveDown={canMoveDown}
+        onPress={handlePress}
+        isDragging={isDragging}
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
+        canDrag={canDrag}
+        dragOffset={dragOffset}
+        onLayout={onLayout}
+        // Animation props
+        isLoading={isLoading}
+        isSelected={cardIsSelected}
+        isFocused={isFocused}
+        isNew={wasJustCreated || isNew}
+      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loading: { flex: 1, backgroundColor: '#f0f0f0' },
-  error: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-});
-
-export default SituationshipList;
+export default SituationshipListView;

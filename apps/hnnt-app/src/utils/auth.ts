@@ -1,5 +1,18 @@
-import { signInWithRedirect, signOut as amplifySignOut, getCurrentUser } from 'aws-amplify/auth';
-import { AuthProvider } from '../components/AuthButton';
+import { signInWithRedirect, signOut as amplifySignOut, getCurrentUser } from '@aws-amplify/auth';
+import { Alert } from 'react-native';
+
+export type AuthProvider = 'google' | 'instagram' | 'snapchat' | 'tiktok' | 'email';
+
+/**
+ * Get the appropriate redirect URI based on environment
+ * @returns The redirect URI for the current environment
+ */
+export const getRedirectUri = (): string => {
+  if (__DEV__) {
+    return 'exp://localhost:19000/';
+  }
+  return 'hnnt://';
+};
 
 /**
  * Handle social login with the specified provider
@@ -8,6 +21,9 @@ import { AuthProvider } from '../components/AuthButton';
  */
 export const handleSocialLogin = async (provider: AuthProvider): Promise<void> => {
   try {
+    const redirectUri = getRedirectUri();
+    console.log(`Attempting ${provider} login with redirect URI: ${redirectUri}`);
+    
     switch (provider) {
       case 'google':
         await signInWithRedirect({ provider: 'Google' });
@@ -17,8 +33,7 @@ export const handleSocialLogin = async (provider: AuthProvider): Promise<void> =
         // We'll use the Facebook provider but with Instagram scopes
         await signInWithRedirect({ 
           provider: 'Facebook',
-          customState: 'instagram', // This helps us identify it's an Instagram login
-          scopes: ['instagram_basic', 'instagram_content_publish'] // Instagram-specific scopes
+          customState: 'instagram' // This helps us identify it's an Instagram login
         });
         break;
       case 'snapchat':
@@ -30,14 +45,36 @@ export const handleSocialLogin = async (provider: AuthProvider): Promise<void> =
         // This will be implemented when we set up the API Gateway endpoints
         throw new Error('TikTok login not yet implemented');
       case 'email':
-        // For email, we'll show the email sign-in screen
-        await signInWithRedirect();
+        // For email, we'll show the email sign-in screen  
+        throw new Error('Email login not yet implemented - please use OAuth providers');
         break;
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
   } catch (error) {
-    console.error('Social login error:', error);
+    console.error(`${provider} OAuth error:`, error);
+    
+    // Enhanced error handling for common OAuth issues
+    if (error.message?.includes('redirect_uri_mismatch')) {
+      Alert.alert(
+        'OAuth Configuration Error',
+        'There was an issue with the OAuth configuration. Please contact support.',
+        [{ text: 'OK' }]
+      );
+    } else if (error.message?.includes('not yet implemented')) {
+      Alert.alert(
+        'Feature Coming Soon',
+        `${provider} login is not yet available. Please try Google or Instagram.`,
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert(
+        'Login Error',
+        `Failed to sign in with ${provider}. Please try again.`,
+        [{ text: 'OK' }]
+      );
+    }
+    
     throw error;
   }
 };

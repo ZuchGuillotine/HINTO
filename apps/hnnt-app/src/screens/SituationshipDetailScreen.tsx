@@ -15,9 +15,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { generateClient } from 'aws-amplify/api';
-import { getCurrentUser } from 'aws-amplify/auth';
-import { uploadData } from 'aws-amplify/storage';
+import { generateClient } from '@aws-amplify/api';
+import { getCurrentUser } from '@aws-amplify/auth';
+import { uploadData } from '@aws-amplify/storage';
 import { MainStackParamList } from '../navigation/types';
 import { Situationship, CreateSituationshipInput, UpdateSituationshipInput } from '../types/API';
 

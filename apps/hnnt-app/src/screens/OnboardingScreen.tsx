@@ -10,7 +10,6 @@
     * - Author          : 
     * - Modification    : 
 **/
-# Onboarding Screen Design
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, useColorScheme, Alert } from 'react-native';
@@ -67,8 +66,7 @@ export default function OnboardingScreen() {
     try {
       setIsLoading(true);
       await handleSocialLogin(provider);
-      // If login is successful, navigate to the main app
-      navigation.replace('SituationshipList');
+      // Auth state change will handle navigation to main app automatically
     } catch (error) {
       console.error('Auth error:', error);
       Alert.alert(
@@ -198,7 +196,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-```
-
-*Next: implement `AuthButton` props for `provider` and wire up actual auth logic.*
-
