@@ -1,6 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../styles/colors';
+import { spacing, radius } from '../styles/spacing';
+import { textStyles } from '../styles/typography';
 
 export type AuthProvider = 'google' | 'snapchat' | 'tiktok' | 'email' | 'instagram';
 
@@ -18,41 +21,41 @@ const getProviderConfig = (provider: AuthProvider) => {
     case 'google':
       return {
         icon: 'logo-google' as const,
-        color: '#4285F4',
-        backgroundColor: '#fff',
-        borderColor: '#4285F4',
+        color: colors.social.google,
+        backgroundColor: colors.background.primary,
+        borderColor: colors.social.google,
         defaultLabel: 'Continue with Google',
       };
     case 'instagram':
       return {
         icon: 'logo-instagram' as const,
-        color: '#E1306C',
-        backgroundColor: '#fff',
-        borderColor: '#E1306C',
+        color: colors.social.instagram,
+        backgroundColor: colors.background.primary,
+        borderColor: colors.social.instagram,
         defaultLabel: 'Continue with Instagram',
       };
     case 'snapchat':
       return {
         icon: 'logo-snapchat' as const,
-        color: '#FFFC00',
-        backgroundColor: '#FFFC00',
-        borderColor: '#FFFC00',
+        color: colors.neutral[900],
+        backgroundColor: colors.social.snapchat,
+        borderColor: colors.social.snapchat,
         defaultLabel: 'Continue with Snapchat',
       };
     case 'tiktok':
       return {
         icon: 'logo-tiktok' as const,
-        color: '#000000',
-        backgroundColor: '#fff',
-        borderColor: '#000000',
+        color: colors.social.tiktok,
+        backgroundColor: colors.background.primary,
+        borderColor: colors.social.tiktok,
         defaultLabel: 'Continue with TikTok',
       };
     case 'email':
       return {
         icon: 'mail' as const,
-        color: '#007AFF',
-        backgroundColor: '#fff',
-        borderColor: '#007AFF',
+        color: colors.social.email,
+        backgroundColor: colors.background.primary,
+        borderColor: colors.social.email,
         defaultLabel: 'Continue with Email',
       };
   }
@@ -109,19 +112,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: spacing[3], // 12px
+    paddingHorizontal: spacing[4], // 16px
+    borderRadius: radius.button, // 8px
     borderWidth: 1,
-    marginVertical: 8,
+    marginVertical: spacing[2], // 8px
     width: '100%',
   },
   icon: {
-    marginRight: 12,
+    marginRight: spacing[3], // 12px
   },
   text: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...textStyles.button,
   },
 });
 
