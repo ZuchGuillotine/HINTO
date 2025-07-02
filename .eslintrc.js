@@ -31,7 +31,6 @@ module.exports = {
   env: {
     es6: true,
     node: true,
-    'react-native/react-native': true,
   },
   settings: {
     react: {

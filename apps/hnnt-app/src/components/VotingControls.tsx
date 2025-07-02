@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { animated, useSpring, config } from '@react-spring/native';
-import HapticFeedback from 'react-native-haptic-feedback';
+import * as Haptics from 'expo-haptics';
 import { Situationship } from './SituationshipCard';
 import { useVoting } from '../context/useVoting';
 const AnimatedText = animated(Text);
@@ -67,20 +67,15 @@ const VotingControls: React.FC<VotingControlsProps> = ({
   // Haptic feedback helper
   const triggerHaptic = useCallback((type: 'light' | 'medium' | 'heavy' = 'light') => {
     try {
-      const hapticOptions = {
-        enableVibrateFallback: true,
-        ignoreAndroidSystemSettings: false,
-      };
-      
       switch (type) {
         case 'light':
-          HapticFeedback.trigger('impactLight', hapticOptions);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           break;
         case 'medium':
-          HapticFeedback.trigger('impactMedium', hapticOptions);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           break;
         case 'heavy':
-          HapticFeedback.trigger('impactHeavy', hapticOptions);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           break;
       }
     } catch {

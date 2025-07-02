@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "temp-project",
-    "slug": "temp-project",
+    "name": "hinto",
+    "slug": "hinto",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,13 +19,20 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5dca9fad-6cb0-46ea-b5f3-94796c0b65e8"
+      }
+    },
+    "owner": "bobvila"
   }
 }

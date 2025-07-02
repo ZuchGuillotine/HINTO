@@ -1,0 +1,8 @@
+Starting project at /Users/benjamincox/Downloads/HINTO
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+The following packages should be updated for best compatibility with the installed expo version:
+  typescript@5.7.3 - expected version: ~5.8.3
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.

@@ -10,7 +10,7 @@ import {
   UIManager,
   Dimensions,
 } from 'react-native';
-import HapticFeedback from 'react-native-haptic-feedback';
+import * as Haptics from 'expo-haptics';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -50,7 +50,7 @@ export function DraggableList<T>({
       onMoveShouldSetPanResponder: () => draggingIdx !== null,
       onPanResponderGrant: () => {
         if (Platform.OS === 'ios') {
-          HapticFeedback.trigger('impactLight');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       },
       onPanResponderMove: (_, gestureState) => {
@@ -110,7 +110,7 @@ export function DraggableList<T>({
     
     setDraggingIdx(index);
     if (Platform.OS === 'android') {
-      HapticFeedback.trigger('impactLight');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
