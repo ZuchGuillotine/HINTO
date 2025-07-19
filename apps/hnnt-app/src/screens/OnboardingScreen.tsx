@@ -88,10 +88,23 @@ export default function OnboardingScreen() {
   const handleAuth = async (provider: AuthProvider) => {
     try {
       setIsLoading(true);
+      
+      if (provider === 'email') {
+        // Navigate to email login screen
+        navigation.navigate('EmailLogin');
+        return;
+      }
+      
       await handleSocialLogin(provider);
       // Auth state change will handle navigation to main app automatically
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth error:', error);
+      
+      if (error.message === 'EMAIL_NAVIGATION_REQUIRED') {
+        navigation.navigate('EmailLogin');
+        return;
+      }
+      
       Alert.alert(
         'Login Failed',
         'Unable to sign in. Please try again.',

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { generateClient } from '@aws-amplify/api';
 import { getCurrentUser } from '@aws-amplify/auth';
 import { Situationship } from '../types/API';
+import { useAuth } from '../hooks/useAuth';
 
 const client = generateClient();
 
@@ -69,11 +70,60 @@ export const SituationshipsProvider = ({ children }: SituationshipsProviderProps
   const [error, setError] = useState<Error | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [canVote, setCanVote] = useState(false);
+  const { user } = useAuth();
 
   const fetchSituationships = async (ownerId?: string, shareToken?: string) => {
     try {
       setLoading(true);
       setError(null);
+
+      // Handle dev mode user
+      if (user?.isDevMode) {
+        console.log('Dev mode: Creating mock situationships data');
+        const mockSituationships: Situationship[] = [
+          {
+            id: 'mock-1',
+            owner: user.userId,
+            name: 'Alex (Sample)',
+            emoji: '😊',
+            category: 'crush',
+            avatarUrl: null,
+            rankIndex: 0,
+            sharedWith: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: 'mock-2',
+            owner: user.userId,
+            name: 'Jordan (Sample)',
+            emoji: '🔥',
+            category: 'dating',
+            avatarUrl: null,
+            rankIndex: 1,
+            sharedWith: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: 'mock-3',
+            owner: user.userId,
+            name: 'Casey (Sample)',
+            emoji: '💫',
+            category: 'situationship',
+            avatarUrl: null,
+            rankIndex: 2,
+            sharedWith: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+        ];
+        
+        setItems(mockSituationships);
+        setCanEdit(true);
+        setCanVote(false);
+        return;
+      }
 
       const currentUser = await getCurrentUser();
       const isOwner = !ownerId || ownerId === currentUser.userId;
@@ -96,6 +146,21 @@ export const SituationshipsProvider = ({ children }: SituationshipsProviderProps
   const reorder = async (situationshipIds: string[]) => {
     try {
       setError(null);
+      
+      // Handle dev mode user
+      if (user?.isDevMode) {
+        console.log('Dev mode: Mock reordering situationships');
+        const updatedItems = [...items];
+        situationshipIds.forEach((id, index) => {
+          const itemIndex = updatedItems.findIndex(item => item.id === id);
+          if (itemIndex !== -1) {
+            updatedItems[itemIndex] = { ...updatedItems[itemIndex], rankIndex: index };
+          }
+        });
+        setItems(updatedItems.sort((a, b) => (a.rankIndex || 0) - (b.rankIndex || 0)));
+        return;
+      }
+      
       const result = await client.graphql({
         query: REORDER_SITUATIONSHIPS_MUTATION,
         variables: {
@@ -124,6 +189,13 @@ export const SituationshipsProvider = ({ children }: SituationshipsProviderProps
   const submitVote = async (situationshipId: string, voteType: 'best' | 'worst') => {
     try {
       setError(null);
+      
+      // Handle dev mode user
+      if (user?.isDevMode) {
+        console.log(`Dev mode: Mock voting ${voteType} for situationship ${situationshipId}`);
+        return;
+      }
+      
       const currentUser = await getCurrentUser();
       
       await client.graphql({
@@ -144,8 +216,10 @@ export const SituationshipsProvider = ({ children }: SituationshipsProviderProps
   };
 
   useEffect(() => {
-    fetchSituationships();
-  }, []);
+    if (user) {
+      fetchSituationships();
+    }
+  }, [user]);
 
   const value: SituationshipsContextType = {
     items,
