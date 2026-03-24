@@ -15,11 +15,8 @@ It is based on a review of:
 
 - `/Users/benjamincox/Downloads/HINTO`
 - `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app`
-
-Not yet reviewed in this workspace:
-
-- `rork-hnnt---hinto-relationship-appV2`
-- `HINTORORK`
+- `/tmp/rork-hnnt---hinto-relationship-appV2`
+- `/tmp/HINTORORK`
 
 ## 2. Main Findings
 
@@ -101,6 +98,29 @@ From `rork-hnnt--hinto--relationship-ranking-app`:
 - tRPC/Hono pieces if we move to Swift + web clients with a shared HTTP API
 - Seattle-only launch assumptions
 - TikTok/Snap-first auth priority for MVP
+
+### 3.4 Findings From The Remaining Repos
+
+`rork-hnnt---hinto-relationship-appV2`:
+
+- an early RORK-generated Expo prototype
+- only one visible commit in the shallow audit
+- uses RORK startup commands and RORK API assumptions
+- contains basic auth, age-gate, home, and AI coach flows
+- uses thin Supabase REST helpers rather than a mature data layer
+
+Recommendation:
+
+- do not use it as a base repo
+- only mine small UI ideas, tags, or copy if they are uniquely useful
+
+`HINTORORK`:
+
+- empty repository
+
+Recommendation:
+
+- nothing to preserve
 
 ## 4. Recommended Canonical Direction
 
@@ -202,15 +222,14 @@ That is materially simpler than restoring Cognito or reviving every social provi
 
 ### Phase 0. Full Inventory
 
-1. Get access to the two missing repos and review them.
-2. Inventory which repo contains the newest useful work by area:
+1. Inventory which repo contains the newest useful work by area:
    - docs
    - schema
    - AI
    - voting
    - auth
    - assets
-3. Tag each artifact as:
+2. Tag each artifact as:
    - keep
    - port
    - archive
@@ -272,12 +291,12 @@ Optional later entities:
 
 ### Next step A: finish the repo audit
 
-Before stripping code, review:
+Audit result:
 
-- `rork-hnnt---hinto-relationship-appV2`
-- `HINTORORK`
+- `rork-hnnt---hinto-relationship-appV2` is a low-value RORK/Expo prototype
+- `HINTORORK` is empty
 
-This prevents deleting the only copy of something still useful.
+This means the only meaningful donor repo besides `HINTO` is `rork-hnnt--hinto--relationship-ranking-app`.
 
 ### Next step B: choose the migration baseline
 
