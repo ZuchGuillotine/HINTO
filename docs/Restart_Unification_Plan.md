@@ -97,7 +97,7 @@ From `rork-hnnt--hinto--relationship-ranking-app`:
 - RORK-specific package naming and project artifacts
 - tRPC/Hono pieces if we move to Swift + web clients with a shared HTTP API
 - Seattle-only launch assumptions
-- TikTok/Snap-first auth priority for MVP
+- assumptions that auth must stay client-only or Cognito-shaped
 
 ### 3.4 Findings From The Remaining Repos
 
@@ -201,8 +201,6 @@ Reason:
 ### 5.2 Defer from MVP
 
 - Android
-- complex social OAuth matrix
-- Snapchat/TikTok integrations
 - subscriptions and monetization
 - full real-time everywhere
 - large contact-import system if it slows delivery
@@ -212,11 +210,23 @@ Reason:
 
 Start with:
 
-- Apple Sign In on iOS
-- Google sign-in
-- email magic link or passwordless web login
+- Supabase Auth as the canonical user/session system
+- Sign in with Apple
+- Meta/Facebook login to cover the Instagram-discovery use case
+- email magic link or other passwordless fallback
 
-That is materially simpler than restoring Cognito or reviving every social provider from the old docs.
+Then layer in:
+
+- Snapchat login
+- TikTok login
+
+Clarification:
+
+- We do not need Instagram data access as part of MVP.
+- We need a low-friction path for users who discover HINTO via Instagram.
+- Meta/Facebook-backed login is acceptable for that requirement.
+- Supabase can manage auth directly where it has provider support.
+- For providers without built-in support, HINTO should own the provider integration and map the result into the canonical app identity model.
 
 ## 6. Repo Unification Plan
 
