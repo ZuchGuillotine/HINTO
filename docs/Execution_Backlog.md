@@ -32,6 +32,100 @@ The active target is:
 - Keep legacy assets until replacements exist, then archive or delete intentionally.
 - Any new backend surface should be usable by both Swift and web without client-specific branching.
 
+## Harness-Oriented Orchestration Notes
+
+This backlog doubles as the task source for orchestrated agent execution.
+
+Use the following operating rules when assigning work through the harness:
+
+- Keep assignments narrow. One agent should own one bounded deliverable or one tightly-related audit.
+- Pair implementation work with evaluation work when the task can drift architecturally or expand scope.
+- Require every agent to report:
+  - files inspected
+  - files changed
+  - assumptions made
+  - unresolved risks
+  - recommended follow-up tasks
+- Prefer additive scaffolding, schema analysis, and contract definition over broad rewrites.
+- Escalate to a human before any destructive archival, large moves, credential-dependent work, or vendor-choice changes.
+
+## Codegraph Navigation Baseline
+
+Before changing code for any non-trivial task, run:
+
+1. `codegraph where <symbol>`
+2. `codegraph context <symbol>`
+3. `codegraph fn-impact <symbol>`
+
+Recommended high-signal entry points for this repo:
+
+- Auth coupling:
+  - `useAuth`
+  - `mapCognitoUserToAppUser`
+  - `checkCurrentUser`
+- Product state and reuse candidates:
+  - `useSituationships`
+  - `fetchSituationships`
+  - `reorder`
+  - `submitVote`
+- App entry and navigation:
+  - `AppRoot`
+  - `AuthNavigator`
+  - `AppNavigator`
+
+Known current hotspots from codegraph:
+
+- `apps/hnnt-app/src/hooks/useAuth.tsx` is high-risk and central to current auth coupling.
+- `apps/hnnt-app/src/context/useSituationships.tsx` is high-risk and central to the first product slice.
+
+## Task Packet Shape
+
+Every agent task should include:
+
+- backlog ID(s)
+- exact goal
+- allowed write scope
+- required reads
+- dependency constraints
+- acceptance criteria
+- drift guardrails
+
+Default drift guardrails:
+
+- do not deepen Amplify/Cognito/AppSync usage
+- do not invent a new target architecture beyond the restart docs
+- preserve product vocabulary and reusable flows
+- prefer scaffolding and extraction over migration-by-deletion
+
+## Initial Orchestration Queue
+
+The first agent wave should stay close to Phase A and unblock the first backend slice.
+
+| Queue | Backlog IDs | Goal | Worker Type | Evaluator Needed | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Q1 | EX-20, EX-21 | Import or reference donor schema cleanly and produce Amplify-to-Supabase entity mapping | Worker | Yes | Must treat donor repo as input, not target architecture |
+| Q2 | EX-22, EX-23 | Define canonical domain model and identify schema gaps for web + Swift | Worker | Yes | Should use EX-21 output as input |
+| Q3 | EX-30, EX-31, EX-32, EX-33, EX-34 | Scaffold `/services/api` with config, error model, logging, and health surface | Worker | Yes | Keep auth implementation out of first scaffold unless needed for structure |
+| Q4 | EX-50, EX-51 | Scaffold `/packages/contracts` and `/packages/domain` for first vertical slice | Worker | Yes | Should align with Q2 and Q3 outputs |
+| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Prioritize active paths under `apps/hnnt-app/src/` and scripts/config |
+
+## Evaluator Responsibilities
+
+Evaluator agents should not repeat the full implementation. They should check for:
+
+- restart-plan drift
+- accidental expansion of legacy AWS dependencies
+- missing acceptance criteria
+- unstable or ambiguous contracts
+- missing tests or verification steps
+- unscoped file edits
+
+Evaluator output should always classify findings as:
+
+- block
+- follow-up
+- acceptable for now
+
 ## Workstreams
 
 ### 0. Immediate Clarification And Source Capture
@@ -57,21 +151,21 @@ The active target is:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-20 | Pull the current Supabase schema/migrations into this repo or reference them cleanly | Agent | In Progress | Donor repo contains `001_initial_schema.sql` through `009_friends_contacts_system.sql` |
-| EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Todo | Users, profiles, situationships, voting sessions, votes, reports, blocks, AI entities |
-| EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Todo | Baseline entities already visible in donor schema: `profiles`, `situationships`, `voting_sessions`, `votes`, `ai_conversations`, `ai_messages`, `blocks`, `reports`, `daily_usage` |
-| EX-23 | Identify schema gaps for web + Swift support | Agent | Todo | Public voting session access, auth identifiers, moderation, audit fields, share-image/storage model |
+| EX-20 | Pull the current Supabase schema/migrations into this repo or reference them cleanly | Agent | Done | Donor repo migrations are now referenced cleanly via `docs/Schema_Entity_Mapping.md` and the donor inventory below |
+| EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Done | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md` |
+| EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Done | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
+| EX-23 | Identify schema gaps for web + Swift support | Agent | Done | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics. |
 | EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Todo | Only after EX-20 to EX-23 are complete |
 
 ### 3. Backend Foundation
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-30 | Scaffold `/services/api` | Agent | Todo | Recommended: TypeScript service with clear route/module layout |
-| EX-31 | Choose API style and codify it | Agent | Todo | REST or RPC-style JSON; OpenAPI contract required |
-| EX-32 | Add environment/config management for local and deployed backend | Agent | Todo | Supabase URL/keys, AI keys, auth settings, storage config |
-| EX-33 | Establish API error model and shared response envelope rules | Agent | Todo | Must be stable for web and Swift clients |
-| EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Todo | Needed before real client integration |
+| EX-30 | Scaffold `/services/api` | Agent | Done | TypeScript scaffold created under `services/api` with versioned routes and minimal server structure |
+| EX-31 | Choose API style and codify it | Agent | Done | REST-style JSON and scaffold decisions documented in `services/api/README.md` |
+| EX-32 | Add environment/config management for local and deployed backend | Agent | Done | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md` |
+| EX-33 | Establish API error model and shared response envelope rules | Agent | Done | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md` |
+| EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
 | EX-35 | Add auth middleware and session/user resolution | Agent | Todo | Should not depend on Cognito and should treat Supabase Auth as the canonical session layer |
 | EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
 | EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | Todo | Apple and Meta/Facebook should use Supabase-managed auth where practical |
@@ -94,8 +188,8 @@ The active target is:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs | Agent | Todo | Central source for both clients |
-| EX-51 | Create `/packages/domain` for shared business rules and validators | Agent | Todo | Limits, enums, state transitions |
+| EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs | Agent | Done | Scaffolded under `packages/contracts` for the first slice with `me` and situationship DTOs, aggregates, and reorder/create/update contracts |
+| EX-51 | Create `/packages/domain` for shared business rules and validators | Agent | Done | Scaffolded under `packages/domain` with profile privacy normalization, capability resolution, audience/access types, and reorder invariants |
 | EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Todo | Salvage from donor repo if better |
 | EX-53 | Generate typed clients or client helpers for web and Swift consumption | Agent | Todo | Web can use generated TS types; Swift can use OpenAPI generation later |
 
@@ -127,7 +221,7 @@ The active target is:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Todo | Code, docs, scripts, native configs, deps |
+| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; active blockers are root bootstrap, `useAuth`, `useUserProfile`, `useSituationships`, and AWS storage/upload paths |
 | EX-81 | Replace client auth assumptions with backend-neutral interfaces | Agent | Todo | Begin with adapters rather than full deletion |
 | EX-82 | Replace GraphQL/AWS API calls with new service clients | Agent | Todo | Incrementally by feature slice |
 | EX-83 | Remove AWS-specific env/config usage from active app paths | Agent | Todo | Only after replacements exist |
@@ -213,12 +307,127 @@ If that works on web and the iOS networking layer, the foundation is credible.
 
 ## Immediate Next Actions
 
-1. Pull the donor Supabase schema and supporting API logic into the restart analysis.
-2. Produce the Supabase-to-HINTO entity mapping and identify schema gaps.
-3. Normalize the first auth migration around `auth_identities` and related audit tables.
-4. Scaffold `/services/api`, `/packages/contracts`, and `/packages/domain`.
-5. Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.
+1. Normalize the first auth migration around `auth_identities` and related audit tables.
+2. Verify Supabase connectivity and confirm the current remote project/env contract.
+3. Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.
+4. Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.
+5. Add backend route tests and DB connectivity checks for the first slice.
 6. Add provider-start and provider-callback flows after the canonical session path is wired.
+
+## Current Orchestrator Guidance
+
+Use the following sequencing constraints while agents are active:
+
+- Do not start EX-24 until EX-21 through EX-23 are reviewed.
+- Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.
+- Prefer profile and situationship contracts as the first shared slice before voting or AI routes.
+- Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
+- For EX-22 and EX-23, preserve-or-defer decisions must explicitly cover legacy custom operations from `amplify/backend/api/hinto/schema.graphql`: `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`.
+- Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
+
+## Next Agent Packets
+
+These are the next bounded assignments after the current scaffold/domain work is accepted.
+
+### Packet A: EX-50 And EX-51
+
+- Goal: scaffold `/packages/contracts` and `/packages/domain` for the first slice only
+- Inputs:
+  - `docs/Canonical_Domain_Model.md`
+  - `docs/Schema_Entity_Mapping.md`
+  - `services/api/README.md`
+- Deliverables:
+  - DTOs for `GET /v1/me`, `PATCH /v1/me`, `GET /v1/me/situationships`
+  - create/update/reorder situationship commands
+  - domain enums and validation rules for privacy, audience, status, and ordering
+- Guardrails:
+  - no generated clients yet
+  - no full voting contract package yet
+  - no donor-table leakage in package names
+
+### Packet B: EX-35
+
+- Goal: add auth middleware and session/user resolution after contracts/domain stabilize
+- Inputs:
+  - `docs/Auth_Model.md`
+  - `docs/Canonical_Domain_Model.md`
+  - `docs/Legacy_AWS_Audit.md`
+  - `services/api` scaffold
+- Deliverables:
+  - authenticated owner-session middleware
+  - viewer/public-session resolution model
+  - request context population rules
+- Guardrails:
+  - do not implement full provider OAuth here
+  - do not recreate Cognito-shaped client state
+  - consume the `sharedWith` replacement model instead of reintroducing field-based auth
+
+### Packet C: EX-40
+
+- Goal: implement profile routes/services against the new contracts
+- Inputs:
+  - contracts/domain packages
+  - `docs/Canonical_Domain_Model.md`
+- Deliverables:
+  - `GET /v1/me`
+  - `PATCH /v1/me`
+  - `MeAggregate` responses
+- Guardrails:
+  - no direct AppSync mirroring
+  - return aggregates and capability metadata, not raw storage rows
+
+### Packet D: EX-41
+
+- Goal: implement situationship routes/services and reorder behavior
+- Inputs:
+  - contracts/domain packages
+  - `docs/Canonical_Domain_Model.md`
+  - codegraph evidence around `useSituationships`, `reorder`, and `submitVote`
+- Deliverables:
+  - list/create/update/delete routes
+  - reorder command route
+  - owner-only authorization and stable ordering semantics
+- Guardrails:
+  - preserve reorder product behavior
+  - do not carry forward Amplify function names as the external contract
+  - do not bury audience/capability rules inside route handlers without shared domain helpers
+
+## Accepted Outputs
+
+The following artifacts are accepted as current restart inputs:
+
+- `docs/Schema_Entity_Mapping.md` for EX-20 and EX-21
+- `docs/Canonical_Domain_Model.md` for EX-22 and EX-23
+- `docs/Legacy_AWS_Audit.md` for EX-80
+- `services/api/README.md` and `services/api/src/*` for EX-30 through EX-34
+- `packages/contracts/*` for EX-50
+- `packages/domain/*` for EX-51
+
+Acceptance notes:
+
+- the API scaffold compiles with `npm run api:build`
+- runtime socket binding could not be exercised in the current sandbox, so route behavior is accepted based on static review plus build verification
+- `services/api/dist/` is build output and should not be treated as source of truth
+- Q4 stayed within scope: profile + situationship contracts only, with no voting or provider-OAuth sprawl
+- package-level build/test wiring does not exist yet and remains follow-up work
+
+## Next Agent Queue
+
+These are the next preferred bounded tasks after the accepted outputs above.
+
+| Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
+| --- | --- | --- | --- | --- |
+| Q6 | EX-24 | Define and implement the first restart-era DB migrations for auth identity linkage and audience/access replacement groundwork | `docs/Auth_Model.md`, `docs/Canonical_Domain_Model.md`, donor Supabase migrations | migration plan plus initial SQL changes or migration stubs |
+| Q7 | EX-35, EX-81 | Add backend auth/session boundary and define client-neutral auth adapter shape | `docs/Auth_Model.md`, `docs/Legacy_AWS_Audit.md`, `services/api/src/*`, `packages/contracts`, `packages/domain` | API auth middleware scaffold plus replacement contract for legacy `useAuth` assumptions |
+| Q8 | EX-40, EX-41 | Implement first real backend routes for profile + situationships | `packages/contracts`, `packages/domain`, `services/api/src/*` | `GET /v1/me`, `PATCH /v1/me`, situationship CRUD/list/reorder routes |
+| Q9 | EX-90, EX-94 | Add backend route tests, migration verification, and DB connectivity checks for the first slice | accepted scaffold/packages plus Supabase project details | test harness, connectivity probe, and repeatable dev verification |
+| Q10 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients for the first slice | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
+
+Queue constraints:
+
+- Q6 should not implement full provider OAuth.
+- Q7 should not start until Q4 has defined first-slice contracts and domain rules.
+- Q8 should start with profile and situationship reads/writes only, not voting or AI.
 
 ## Notes From Donor Supabase Repo
 

@@ -1,6 +1,6 @@
 # HINTO Restart And Unification Plan
 
-*Reviewed on: 2026-03-23*
+*Reviewed on: 2026-03-27*
 
 ## 1. Purpose
 
@@ -257,6 +257,42 @@ Clarification:
 2. Move legacy React Native/Expo code into `/legacy`.
 3. Copy over only selected reusable logic from the Supabase repo.
 4. Remove RORK naming, stale repo metadata, and duplicate docs.
+
+## 7. Current Execution Status
+
+The restart is no longer only a plan. The following execution artifacts now exist in the canonical repo:
+
+- execution backlog and orchestration guidance in `docs/Execution_Backlog.md`
+- Amplify-to-Supabase mapping and donor migration inventory in `docs/Schema_Entity_Mapping.md`
+- canonical domain model and first-slice aggregate definitions in `docs/Canonical_Domain_Model.md`
+- restart auth model in `docs/Auth_Model.md`
+- AWS/Amplify blocker audit in `docs/Legacy_AWS_Audit.md`
+- initial backend scaffold in `/services/api`
+- first-slice contracts scaffold in `/packages/contracts`
+- first-slice domain rules scaffold in `/packages/domain`
+
+What is now settled:
+
+- the first vertical slice is profile plus situationship CRUD and reorder
+- the shared API shape is REST-style JSON with stable envelopes and request IDs
+- the first shared package boundary is `/packages/contracts` plus `/packages/domain`
+- legacy custom GraphQL behavior such as reorder and owner-scoped situationship listing must be preserved as product behavior, not as transport details
+- legacy `sharedWith` semantics must be replaced explicitly as audience/access behavior rather than copied as a field
+
+What remains immediately in front of implementation:
+
+- confirm remote Supabase connectivity and current environment contract
+- add the first restart-era DB migrations for auth linkage and audience/access groundwork
+- wire auth/session middleware into `/services/api`
+- implement `GET /v1/me`, `PATCH /v1/me`, and situationship list/create/update/delete/reorder routes
+- begin replacing active Amplify/AppSync client paths once those routes exist
+
+## 8. Current Risks
+
+- The active app bootstrap still depends on legacy Amplify/Cognito paths, so the current client runtime is not yet backend-neutral.
+- The local `.env` in this workspace does not currently expose usable Supabase variables, so remote DB verification is blocked until credentials or a linked project are supplied.
+- There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
+- Backend route tests and DB verification are not yet wired, so current backend progress is scaffold-level rather than slice-complete.
 
 ### Phase 3. Backend Foundation
 
