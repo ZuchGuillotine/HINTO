@@ -155,7 +155,7 @@ Evaluator output should always classify findings as:
 | EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Done | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md` |
 | EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Done | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
 | EX-23 | Identify schema gaps for web + Swift support | Agent | Done | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics. |
-| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Todo | Only after EX-20 to EX-23 are complete |
+| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Migration `010_auth_identities.sql` adds `auth_identities` and `auth_login_events` tables with RLS policies |
 
 ### 3. Backend Foundation
 
@@ -166,7 +166,7 @@ Evaluator output should always classify findings as:
 | EX-32 | Add environment/config management for local and deployed backend | Agent | Done | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md` |
 | EX-33 | Establish API error model and shared response envelope rules | Agent | Done | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md` |
 | EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
-| EX-35 | Add auth middleware and session/user resolution | Agent | Todo | Should not depend on Cognito and should treat Supabase Auth as the canonical session layer |
+| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts` |
 | EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
 | EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | Todo | Apple and Meta/Facebook should use Supabase-managed auth where practical |
 | EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | Todo | Snapchat and TikTok likely require backend-owned OAuth/token-exchange flows layered onto the Supabase user/session model |
@@ -175,8 +175,8 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-40 | Implement profile routes/services | Agent | Todo | Get current profile, update profile, privacy settings |
-| EX-41 | Implement situationship routes/services | Agent | Todo | CRUD, reorder, limits, validation |
+| EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
+| EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
 | EX-42 | Implement voting session routes/services | Agent | Todo | Create session, expire session, retrieve public voting view |
 | EX-43 | Implement vote submission routes/services | Agent | Todo | Best/worst selection, optional comment, idempotency safeguards |
 | EX-44 | Implement results aggregation routes/services | Agent | Todo | Owner-facing summaries, counts, comments, anonymity rules |
