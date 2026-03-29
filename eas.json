@@ -16,6 +16,13 @@
         "simulator": false
       }
     },
+    "testflight": {
+      "distribution": "store",
+      "ios": {
+        "simulator": false
+      },
+      "channel": "testflight"
+    },
     "production": {
       "autoIncrement": true
     }

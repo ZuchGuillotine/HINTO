@@ -82,7 +82,7 @@
       "Google"
     ],
     "hostedUIProviderMeta": "[{\"ProviderName\":\"Facebook\",\"authorize_scopes\":\"email,public_profile\",\"AttributeMapping\":{\"email\":\"email\",\"username\":\"id\"}},{\"ProviderName\":\"Google\",\"authorize_scopes\":\"openid email profile\",\"AttributeMapping\":{\"email\":\"email\",\"username\":\"sub\"}}]",
-    "oAuthMetadata": "{\"AllowedOAuthFlows\":[\"code\"],\"AllowedOAuthScopes\":[\"phone\",\"email\",\"openid\",\"profile\",\"aws.cognito.signin.user.admin\"],\"CallbackURLs\":[\"hnnt://\",\"https://www.hnnt.app/auth/callback/\"],\"LogoutURLs\":[\"hnnt://\",\"https://www.hnnt.app/auth/signout/\"]}",
+    "oAuthMetadata": "{\"AllowedOAuthFlows\":[\"code\"],\"AllowedOAuthScopes\":[\"phone\",\"email\",\"openid\",\"profile\",\"aws.cognito.signin.user.admin\"],\"CallbackURLs\":[\"hnnt://\",\"https://www.hnnt.app/auth/callback/\",\"exp://localhost:19000/\",\"exp://127.0.0.1:19000/\",\"http://localhost:19000/\"],\"LogoutURLs\":[\"hnnt://\",\"https://www.hnnt.app/auth/signout/\",\"exp://localhost:19000/\",\"exp://127.0.0.1:19000/\",\"http://localhost:19000/\"]}",
     "userPoolGroupList": [
       "HINTOMVPPOOL2"
     ],

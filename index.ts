@@ -1,3 +1,15 @@
+/**
+    * @description      : 
+    * @author           : 
+    * @group            : 
+    * @created          : 30/06/2025 - 23:55:17
+    * 
+    * MODIFICATION LOG
+    * - Version         : 1.0.0
+    * - Date            : 30/06/2025
+    * - Author          : 
+    * - Modification    : 
+**/
 import { registerRootComponent } from 'expo';
 
 import App from './App';

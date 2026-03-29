@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import SituationshipList from '../components/SituationshipList';
 import { useSituationships } from '../context/useSituationships';
-import { generateClient } from 'aws-amplify/api';
+import { generateClient } from '@aws-amplify/api';
 
 const client = generateClient();
 

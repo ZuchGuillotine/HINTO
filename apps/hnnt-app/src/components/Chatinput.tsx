@@ -9,13 +9,16 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Text
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useSpring, animated, config } from '@react-spring/native';
 import { useAttachments } from '../context/useAttachments';
 import { useOCR } from '../context/useOCR';
+
+const AnimatedTouchableOpacity = animated(TouchableOpacity);
 
 const MAX_WIDTH = 1024;
 const QUALITY = 0.8;
@@ -27,8 +30,21 @@ type ChatInputProps = {
 const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   const [text, setText] = useState<string>('');
   const [uploading, setUploading] = useState<boolean>(false);
+  const [isPressed, setIsPressed] = useState<boolean>(false);
   const { attachments, addAttachment, removeAttachment } = useAttachments();
   const { submitOCR } = useOCR();
+
+  // Send button animation
+  const sendButtonAnimation = useSpring({
+    transform: isPressed ? [{ scale: 0.95 }] : [{ scale: 1 }],
+    config: config.wobbly,
+  });
+
+  // Input container animation
+  const inputAnimation = useSpring({
+    transform: text.length > 0 ? [{ scale: 1.02 }] : [{ scale: 1 }],
+    config: config.gentle,
+  });
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -61,6 +77,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   };
 
   const handleSend = async () => {
+    // Haptic feedback on send
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
     setUploading(true);
     const ocrResults: string[] = [];
     for (const att of attachments) {
@@ -74,6 +93,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
     onSend(text, ocrResults);
     setText('');
     setUploading(false);
+  };
+
+  const handlePressIn = () => {
+    setIsPressed(true);
+  };
+
+  const handlePressOut = () => {
+    setIsPressed(false);
   };
 
   const canSend = !!text.trim() || attachments.length > 0;
@@ -105,19 +132,24 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         <TouchableOpacity onPress={takePhoto} style={styles.iconButton}>
           <Ionicons name="camera-outline" size={24} />
         </TouchableOpacity>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Type a message..."
-          multiline
-          value={text}
-          onChangeText={setText}
-        />
-        <TouchableOpacity
+        <animated.View style={[inputAnimation]}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type a message..."
+            multiline
+            value={text}
+            onChangeText={setText}
+          />
+        </animated.View>
+        <AnimatedTouchableOpacity
           onPress={handleSend}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
           disabled={!canSend || uploading}
           style={[
             styles.sendButton,
             !(canSend && !uploading) && styles.disabledButton,
+            sendButtonAnimation,
           ]}
         >
           {uploading ? (
@@ -125,7 +157,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
           ) : (
             <Ionicons name="send" size={24} color="#fff" />
           )}
-        </TouchableOpacity>
+        </AnimatedTouchableOpacity>
       </View>
     </View>
   );
