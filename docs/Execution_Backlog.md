@@ -1,6 +1,7 @@
 # HINTO Execution Backlog
 
 *Created: 2026-03-27*
+*Reviewed: 2026-03-31*
 
 ## Purpose
 
@@ -20,8 +21,8 @@ The active target is:
 
 - A Supabase database already exists and at least one migration has already been applied.
 - The most likely current schema source is `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/migrations/`.
-- The current repo does not yet contain the new backend foundation.
-- The current client code is still largely coupled to Amplify Auth and GraphQL.
+- The current repo now contains the restart-era backend foundation under `/services/api`, shared first-slice packages under `/packages/contracts` and `/packages/domain`, migration `supabase/migrations/010_auth_identities.sql`, and a native SwiftUI app shell under `/apps/ios`.
+- The legacy Expo client is still largely coupled to Amplify Auth and GraphQL, while the SwiftUI app contains partial API wiring and placeholder auth/voting/AI behavior.
 - Native iOS and web are both first-class targets, so backend design must be client-agnostic.
 
 ## Execution Rules
@@ -144,7 +145,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-10 | Write a new canonical MVP brief that replaces Seattle-only and Expo/AWS assumptions | Agent | Done | See `docs/Canonical_MVP_Brief.md` |
 | EX-11 | Write a new system architecture doc for web + Swift + shared backend | Agent | Done | See `docs/Canonical_Architecture.md` |
-| EX-12 | Define canonical top-level repo structure | Agent | Todo | `/apps/ios`, `/apps/web`, `/services/api`, `/packages/domain`, `/packages/contracts`, `/packages/prompts`, `/legacy` |
+| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts` now exist; `/apps/web`, `/packages/prompts`, and `/legacy` remain open |
 | EX-13 | Remove or quarantine legacy docs that conflict with the restart plan | Agent | Done | Conflicting AWS/Amplify/Expo planning docs removed; restart docs are now the active source of truth |
 
 ### 2. Domain Model And Database Alignment
@@ -210,12 +211,12 @@ Evaluator output should always classify findings as:
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
 | EX-70 | Decide whether `/apps/ios` will be created fresh or derived from current `ios/` shell | Agent | Done | Fresh SwiftUI is lower-complexity than reworking the existing Expo-native shell |
-| EX-71 | Scaffold native SwiftUI app structure | Agent | Todo | Fresh app under `/apps/ios` |
-| EX-72 | Establish networking layer against the shared API contract | Agent | Todo | Auth, request/response decoding, error handling |
-| EX-73 | Build auth and onboarding shell | Agent | Todo | Must support Supabase session flow and social provider entrypoints |
-| EX-74 | Build profile and situationship flows | Agent | Todo | Consume same backend as web |
-| EX-75 | Build voting and results flows | Agent | Todo | Same contract, native UI |
-| EX-76 | Build AI coach UI against backend API | Agent | Todo | After AI module is stable |
+| EX-71 | Scaffold native SwiftUI app structure | Agent | Done | Swift package and app structure exist under `apps/ios` with design tokens, models, navigation, and feature views |
+| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` exists for `/v1/me` and situationship routes, but route alignment and live session exchange still need hardening |
+| EX-73 | Build auth and onboarding shell | Agent | In Progress | `RootView`, `OnboardingView`, and `AuthManager` exist; Apple sign-in and other providers still use placeholder session handling |
+| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile and situationship screens exist with partial API wiring; they are not yet validated end-to-end against the live backend |
+| EX-75 | Build voting and results flows | Agent | In Progress | Native voting/results views exist, but backend voting routes do not yet exist and current submission behavior is placeholder-only |
+| EX-76 | Build AI coach UI against backend API | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet |
 
 ### 8. Client Migration And De-AWS Work
 
@@ -243,18 +244,18 @@ Evaluator output should always classify findings as:
 
 ### Phase A: Unblock The Backend
 
-1. EX-00 through EX-04
-2. EX-10 through EX-13
-3. EX-20 through EX-24
-4. EX-30 through EX-35
-5. EX-50 through EX-53
+This phase is largely complete in the repo:
 
-### Phase B: Ship One Vertical Slice
+1. EX-10 through EX-24
+2. EX-30 through EX-35
+3. EX-40, EX-41, EX-50, and EX-51
 
-1. EX-40 and EX-41
-2. EX-60 through EX-63
-3. EX-72 through EX-74
-4. EX-90 through EX-94
+### Phase B: Stabilize And Ship One Vertical Slice
+
+1. EX-90 and EX-94
+2. EX-37 and EX-38
+3. EX-60 through EX-63
+4. EX-72 through EX-74
 
 The first vertical slice should be:
 
@@ -315,6 +316,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 6. Add provider-start and provider-callback flows after the canonical session path is wired.
 7. Implement voting session and vote submission routes (EX-42, EX-43).
 8. Scaffold `/apps/web` and build first vertical slice on the new API (EX-60 through EX-63).
+9. Align the existing SwiftUI app shell with the live backend contracts and replace placeholder auth/session behavior.
 
 ## Current Orchestrator Guidance
 
@@ -324,6 +326,7 @@ Use the following sequencing constraints while agents are active:
 - ~~Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.~~ - EX-35 is complete; EX-37/EX-38 remain scoped.
 - ~~Prefer profile and situationship contracts as the first shared slice before voting or AI routes.~~ - First slice is complete.
 - Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
+- Treat `apps/ios` as the current native baseline, but do not mistake its placeholder auth, vote submission, or AI responses for end-to-end integration.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
 - Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.
 - Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
@@ -343,6 +346,13 @@ Additional deliverables in PR #1:
 - `services/api/src/supabase.ts` - Supabase client module (service-role and user-scoped)
 - `services/api/src/body.ts` - JSON body parser with size limits
 - Route dispatcher refactored to async pattern
+
+The current branch also includes a native SwiftUI app baseline under `/apps/ios` with:
+
+- app/navigation shell in `HINTOApp.swift`, `RootView.swift`, and `MainTabView.swift`
+- design tokens and reusable components under `Sources/Design` and `Sources/Views/Components`
+- client models plus `APIClient.swift` and `AuthManager.swift`
+- feature shells for onboarding, profile, situationships, voting/results, settings, and AI chat
 
 ## Next Agent Packets
 
@@ -404,6 +414,22 @@ Additional deliverables in PR #1:
   - must target new backend, not Amplify
   - reuse domain naming and copy from contracts
 
+### Packet I: EX-72, EX-73, EX-74, EX-75, EX-76
+
+- Goal: align the existing SwiftUI app shell with the live backend contract and current restart scope
+- Inputs:
+  - `apps/ios`
+  - `packages/contracts`
+  - `services/api/src/routes/*`
+- Deliverables:
+  - route and payload alignment between `APIClient.swift` and `/services/api`
+  - backend-backed session flow replacing placeholder token storage where supported
+  - explicit separation between live profile/situationship flows and placeholder vote/chat flows
+- Guardrails:
+  - do not invent a client-only auth model
+  - do not claim voting or AI are live before backend routes exist
+  - preserve the existing SwiftUI design language while tightening integration
+
 ## Accepted Outputs
 
 The following artifacts are accepted as current restart inputs:
@@ -418,6 +444,7 @@ The following artifacts are accepted as current restart inputs:
 - `services/api/src/routes/profile.ts` for EX-40
 - `services/api/src/routes/situationships.ts` for EX-41
 - `supabase/migrations/010_auth_identities.sql` for EX-24
+- `apps/ios/*` as the current SwiftUI baseline for EX-71 through EX-76
 
 Acceptance notes:
 
@@ -438,6 +465,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 | Q11 | EX-42, EX-43, EX-44 | Implement voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions | voting session CRUD, vote submission, results aggregation |
 | Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
 | Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
+| Q14 | EX-72, EX-73, EX-74, EX-75, EX-76 | Align the existing SwiftUI shell with the live backend and current scope | `apps/ios`, `packages/contracts`, `services/api/src/routes/*` | route alignment, real session handling where available, and explicit placeholder boundaries |
 
 Queue constraints:
 
@@ -445,6 +473,7 @@ Queue constraints:
 - Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only.
 - Q11 should start with session creation and vote submission only, deferring AI integration.
 - Q13 can run in parallel with Q10/Q11 once Q9 passes.
+- Q14 should avoid over-integrating voting or AI before Q11 exists; profile and situationship wiring should come first.
 
 ## Notes From Donor Supabase Repo
 

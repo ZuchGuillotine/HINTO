@@ -1,6 +1,6 @@
 # HINTO Restart And Unification Plan
 
-*Reviewed on: 2026-03-27*
+*Reviewed on: 2026-03-31*
 
 ## 1. Purpose
 
@@ -31,7 +31,7 @@ The durable idea is consistent across both repos:
 
 ### 2.2 The implementation assumptions are outdated
 
-The current `HINTO` repo is built around:
+The legacy implementation in `HINTO` is built around:
 
 - Expo
 - AWS Amplify
@@ -49,12 +49,20 @@ The sibling `rork-...relationship-ranking-app` repo is built around:
 - React Query
 - some RORK-specific scaffolding and naming
 
-Neither repo matches the stated restart target of:
+Neither original implementation matched the stated restart target of:
 
 - native iOS in Swift
 - web app in JS or PHP
 - no Expo as the primary app runtime
 - one clean repo
+
+The repo now contains restart-era work that moves toward that target:
+
+- `/services/api` with auth, profile, and situationship routes
+- `/packages/contracts` and `/packages/domain` for the first shared slice
+- `/apps/ios` with a native SwiftUI app shell and feature views
+
+What remains true is that the active legacy runtime under `apps/hnnt-app/src/` is still Amplify-shaped and has not yet been retired.
 
 ### 2.3 Reuse is possible, but selective
 
@@ -151,6 +159,14 @@ Target this structure:
 /docs
 /legacy
 ```
+
+Current state in the repo:
+
+- `/apps/ios` exists
+- `/services/api` exists
+- `/packages/contracts` exists
+- `/packages/domain` exists
+- `/apps/web`, `/packages/prompts`, and `/legacy` do not yet exist
 
 ### 4.3 Backend decision
 
@@ -267,52 +283,40 @@ The restart is no longer only a plan. The following execution artifacts now exis
 - canonical domain model and first-slice aggregate definitions in `docs/Canonical_Domain_Model.md`
 - restart auth model in `docs/Auth_Model.md`
 - AWS/Amplify blocker audit in `docs/Legacy_AWS_Audit.md`
-- initial backend scaffold in `/services/api`
+- backend scaffold plus first-slice auth/profile/situationship implementation in `/services/api`
+- auth-linkage migration in `supabase/migrations/010_auth_identities.sql`
 - first-slice contracts scaffold in `/packages/contracts`
 - first-slice domain rules scaffold in `/packages/domain`
+- native SwiftUI app shell in `/apps/ios`
 
 What is now settled:
 
 - the first vertical slice is profile plus situationship CRUD and reorder
 - the shared API shape is REST-style JSON with stable envelopes and request IDs
 - the first shared package boundary is `/packages/contracts` plus `/packages/domain`
+- `restart-plan` is now the integration branch that contains the restart docs, the merged backend slice, and the merged SwiftUI branch
 - legacy custom GraphQL behavior such as reorder and owner-scoped situationship listing must be preserved as product behavior, not as transport details
 - legacy `sharedWith` semantics must be replaced explicitly as audience/access behavior rather than copied as a field
 
 What remains immediately in front of implementation:
 
 - confirm remote Supabase connectivity and current environment contract
-- add the first restart-era DB migrations for auth linkage and audience/access groundwork
-- wire auth/session middleware into `/services/api`
-- implement `GET /v1/me`, `PATCH /v1/me`, and situationship list/create/update/delete/reorder routes
-- begin replacing active Amplify/AppSync client paths once those routes exist
+- add backend tests, DB verification, and repeatable migration/dev workflows
+- implement provider auth flows on top of the new auth identity model
+- implement voting session, vote submission, and results routes
+- scaffold `/apps/web`
+- align the existing SwiftUI app shell with the live backend contracts and replace placeholder auth/voting/AI behavior incrementally
 
 ## 8. Current Risks
 
 - The active app bootstrap still depends on legacy Amplify/Cognito paths, so the current client runtime is not yet backend-neutral.
-- The local `.env` in this workspace does not currently expose usable Supabase variables, so remote DB verification is blocked until credentials or a linked project are supplied.
+- The repo-local environment and Supabase metadata are not yet confirmed as a complete end-to-end setup for remote DB verification, so connectivity work is still blocked pending a verified URL/key set or linked project workflow.
 - There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
-- Backend route tests and DB verification are not yet wired, so current backend progress is scaffold-level rather than slice-complete.
+- Backend route tests and DB verification are not yet wired, so the backend slice is implemented but not yet verified end-to-end.
+- The native iOS app currently mixes real API-facing structure with placeholder behavior: auth stores a temporary token locally, vote submission is mocked, and AI chat uses canned responses.
+- The repo shape is still only partially converged because `/apps/web`, `/packages/prompts`, and `/legacy` have not been created yet.
 
-### Phase 3. Backend Foundation
-
-1. Finalize Postgres schema.
-2. Stand up auth, storage, and core tables.
-3. Build API endpoints for:
-   - profile
-   - situationships
-   - voting sessions
-   - votes
-   - AI chat
-   - reports/blocks
-
-### Phase 4. Client MVP Build
-
-1. Build iOS SwiftUI app against the shared API contract.
-2. Build web app against the same contract.
-3. Add admin-safe moderation and support workflows.
-
-## 7. Recommended Data Model Baseline
+## 9. Recommended Data Model Baseline
 
 Keep these core entities regardless of backend tooling:
 
@@ -333,26 +337,27 @@ Optional later entities:
 - `subscriptions`
 - `notifications`
 
-## 8. Immediate Next Steps
+## 10. Immediate Next Steps
 
-### Next step A: finish the repo audit
+### Next step A: verify the backend slice against a real Supabase environment
 
-Audit result:
+- confirm working `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
+- verify migration `010_auth_identities.sql`
+- add route tests and DB connectivity checks for `/v1/me` and situationships
 
-- `rork-hnnt---hinto-relationship-appV2` is a low-value RORK/Expo prototype
-- `HINTORORK` is empty
+### Next step B: continue backend completion from the current baseline
 
-This means the only meaningful donor repo besides `HINTO` is `rork-hnnt--hinto--relationship-ranking-app`.
+- implement provider auth flows
+- add voting session, vote submission, and results routes
+- keep AI routes behind the prompt/moderation package boundary
 
-### Next step B: choose the migration baseline
+### Next step C: turn the existing clients into real consumers of the shared backend
 
-Current recommendation:
+- scaffold `/apps/web`
+- align `apps/ios/HINTO/Sources/Services/APIClient.swift` with the current route contract
+- replace placeholder iOS auth, voting, and AI behavior incrementally as backend routes become available
 
-- keep `HINTO` as the canonical repo
-- use the Supabase repo as a donor for schema, voting, and AI prompt logic
-- do not keep Amplify as the target backend
-
-### Next step C: begin cleanup with a strict rule
+### Next step D: continue cleanup with a strict rule
 
 Only preserve code that does one of these:
 
@@ -362,13 +367,14 @@ Only preserve code that does one of these:
 
 Everything else should be archived or deleted.
 
-## 9. Practical Conclusion
+## 11. Practical Conclusion
 
 The fastest credible path is not to repair the current Expo/AWS app. It is to:
 
 1. declare one canonical repo
 2. salvage the best schema and domain logic from the Supabase branch
-3. retire RORK, Amplify, and Expo-first assumptions
-4. rebuild the MVP around native iOS, a JS web app, and a Postgres-centered backend
+3. keep building on the restart branch that now already contains the backend slice and SwiftUI shell
+4. retire RORK, Amplify, and Expo-first assumptions as replacement paths become real
+5. rebuild the MVP around native iOS, a JS web app, and a Postgres-centered backend
 
 That gives you a smaller, more durable foundation for the MVP and avoids carrying obsolete architecture into the restart.
