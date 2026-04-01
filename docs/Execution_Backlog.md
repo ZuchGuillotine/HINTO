@@ -307,90 +307,102 @@ If that works on web and the iOS networking layer, the foundation is credible.
 
 ## Immediate Next Actions
 
-1. Normalize the first auth migration around `auth_identities` and related audit tables.
+1. ~~Normalize the first auth migration around `auth_identities` and related audit tables.~~ - Done (PR #1)
 2. Verify Supabase connectivity and confirm the current remote project/env contract.
-3. Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.
-4. Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.
+3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
+4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
 5. Add backend route tests and DB connectivity checks for the first slice.
 6. Add provider-start and provider-callback flows after the canonical session path is wired.
+7. Implement voting session and vote submission routes (EX-42, EX-43).
+8. Scaffold `/apps/web` and build first vertical slice on the new API (EX-60 through EX-63).
 
 ## Current Orchestrator Guidance
 
 Use the following sequencing constraints while agents are active:
 
-- Do not start EX-24 until EX-21 through EX-23 are reviewed.
-- Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.
-- Prefer profile and situationship contracts as the first shared slice before voting or AI routes.
+- ~~Do not start EX-24 until EX-21 through EX-23 are reviewed.~~ - EX-24 is complete.
+- ~~Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.~~ - EX-35 is complete; EX-37/EX-38 remain scoped.
+- ~~Prefer profile and situationship contracts as the first shared slice before voting or AI routes.~~ - First slice is complete.
 - Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
-- For EX-22 and EX-23, preserve-or-defer decisions must explicitly cover legacy custom operations from `amplify/backend/api/hinto/schema.graphql`: `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
+- Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.
+- Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
+
+## Completed Agent Packets
+
+The following packets were delivered and merged in PR #1 (2026-03-28):
+
+- **Packet A (EX-50, EX-51)**: contracts and domain packages scaffolded
+- **Packet B (EX-35)**: auth middleware with Supabase JWT session resolution
+- **Packet C (EX-40)**: profile routes with MeAggregate responses
+- **Packet D (EX-41)**: situationship CRUD, reorder, and delete routes
+
+Additional deliverables in PR #1:
+
+- **EX-24**: `supabase/migrations/010_auth_identities.sql` - `auth_identities` and `auth_login_events` tables with RLS
+- `services/api/src/supabase.ts` - Supabase client module (service-role and user-scoped)
+- `services/api/src/body.ts` - JSON body parser with size limits
+- Route dispatcher refactored to async pattern
 
 ## Next Agent Packets
 
-These are the next bounded assignments after the current scaffold/domain work is accepted.
+### Packet E: EX-90, EX-94
 
-### Packet A: EX-50 And EX-51
-
-- Goal: scaffold `/packages/contracts` and `/packages/domain` for the first slice only
+- Goal: add backend route tests, migration verification, and DB connectivity checks
 - Inputs:
-  - `docs/Canonical_Domain_Model.md`
-  - `docs/Schema_Entity_Mapping.md`
-  - `services/api/README.md`
+  - `services/api/src/routes/*`
+  - `services/api/src/middleware/auth.ts`
+  - `supabase/migrations/010_auth_identities.sql`
 - Deliverables:
-  - DTOs for `GET /v1/me`, `PATCH /v1/me`, `GET /v1/me/situationships`
-  - create/update/reorder situationship commands
-  - domain enums and validation rules for privacy, audience, status, and ordering
+  - test harness for profile and situationship routes
+  - DB connectivity probe
+  - migration verification and dev seed fixtures
 - Guardrails:
-  - no generated clients yet
-  - no full voting contract package yet
-  - no donor-table leakage in package names
+  - focus on first-slice routes only
+  - do not add voting or AI test infrastructure yet
 
-### Packet B: EX-35
+### Packet F: EX-37, EX-38
 
-- Goal: add auth middleware and session/user resolution after contracts/domain stabilize
+- Goal: implement provider auth flows (Apple, Meta/Facebook via Supabase; Snapchat, TikTok via custom backend)
 - Inputs:
   - `docs/Auth_Model.md`
-  - `docs/Canonical_Domain_Model.md`
-  - `docs/Legacy_AWS_Audit.md`
-  - `services/api` scaffold
+  - `services/api/src/middleware/auth.ts`
 - Deliverables:
-  - authenticated owner-session middleware
-  - viewer/public-session resolution model
-  - request context population rules
+  - provider-start and provider-callback routes
+  - identity-linking flow against `auth_identities`
 - Guardrails:
-  - do not implement full provider OAuth here
+  - Apple and Meta/Facebook should use Supabase-managed auth where supported
+  - Snapchat and TikTok require custom backend OAuth flows
   - do not recreate Cognito-shaped client state
-  - consume the `sharedWith` replacement model instead of reintroducing field-based auth
 
-### Packet C: EX-40
+### Packet G: EX-42, EX-43, EX-44
 
-- Goal: implement profile routes/services against the new contracts
+- Goal: implement voting session, vote submission, and results routes
 - Inputs:
-  - contracts/domain packages
+  - `packages/contracts`, `packages/domain`
+  - donor repo voting functions (`003_voting_functions.sql`)
   - `docs/Canonical_Domain_Model.md`
 - Deliverables:
-  - `GET /v1/me`
-  - `PATCH /v1/me`
-  - `MeAggregate` responses
+  - voting session create/expire/retrieve routes
+  - vote submission with best/worst, comments, idempotency
+  - results aggregation with anonymity rules
 - Guardrails:
-  - no direct AppSync mirroring
-  - return aggregates and capability metadata, not raw storage rows
+  - reuse donor DB functions where applicable
+  - keep public vote flows auth-free
 
-### Packet D: EX-41
+### Packet H: EX-60, EX-61, EX-62, EX-63
 
-- Goal: implement situationship routes/services and reorder behavior
+- Goal: scaffold web app and build first vertical slice
 - Inputs:
-  - contracts/domain packages
-  - `docs/Canonical_Domain_Model.md`
-  - codegraph evidence around `useSituationships`, `reorder`, and `submitVote`
+  - `packages/contracts`
+  - `services/api` routes
 - Deliverables:
-  - list/create/update/delete routes
-  - reorder command route
-  - owner-only authorization and stable ordering semantics
+  - Next.js app under `/apps/web`
+  - auth entry and session handling against Supabase
+  - profile and situationship flows consuming the new API
 - Guardrails:
-  - preserve reorder product behavior
-  - do not carry forward Amplify function names as the external contract
-  - do not bury audience/capability rules inside route handlers without shared domain helpers
+  - must target new backend, not Amplify
+  - reuse domain naming and copy from contracts
 
 ## Accepted Outputs
 
@@ -402,13 +414,17 @@ The following artifacts are accepted as current restart inputs:
 - `services/api/README.md` and `services/api/src/*` for EX-30 through EX-34
 - `packages/contracts/*` for EX-50
 - `packages/domain/*` for EX-51
+- `services/api/src/middleware/auth.ts` for EX-35
+- `services/api/src/routes/profile.ts` for EX-40
+- `services/api/src/routes/situationships.ts` for EX-41
+- `supabase/migrations/010_auth_identities.sql` for EX-24
 
 Acceptance notes:
 
 - the API scaffold compiles with `npm run api:build`
 - runtime socket binding could not be exercised in the current sandbox, so route behavior is accepted based on static review plus build verification
 - `services/api/dist/` is build output and should not be treated as source of truth
-- Q4 stayed within scope: profile + situationship contracts only, with no voting or provider-OAuth sprawl
+- PR #1 (merged 2026-03-28) delivered EX-24, EX-35, EX-40, EX-41 - the full first backend slice
 - package-level build/test wiring does not exist yet and remains follow-up work
 
 ## Next Agent Queue
@@ -417,17 +433,18 @@ These are the next preferred bounded tasks after the accepted outputs above.
 
 | Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
 | --- | --- | --- | --- | --- |
-| Q6 | EX-24 | Define and implement the first restart-era DB migrations for auth identity linkage and audience/access replacement groundwork | `docs/Auth_Model.md`, `docs/Canonical_Domain_Model.md`, donor Supabase migrations | migration plan plus initial SQL changes or migration stubs |
-| Q7 | EX-35, EX-81 | Add backend auth/session boundary and define client-neutral auth adapter shape | `docs/Auth_Model.md`, `docs/Legacy_AWS_Audit.md`, `services/api/src/*`, `packages/contracts`, `packages/domain` | API auth middleware scaffold plus replacement contract for legacy `useAuth` assumptions |
-| Q8 | EX-40, EX-41 | Implement first real backend routes for profile + situationships | `packages/contracts`, `packages/domain`, `services/api/src/*` | `GET /v1/me`, `PATCH /v1/me`, situationship CRUD/list/reorder routes |
 | Q9 | EX-90, EX-94 | Add backend route tests, migration verification, and DB connectivity checks for the first slice | accepted scaffold/packages plus Supabase project details | test harness, connectivity probe, and repeatable dev verification |
-| Q10 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients for the first slice | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
+| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes and identity-linking flow |
+| Q11 | EX-42, EX-43, EX-44 | Implement voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions | voting session CRUD, vote submission, results aggregation |
+| Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
+| Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
 
 Queue constraints:
 
-- Q6 should not implement full provider OAuth.
-- Q7 should not start until Q4 has defined first-slice contracts and domain rules.
-- Q8 should start with profile and situationship reads/writes only, not voting or AI.
+- Q9 should complete before starting Q10 or Q11, to confirm the first slice is stable.
+- Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only.
+- Q11 should start with session creation and vote submission only, deferring AI integration.
+- Q13 can run in parallel with Q10/Q11 once Q9 passes.
 
 ## Notes From Donor Supabase Repo
 

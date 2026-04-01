@@ -294,22 +294,22 @@ For public vote flows:
 - vote uniqueness rules need a clear anonymous-user policy
 - RLS from the donor repo may not match the new API-owned boundary
 - donor schema assumes some direct-client access patterns that should move behind the API
-- provider-linking tables are missing and should be added before auth complexity spreads
+- ~~provider-linking tables are missing and should be added before auth complexity spreads~~ - Resolved: `auth_identities` and `auth_login_events` added in migration 010
 
 ## Recommended Build Order
 
-1. create `/services/api`
-2. wire config, logger, health route, and request ID middleware
-3. add auth middleware against Supabase-backed identity
-4. add `GET /v1/me` and `PATCH /v1/me`
-5. add situationship CRUD and reorder endpoints
-6. add `auth_identities` migration
+1. ~~create `/services/api`~~ - Done
+2. ~~wire config, logger, health route, and request ID middleware~~ - Done
+3. ~~add auth middleware against Supabase-backed identity~~ - Done (PR #1, `services/api/src/middleware/auth.ts`)
+4. ~~add `GET /v1/me` and `PATCH /v1/me`~~ - Done (PR #1, `services/api/src/routes/profile.ts`)
+5. ~~add situationship CRUD and reorder endpoints~~ - Done (PR #1, `services/api/src/routes/situationships.ts`)
+6. ~~add `auth_identities` migration~~ - Done (PR #1, `supabase/migrations/010_auth_identities.sql`)
 7. add provider-start and provider-callback flows
 8. add voting and results endpoints
 9. add AI routes after prompt package and quota rules are in place
 
 ## Practical Conclusion
 
-The donor Supabase schema is good enough to drive the initial backend if it is treated as a normalized baseline.
+The initial backend foundation is now wired. Steps 1-6 are complete as of PR #1 (merged 2026-03-28). The Supabase-backed auth middleware, profile routes, situationship CRUD/reorder, and `auth_identities` migration are all in place.
 
-The most important missing piece is not core product tables. It is the auth/linkage layer that reconciles multiple sign-in methods into one canonical HINTO user model.
+The next priorities are provider auth flows (step 7), voting/results endpoints (step 8), and AI routes (step 9).
