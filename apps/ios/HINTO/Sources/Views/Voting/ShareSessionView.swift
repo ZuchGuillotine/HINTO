@@ -15,7 +15,7 @@ struct ShareSessionView: View {
                 VStack(spacing: Spacing.sm) {
                     Image(systemName: "person.2.wave.2.fill")
                         .font(.system(size: 56))
-                        .foregroundStyle(.hintoPink.gradient)
+                        .foregroundStyle(Color.hintoPink.gradient)
                         .symbolEffect(.variableColor.iterative)
 
                     Text("Share with Friends")
@@ -97,7 +97,7 @@ struct ShareSessionView: View {
                 if situationships.count < 2 {
                     Text("Add at least 2 situationships to create a voting session")
                         .font(.hintoCaption)
-                        .foregroundStyle(.hintoError)
+                        .foregroundStyle(Color.hintoError)
                 }
             }
             .padding(.bottom, Spacing.lg)

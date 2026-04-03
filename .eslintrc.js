@@ -32,6 +32,15 @@ module.exports = {
     es6: true,
     node: true,
   },
+  overrides: [
+    {
+      files: ['apps/web/src/**/*.js'],
+      env: {
+        browser: true,
+        node: false,
+      },
+    },
+  ],
   settings: {
     react: {
       version: 'detect',

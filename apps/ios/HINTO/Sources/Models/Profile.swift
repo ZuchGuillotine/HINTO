@@ -77,6 +77,7 @@ struct MeAggregate: Codable {
 }
 
 struct UpdateProfileRequest: Codable {
+    var username: String?
     var displayName: String?
     var bio: String?
     var avatarUrl: String?

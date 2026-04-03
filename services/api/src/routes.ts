@@ -3,6 +3,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppConfig, RequestContext } from './types.js';
 import { sendJsonSuccess, sendJsonError } from './http.js';
 import { AppError, toErrorEnvelope } from './errors.js';
+import { handleCreateDevelopmentSession } from './routes/dev.js';
 import { handleGetMe, handlePatchMe } from './routes/profile.js';
 import {
   handleListSituationships,
@@ -59,6 +60,7 @@ async function routeAsync(
       routes: [
         'GET  /v1/me',
         'PATCH /v1/me',
+        'POST /v1/dev/session',
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
@@ -66,6 +68,11 @@ async function routeAsync(
         'PUT  /v1/me/situationships/order',
       ],
     });
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/dev/session') {
+    await handleCreateDevelopmentSession(request, response, context, config);
     return true;
   }
 

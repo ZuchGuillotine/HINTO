@@ -54,7 +54,7 @@ struct AvatarView: View {
             } else {
                 Image(systemName: "person.fill")
                     .font(.system(size: size * 0.35))
-                    .foregroundStyle(.hintoPink400)
+                    .foregroundStyle(Color.hintoPink400)
             }
         }
     }

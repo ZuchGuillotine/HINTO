@@ -39,6 +39,7 @@ export interface GetMeResponseDto {
 }
 
 export interface UpdateMeRequestDto {
+  username?: string;
   displayName?: string;
   bio?: string | null;
   avatarUrl?: string | null;

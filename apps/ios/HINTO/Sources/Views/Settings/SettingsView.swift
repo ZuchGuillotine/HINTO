@@ -28,7 +28,7 @@ struct SettingsView: View {
                             if profile.subscriptionTier == .premium {
                                 Label("PRO", systemImage: "crown.fill")
                                     .font(.hintoCaption)
-                                    .foregroundStyle(.hintoPink)
+                                    .foregroundStyle(Color.hintoPink)
                             }
                         }
                     }

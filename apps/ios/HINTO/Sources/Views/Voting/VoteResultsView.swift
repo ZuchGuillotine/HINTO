@@ -32,7 +32,7 @@ struct VoteResultsView: View {
                 VStack(spacing: Spacing.xs) {
                     Text("\(totalVoters)")
                         .font(.hintoDisplay)
-                        .foregroundStyle(.hintoPink)
+                        .foregroundStyle(Color.hintoPink)
 
                     Text("friends voted")
                         .font(.hintoBody)
@@ -82,7 +82,13 @@ struct VoteResultsView: View {
                 VStack(alignment: .trailing) {
                     Text(result.score > 0 ? "+\(result.score)" : "\(result.score)")
                         .font(.hintoH4)
-                        .foregroundStyle(result.score > 0 ? .hintoSuccess : result.score < 0 ? .hintoError : .secondary)
+                        .foregroundStyle(
+                            result.score > 0
+                                ? Color.hintoSuccess
+                                : result.score < 0
+                                    ? Color.hintoError
+                                    : Color.secondary
+                        )
                     Text("score")
                         .font(.hintoCaption)
                         .foregroundStyle(.tertiary)
@@ -96,7 +102,7 @@ struct VoteResultsView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "heart.fill")
                             .font(.caption2)
-                            .foregroundStyle(.hintoSuccess)
+                            .foregroundStyle(Color.hintoSuccess)
                         Text("\(result.bestVotes) best")
                             .font(.hintoCaption)
                             .foregroundStyle(.secondary)
@@ -117,7 +123,7 @@ struct VoteResultsView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.caption2)
-                            .foregroundStyle(.hintoError)
+                            .foregroundStyle(Color.hintoError)
                         Text("\(result.worstVotes) worst")
                             .font(.hintoCaption)
                             .foregroundStyle(.secondary)

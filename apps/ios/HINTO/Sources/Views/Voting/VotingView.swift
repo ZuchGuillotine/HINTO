@@ -39,7 +39,7 @@ struct VotingView: View {
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Best Fit", systemImage: "heart.fill")
                         .font(.hintoH4)
-                        .foregroundStyle(.hintoSuccess)
+                        .foregroundStyle(Color.hintoSuccess)
 
                     ForEach(situationships) { item in
                         voteOption(item, selected: bestPick?.id == item.id, color: .hintoSuccess) {
@@ -56,7 +56,7 @@ struct VotingView: View {
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Not the One", systemImage: "xmark.circle.fill")
                         .font(.hintoH4)
-                        .foregroundStyle(.hintoError)
+                        .foregroundStyle(Color.hintoError)
 
                     ForEach(situationships) { item in
                         voteOption(item, selected: worstPick?.id == item.id, color: .hintoError) {
@@ -115,8 +115,7 @@ struct VotingView: View {
 
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 72))
-                .foregroundStyle(.hintoSuccess.gradient)
-                .symbolEffect(.bounce)
+                .foregroundStyle(Color.hintoSuccess.gradient)
 
             Text("Vote Submitted!")
                 .font(.hintoH1)
@@ -173,7 +172,7 @@ struct VotingView: View {
     }
 
     private func submitVote() async {
-        guard let best = bestPick, let worst = worstPick else { return }
+        guard bestPick != nil, worstPick != nil else { return }
         isSubmitting = true
 
         // In production, this calls the API

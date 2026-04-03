@@ -60,11 +60,19 @@ struct OnboardingView: View {
                 }
 
                 #if DEBUG
-                Button("Dev Sign In") {
-                    auth.devSignIn()
+                VStack(spacing: Spacing.xs) {
+                    Button("Use Local API") {
+                        Task { await handleLocalDevelopmentAuth() }
+                    }
+                    .font(.hintoCaption)
+                    .foregroundStyle(Color.hintoPink)
+
+                    Button("Preview Mode") {
+                        auth.devSignIn()
+                    }
+                    .font(.hintoCaption)
+                    .foregroundStyle(.tertiary)
                 }
-                .font(.hintoCaption)
-                .foregroundStyle(.tertiary)
                 .padding(.top, Spacing.xs)
                 #endif
             }
@@ -86,6 +94,18 @@ struct OnboardingView: View {
             try await auth.signInWithProvider(provider)
         } catch AuthError.cancelled {
             // User cancelled, do nothing
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    private func handleLocalDevelopmentAuth() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try await auth.signInForLocalDevelopment()
         } catch {
             errorMessage = error.localizedDescription
             showError = true

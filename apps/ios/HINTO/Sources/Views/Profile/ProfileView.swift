@@ -14,12 +14,6 @@ struct ProfileView: View {
     @State private var username = ""
     @State private var displayName = ""
     @State private var bio = ""
-    @State private var location = ""
-    @State private var website = ""
-    @State private var instagram = ""
-    @State private var twitter = ""
-    @State private var snapchat = ""
-    @State private var tiktok = ""
     @State private var privacy: ProfilePrivacy = .private
 
     private var profile: Profile? { auth.currentUser?.profile }
@@ -30,7 +24,7 @@ struct ProfileView: View {
                 VStack(spacing: Spacing.lg) {
                     avatarSection
                     profileFields
-                    socialLinksSection
+                    linkedProvidersSection
                     privacySection
                     accountActions
                 }
@@ -98,7 +92,7 @@ struct ProfileView: View {
             if let tier = profile?.subscriptionTier, tier == .premium {
                 Label("PRO", systemImage: "crown.fill")
                     .font(.hintoCaption)
-                    .foregroundStyle(.hintoPink)
+                    .foregroundStyle(Color.hintoPink)
                     .padding(.horizontal, Spacing.xs)
                     .padding(.vertical, 2)
                     .background(Color.hintoPink.opacity(0.15))
@@ -120,40 +114,34 @@ struct ProfileView: View {
                 editableField("Username", text: $username)
                 editableField("Display Name", text: $displayName)
                 editableField("Bio", text: $bio, axis: .vertical)
-                editableField("Location", text: $location)
-                editableField("Website", text: $website, keyboardType: .URL)
             } else {
                 displayField("Username", value: username)
                 if !displayName.isEmpty { displayField("Display Name", value: displayName) }
                 if !bio.isEmpty { displayField("Bio", value: bio) }
-                if !location.isEmpty { displayField("Location", value: location) }
-                if !website.isEmpty { displayField("Website", value: website) }
             }
         }
     }
 
-    // MARK: - Social Links
+    // MARK: - Linked Providers
 
-    private var socialLinksSection: some View {
+    private var linkedProvidersSection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text("Social Links")
+            Text("Connected Sign-In")
                 .font(.hintoH4)
 
-            if isEditing {
-                socialField("Instagram", icon: "camera", text: $instagram)
-                socialField("Twitter / X", icon: "at", text: $twitter)
-                socialField("Snapchat", icon: "camera.fill", text: $snapchat)
-                socialField("TikTok", icon: "music.note", text: $tiktok)
-            } else {
-                if !instagram.isEmpty { displayField("Instagram", value: "@\(instagram)") }
-                if !twitter.isEmpty { displayField("Twitter", value: "@\(twitter)") }
-                if !snapchat.isEmpty { displayField("Snapchat", value: "@\(snapchat)") }
-                if !tiktok.isEmpty { displayField("TikTok", value: "@\(tiktok)") }
-                if instagram.isEmpty && twitter.isEmpty && snapchat.isEmpty && tiktok.isEmpty {
-                    Text("No social links added")
-                        .font(.hintoBodySmall)
-                        .foregroundStyle(.tertiary)
+            if let providers = auth.currentUser?.auth.linkedProviders, !providers.isEmpty {
+                ForEach(providers, id: \.self) { provider in
+                    Label(provider.capitalized, systemImage: "link")
+                        .font(.hintoBody)
                 }
+            } else {
+                Text("Provider linking will expand as more auth flows land.")
+                    .font(.hintoBodySmall)
+                    .foregroundStyle(.tertiary)
+            }
+
+            if let primaryProvider = auth.currentUser?.auth.primaryProvider {
+                displayField("Primary", value: primaryProvider.capitalized)
             }
         }
     }
@@ -222,24 +210,6 @@ struct ProfileView: View {
     }
 
     @ViewBuilder
-    private func socialField(_ label: String, icon: String, text: Binding<String>) -> some View {
-        HStack(spacing: Spacing.xs) {
-            Image(systemName: icon)
-                .frame(width: 24)
-                .foregroundStyle(.secondary)
-
-            TextField(label, text: text)
-                .font(.hintoBody)
-                .textFieldStyle(.plain)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-        }
-        .padding(Spacing.sm)
-        .background(Color(.tertiarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.base))
-    }
-
-    @ViewBuilder
     private func displayField(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
@@ -272,6 +242,7 @@ struct ProfileView: View {
         guard let token = auth.accessToken else { return }
 
         let update = UpdateProfileRequest(
+            username: username.isEmpty ? nil : username,
             displayName: displayName.isEmpty ? nil : displayName,
             bio: bio.isEmpty ? nil : bio,
             privacy: privacy

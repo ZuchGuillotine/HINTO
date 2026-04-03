@@ -29,7 +29,8 @@ final class APIClient {
         body: (any Encodable)? = nil,
         token: String? = nil
     ) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+        let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let url = baseURL.appendingPathComponent(normalizedPath)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -50,6 +51,9 @@ final class APIClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
             if let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data) {
                 throw APIError.server(
                     code: errorEnvelope.error.code,
@@ -73,6 +77,10 @@ final class APIClient {
         try await request(.patch, path: "/v1/me", body: update, token: token)
     }
 
+    func createDevelopmentSession(input: DevelopmentSessionRequest) async throws -> APIResponse<DevelopmentSessionData> {
+        try await request(.post, path: "/v1/dev/session", body: input)
+    }
+
     // MARK: - Situationships
 
     func getSituationships(token: String) async throws -> APIResponse<SituationshipListAggregate> {
@@ -92,7 +100,7 @@ final class APIClient {
     }
 
     func reorderSituationships(token: String, order: ReorderRequest) async throws -> APIResponse<ReorderResponseData> {
-        try await request(.post, path: "/v1/me/situationships:reorder", body: order, token: token)
+        try await request(.put, path: "/v1/me/situationships/order", body: order, token: token)
     }
 }
 
@@ -122,6 +130,20 @@ struct DeletedData: Decodable {
 struct ReorderResponseData: Decodable {
     let ordering: Ordering
     let items: [Situationship]
+}
+
+struct DevelopmentSessionRequest: Encodable {
+    var profileId: String
+    var username: String
+    var displayName: String
+    var email: String?
+    var privacy: ProfilePrivacy
+}
+
+struct DevelopmentSessionData: Decodable {
+    let accessToken: String
+    let me: MeAggregate
+    let development: Bool
 }
 
 struct APIErrorEnvelope: Decodable {
@@ -164,10 +186,20 @@ struct AnyEncodable: Encodable {
 
 enum Configuration {
     static var apiBaseURL: String {
+        if let environmentValue = ProcessInfo.processInfo.environment["HINTO_API_BASE_URL"],
+           !environmentValue.isEmpty {
+            return environmentValue
+        }
+
+        if let infoValue = Bundle.main.object(forInfoDictionaryKey: "HINTOAPIBaseURL") as? String,
+           !infoValue.isEmpty {
+            return infoValue
+        }
+
         #if DEBUG
-        "http://localhost:3000"
+        return "http://127.0.0.1:3000"
         #else
-        "https://api.hinto.app"
+        return "https://api.hinto.app"
         #endif
     }
 }

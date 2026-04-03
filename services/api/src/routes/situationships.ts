@@ -11,13 +11,16 @@ interface SituationshipRow {
   id: string;
   user_id: string;
   name: string;
-  emoji: string | null;
-  category: string | null;
+  emoji: string;
+  category: string;
   description: string | null;
   rank: number;
-  status: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+  primary_image_id: string | null;
+  image_count: number;
+  has_images: boolean;
 }
 
 function toSituationshipDto(row: SituationshipRow) {
@@ -29,7 +32,7 @@ function toSituationshipDto(row: SituationshipRow) {
     category: row.category,
     description: row.description,
     rank: row.rank ?? 0,
-    status: row.status === 'archived' ? ('archived' as const) : ('active' as const),
+    status: row.is_active ? ('active' as const) : ('archived' as const),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -86,13 +89,13 @@ export async function handleListSituationships(
   // Enrich owner profile info
   const { data: profile } = await supabase
     .from('profiles')
-    .select('username, display_name')
+    .select('username, name')
     .eq('id', authCtx.user.profileId)
     .single();
 
   if (profile) {
     aggregate.ownerProfile.username = (profile as { username: string }).username ?? '';
-    aggregate.ownerProfile.displayName = (profile as { display_name: string }).display_name ?? '';
+    aggregate.ownerProfile.displayName = (profile as { name: string }).name ?? '';
   }
 
   sendJsonSuccess(response, 200, context.requestId, aggregate);
@@ -113,6 +116,12 @@ export async function handleCreateSituationship(
   if (!body.name || typeof body.name !== 'string' || (body.name as string).trim().length === 0) {
     throw new AppError('validation_error', 'name is required', 400);
   }
+  if (!body.emoji || typeof body.emoji !== 'string') {
+    throw new AppError('validation_error', 'emoji is required', 400);
+  }
+  if (!body.category || typeof body.category !== 'string') {
+    throw new AppError('validation_error', 'category is required', 400);
+  }
 
   const supabase = getServiceClient(config);
 
@@ -131,11 +140,11 @@ export async function handleCreateSituationship(
     .insert({
       user_id: authCtx.user.profileId,
       name: (body.name as string).trim(),
-      emoji: body.emoji ?? null,
-      category: body.category ?? null,
+      emoji: (body.emoji as string).trim(),
+      category: (body.category as string).trim(),
       description: body.description ?? null,
       rank: nextRank,
-      status: 'active',
+      is_active: true,
     })
     .select('*')
     .single();
@@ -177,7 +186,7 @@ export async function handleUpdateSituationship(
     if (body.status !== 'active' && body.status !== 'archived') {
       throw new AppError('validation_error', 'status must be active or archived', 400);
     }
-    updateFields.status = body.status;
+    updateFields.is_active = body.status === 'active';
   }
 
   if (Object.keys(updateFields).length === 0) {
@@ -263,7 +272,7 @@ export async function handleReorderSituationships(
   // Fetch current situationships for validation
   const { data: current, error: fetchError } = await supabase
     .from('situationships')
-    .select('id, user_id, rank, status')
+    .select('id, user_id, rank, is_active')
     .eq('user_id', authCtx.user.profileId)
     .order('rank', { ascending: true });
 
@@ -271,7 +280,7 @@ export async function handleReorderSituationships(
     throw new AppError('fetch_failed', 'Failed to fetch current situationships', 500);
   }
 
-  const currentRows = current as { id: string; user_id: string; rank: number; status: string }[];
+  const currentRows = current as { id: string; user_id: string; rank: number; is_active: boolean }[];
 
   // Validate: all IDs must match
   const currentIds = new Set(currentRows.map((r) => r.id));

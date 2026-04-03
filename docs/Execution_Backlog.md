@@ -17,6 +17,21 @@ The active target is:
 - HTTP API and contracts that are clean for both Swift and web clients
 - gradual retirement of AWS Amplify, Cognito, AppSync, and Expo-first assumptions
 
+## Session Focus: 2026-04-01
+
+This section is the live execution tracker for the current build-and-verify push.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| SX-01 | Review canonical restart docs and map current repo state to the next execution slice | Done | Canonical MVP brief, restart plan, backlog, API scaffold, and SwiftUI app shell reviewed at the start of the session |
+| SX-02 | Use this backlog as the status source while delivering the next slice | Done | Session goals, build attempts, and remaining blockers have been recorded here during implementation |
+| SX-03 | Harden local backend wiring for shared iOS + web development | Done | API now auto-loads repo `.env`, serves local CORS headers, and exposes `POST /v1/dev/session` with development-token auth support for `/v1/me` and situationship flows |
+| SX-04 | Build `/apps/web` with comparable JS onboarding, profile, and situationship features | Done | `/apps/web` now contains a dependency-light JS shell with local-dev sign-in, profile editing, situationship create/edit/delete/reorder, and honest roadmap panels for voting + AI |
+| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend | In Progress | Local API base URL override, development sign-in, profile contract alignment, and situationship route fixes are in place; simulator build is down to remaining voting/share view compile cleanup |
+| SX-06 | Add Tuist project generation and local build configuration docs | Done | `Project.swift`, `Workspace.swift`, `Tuist/Config.swift`, and `docs/Local_Development.md` added; `tuist generate` succeeded and produced `HINTO.xcworkspace` |
+| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build | In Progress | `npm run api:build` passed, targeted ESLint for new files passed, `tuist generate` passed, and iterative iOS builds were attempted; localhost server smoke tests still need an out-of-sandbox run and the iOS build still has one remaining SwiftUI compile blocker in the staged voting/share shell |
+| SX-08 | Capture dependency-install signal from the current root package graph | Done | `npm install` completed but confirmed the root dependency graph is still legacy-heavy; warnings were dominated by Expo/AWS/Amplify-era packages rather than the new web/API slice |
+
 ## Assumptions
 
 - A Supabase database already exists and at least one migration has already been applied.
@@ -145,7 +160,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-10 | Write a new canonical MVP brief that replaces Seattle-only and Expo/AWS assumptions | Agent | Done | See `docs/Canonical_MVP_Brief.md` |
 | EX-11 | Write a new system architecture doc for web + Swift + shared backend | Agent | Done | See `docs/Canonical_Architecture.md` |
-| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts` now exist; `/apps/web`, `/packages/prompts`, and `/legacy` remain open |
+| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/web` now exists alongside `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts`; `/packages/prompts` and `/legacy` remain open |
 | EX-13 | Remove or quarantine legacy docs that conflict with the restart plan | Agent | Done | Conflicting AWS/Amplify/Expo planning docs removed; restart docs are now the active source of truth |
 
 ### 2. Domain Model And Database Alignment
@@ -198,10 +213,10 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-60 | Scaffold `/apps/web` | Agent | Todo | Recommended: Next.js |
-| EX-61 | Implement app shell, auth entry, and session handling | Agent | Todo | Must target new backend, not Amplify |
-| EX-62 | Build profile flow on the new API | Agent | Todo | First vertical slice candidate |
-| EX-63 | Build situationship list/detail/create/edit flows | Agent | Todo | Reuse domain naming and copy where useful |
+| EX-60 | Scaffold `/apps/web` | Agent | Done | Restart-era web shell created under `/apps/web` with a local Node dev server and static JS entrypoint to avoid inventing a framework dependency before the first slice is stable |
+| EX-61 | Implement app shell, auth entry, and session handling | Agent | Done | Web shell now uses `POST /v1/dev/session`, stores the returned access token locally, and loads `/v1/me` plus `/v1/me/situationships` from the new backend |
+| EX-62 | Build profile flow on the new API | Agent | Done | Web profile form now edits username, display name, bio, and privacy through `PATCH /v1/me` |
+| EX-63 | Build situationship list/detail/create/edit flows | Agent | Done | Web shell now supports list, create, edit, delete, and reorder against the shared situationship routes |
 | EX-64 | Build voting session and vote submission flows | Agent | Todo | Public or semi-public share flow |
 | EX-65 | Build results view | Agent | Todo | Owner-facing |
 | EX-66 | Add admin-safe report triage view if needed for MVP | Agent | Todo | Could be deferred if manual ops suffice |
@@ -212,9 +227,9 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-70 | Decide whether `/apps/ios` will be created fresh or derived from current `ios/` shell | Agent | Done | Fresh SwiftUI is lower-complexity than reworking the existing Expo-native shell |
 | EX-71 | Scaffold native SwiftUI app structure | Agent | Done | Swift package and app structure exist under `apps/ios` with design tokens, models, navigation, and feature views |
-| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` exists for `/v1/me` and situationship routes, but route alignment and live session exchange still need hardening |
-| EX-73 | Build auth and onboarding shell | Agent | In Progress | `RootView`, `OnboardingView`, and `AuthManager` exist; Apple sign-in and other providers still use placeholder session handling |
-| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile and situationship screens exist with partial API wiring; they are not yet validated end-to-end against the live backend |
+| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` now supports local base URL overrides, development session bootstrap, and the correct situationship reorder route; remaining work is full end-to-end validation after the simulator build is clean |
+| EX-73 | Build auth and onboarding shell | Agent | In Progress | `OnboardingView` now offers `Use Local API` in debug builds and `AuthManager` caches the restored profile/session; real Apple and other provider flows remain staged |
+| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile editing now matches the current backend contract more honestly and situationship CRUD/reorder wiring is improved, but simulator verification is still in progress |
 | EX-75 | Build voting and results flows | Agent | In Progress | Native voting/results views exist, but backend voting routes do not yet exist and current submission behavior is placeholder-only |
 | EX-76 | Build AI coach UI against backend API | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet |
 
@@ -235,7 +250,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-90 | Add backend test harness | Agent | Todo | Unit + route/integration tests |
 | EX-91 | Add contract validation in CI | Agent | Todo | Prevent API drift across clients |
-| EX-92 | Add web app smoke tests | Agent | Todo | Critical flows only at first |
+| EX-92 | Add web app smoke tests | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
 | EX-93 | Add iOS networking/model tests | Agent | Todo | Expand as native app grows |
 | EX-94 | Add migration verification and seed/dev fixtures | Agent | Todo | Necessary for repeatable local setup |
 | EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |

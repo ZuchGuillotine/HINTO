@@ -117,7 +117,7 @@ struct SituationshipDetailView: View {
                 if name.count > 40 {
                     Text("\(50 - name.count) characters remaining")
                         .font(.hintoCaption)
-                        .foregroundStyle(name.count > 50 ? .hintoError : .secondary)
+                        .foregroundStyle(name.count > 50 ? Color.hintoError : Color.secondary)
                 }
             }
 

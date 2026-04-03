@@ -13,6 +13,8 @@ final class AuthManager: NSObject {
 
     private let tokenKey = "hinto_access_token"
     private let profileKey = "hinto_profile_cache"
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     override init() {
         super.init()
@@ -26,6 +28,10 @@ final class AuthManager: NSObject {
             self.accessToken = token
             self.isAuthenticated = true
         }
+        if let data = UserDefaults.standard.data(forKey: profileKey),
+           let user = try? decoder.decode(MeAggregate.self, from: data) {
+            self.currentUser = user
+        }
         self.isLoading = false
     }
 
@@ -35,6 +41,9 @@ final class AuthManager: NSObject {
         self.isAuthenticated = true
         self.authError = nil
         UserDefaults.standard.set(token, forKey: tokenKey)
+        if let encoded = try? encoder.encode(user) {
+            UserDefaults.standard.set(encoded, forKey: profileKey)
+        }
     }
 
     func signOut() {
@@ -43,6 +52,19 @@ final class AuthManager: NSObject {
         isAuthenticated = false
         UserDefaults.standard.removeObject(forKey: tokenKey)
         UserDefaults.standard.removeObject(forKey: profileKey)
+    }
+
+    func signInForLocalDevelopment() async throws {
+        let request = DevelopmentSessionRequest(
+            profileId: "dev-user-001",
+            username: "local_dev",
+            displayName: "Local Dev",
+            email: "dev@hinto.app",
+            privacy: .private
+        )
+        let client = APIClient()
+        let response = try await client.createDevelopmentSession(input: request)
+        setSession(token: response.data.accessToken, user: response.data.me)
     }
 
     // MARK: - Sign in with Apple

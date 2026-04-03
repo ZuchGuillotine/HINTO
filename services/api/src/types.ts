@@ -4,6 +4,7 @@ export interface AppConfig {
   apiName: string;
   host: string;
   port: number;
+  corsAllowOrigin: string;
   logLevel: LogLevel;
   nodeEnv: string;
   supabaseUrl?: string;
