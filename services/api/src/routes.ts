@@ -3,6 +3,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppConfig, RequestContext } from './types.js';
 import { sendJsonSuccess, sendJsonError } from './http.js';
 import { AppError, toErrorEnvelope } from './errors.js';
+import { handleEmailOtp, handleEmailVerify, handleRefreshToken } from './routes/auth.js';
 import { handleCreateDevelopmentSession } from './routes/dev.js';
 import { handleGetMe, handlePatchMe } from './routes/profile.js';
 import {
@@ -58,6 +59,9 @@ async function routeAsync(
       api: 'v1',
       status: 'active',
       routes: [
+        'POST /v1/auth/email/otp',
+        'POST /v1/auth/email/verify',
+        'POST /v1/auth/refresh',
         'GET  /v1/me',
         'PATCH /v1/me',
         'POST /v1/dev/session',
@@ -73,6 +77,23 @@ async function routeAsync(
 
   if (method === 'POST' && path === '/v1/dev/session') {
     await handleCreateDevelopmentSession(request, response, context, config);
+    return true;
+  }
+
+  // ── Auth routes (no bearer token required) ──────────────────
+
+  if (method === 'POST' && path === '/v1/auth/email/otp') {
+    await handleEmailOtp(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/email/verify') {
+    await handleEmailVerify(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/refresh') {
+    await handleRefreshToken(request, response, context, config);
     return true;
   }
 

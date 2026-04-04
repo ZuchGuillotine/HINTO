@@ -81,6 +81,20 @@ final class APIClient {
         try await request(.post, path: "/v1/dev/session", body: input)
     }
 
+    // MARK: - Auth
+
+    func sendEmailOtp(email: String) async throws -> APIResponse<EmailOtpResponse> {
+        try await request(.post, path: "/v1/auth/email/otp", body: EmailOtpRequest(email: email))
+    }
+
+    func verifyEmailOtp(email: String, code: String) async throws -> APIResponse<AuthSessionData> {
+        try await request(.post, path: "/v1/auth/email/verify", body: EmailVerifyRequest(email: email, token: code))
+    }
+
+    func refreshSession(refreshToken: String) async throws -> APIResponse<AuthSessionData> {
+        try await request(.post, path: "/v1/auth/refresh", body: RefreshTokenRequest(refreshToken: refreshToken))
+    }
+
     // MARK: - Situationships
 
     func getSituationships(token: String) async throws -> APIResponse<SituationshipListAggregate> {
@@ -144,6 +158,33 @@ struct DevelopmentSessionData: Decodable {
     let accessToken: String
     let me: MeAggregate
     let development: Bool
+}
+
+// MARK: - Auth Types
+
+struct EmailOtpRequest: Encodable {
+    let email: String
+}
+
+struct EmailOtpResponse: Decodable {
+    let sent: Bool
+    let email: String
+}
+
+struct EmailVerifyRequest: Encodable {
+    let email: String
+    let token: String
+}
+
+struct AuthSessionData: Decodable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresAt: Int?
+    let me: MeAggregate
+}
+
+struct RefreshTokenRequest: Encodable {
+    let refreshToken: String
 }
 
 struct APIErrorEnvelope: Decodable {

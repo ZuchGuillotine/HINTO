@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showEmailSignIn = false
 
     private let slides: [(emoji: String, title: String, description: String)] = [
         ("💖", "Welcome to HINTO", "Navigate your dating life with clarity and get the truth about your situationships."),
@@ -79,6 +80,16 @@ struct OnboardingView: View {
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.xl)
         }
+        .sheet(isPresented: $showEmailSignIn) {
+            NavigationStack {
+                EmailSignInView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showEmailSignIn = false }
+                        }
+                    }
+            }
+        }
         .alert("Sign In Error", isPresented: $showError) {
             Button("OK") {}
         } message: {
@@ -87,6 +98,11 @@ struct OnboardingView: View {
     }
 
     private func handleAuth(_ provider: AuthProvider) async {
+        if provider == .email {
+            showEmailSignIn = true
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 

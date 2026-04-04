@@ -12,6 +12,7 @@ final class AuthManager: NSObject {
     private(set) var accessToken: String?
 
     private let tokenKey = "hinto_access_token"
+    private let refreshTokenKey = "hinto_refresh_token"
     private let profileKey = "hinto_profile_cache"
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -35,12 +36,15 @@ final class AuthManager: NSObject {
         self.isLoading = false
     }
 
-    func setSession(token: String, user: MeAggregate) {
+    func setSession(token: String, refreshToken: String? = nil, user: MeAggregate) {
         self.accessToken = token
         self.currentUser = user
         self.isAuthenticated = true
         self.authError = nil
         UserDefaults.standard.set(token, forKey: tokenKey)
+        if let refreshToken {
+            UserDefaults.standard.set(refreshToken, forKey: refreshTokenKey)
+        }
         if let encoded = try? encoder.encode(user) {
             UserDefaults.standard.set(encoded, forKey: profileKey)
         }
@@ -51,6 +55,7 @@ final class AuthManager: NSObject {
         currentUser = nil
         isAuthenticated = false
         UserDefaults.standard.removeObject(forKey: tokenKey)
+        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
         UserDefaults.standard.removeObject(forKey: profileKey)
     }
 
@@ -126,16 +131,49 @@ final class AuthManager: NSObject {
         }
     }
 
+    // MARK: - Email Auth
+
+    func sendEmailOtp(email: String) async throws {
+        let client = APIClient()
+        let _ = try await client.sendEmailOtp(email: email)
+    }
+
+    func verifyEmailOtp(email: String, code: String) async throws {
+        let client = APIClient()
+        let response = try await client.verifyEmailOtp(email: email, code: code)
+        setSession(
+            token: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            user: response.data.me
+        )
+    }
+
+    // MARK: - Token Refresh
+
+    func refreshSessionIfNeeded() async throws {
+        guard let refreshToken = UserDefaults.standard.string(forKey: refreshTokenKey) else {
+            signOut()
+            throw AuthError.sessionExpired
+        }
+        let client = APIClient()
+        let response = try await client.refreshSession(refreshToken: refreshToken)
+        setSession(
+            token: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            user: response.data.me
+        )
+    }
+
     // MARK: - Social Auth Placeholder
 
     func signInWithProvider(_ provider: AuthProvider) async throws {
-        // In production, each provider redirects to backend OAuth flow
-        // Backend exchanges tokens and returns Supabase session
         switch provider {
         case .apple:
             try await signInWithApple()
-        case .facebook, .snapchat, .tiktok, .email:
-            // Placeholder: these would open ASWebAuthenticationSession
+        case .email:
+            // Email handled via EmailSignInView directly
+            break
+        case .facebook, .snapchat, .tiktok:
             throw AuthError.providerNotImplemented(provider.rawValue)
         }
     }
@@ -228,12 +266,14 @@ enum AuthError: LocalizedError {
     case invalidCredential
     case providerNotImplemented(String)
     case cancelled
+    case sessionExpired
 
     var errorDescription: String? {
         switch self {
         case .invalidCredential: "Invalid sign-in credential"
         case .providerNotImplemented(let p): "\(p) sign-in coming soon"
         case .cancelled: "Sign-in was cancelled"
+        case .sessionExpired: "Your session has expired. Please sign in again."
         }
     }
 }
