@@ -2,8 +2,6 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
 import { loadConfig } from './config.js';
-import { toErrorEnvelope } from './errors.js';
-import { sendJsonError } from './http.js';
 import { Logger } from './logger.js';
 import { routeRequest } from './routes.js';
 import { RequestContext } from './types.js';
@@ -21,6 +19,15 @@ function createRequestContext(): RequestContext {
 const server = createServer((request, response) => {
   const context = createRequestContext();
   response.setHeader('x-request-id', context.requestId);
+  response.setHeader('access-control-allow-origin', config.corsAllowOrigin);
+  response.setHeader('access-control-allow-methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
+  response.setHeader('access-control-allow-headers', 'Content-Type, Authorization');
+
+  if (request.method === 'OPTIONS') {
+    response.statusCode = 204;
+    response.end();
+    return;
+  }
 
   routeRequest(request, response, context, config);
 

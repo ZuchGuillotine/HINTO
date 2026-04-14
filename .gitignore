@@ -63,5 +63,16 @@ amplifytools.xcconfig
 **.sample
 #amplify-do-not-edit-end
 
+# Xcode / Tuist (generated — regenerate with `tuist generate`)
+HINTO.xcodeproj/
+HINTO.xcworkspace/
+Derived/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+apps/ios/.build/
+.swiftpm/
+
 # Babel custom plugins (keep for TypeScript compatibility)
 !babel-plugin-fix-ts-unknown.js

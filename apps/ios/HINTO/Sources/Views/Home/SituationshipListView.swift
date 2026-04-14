@@ -123,7 +123,7 @@ struct SituationshipListView: View {
                         if isReordering {
                             Text("Drag to reorder")
                                 .font(.hintoCaption)
-                                .foregroundStyle(.hintoPink)
+                                .foregroundStyle(Color.hintoPink)
                                 .textCase(nil)
                         }
                     }
@@ -141,7 +141,7 @@ struct SituationshipListView: View {
         VStack(spacing: Spacing.lg) {
             Image(systemName: "heart.text.clipboard")
                 .font(.system(size: 64))
-                .foregroundStyle(.hintoPink.gradient)
+                .foregroundStyle(Color.hintoPink.gradient)
                 .symbolEffect(.pulse)
 
             VStack(spacing: Spacing.xs) {

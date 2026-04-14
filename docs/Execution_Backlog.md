@@ -1,7 +1,7 @@
 # HINTO Execution Backlog
 
 *Created: 2026-03-27*
-*Reviewed: 2026-03-31*
+*Reviewed: 2026-04-14*
 
 ## Purpose
 
@@ -16,6 +16,22 @@ The active target is:
 - PostgreSQL/Supabase-backed data model
 - HTTP API and contracts that are clean for both Swift and web clients
 - gradual retirement of AWS Amplify, Cognito, AppSync, and Expo-first assumptions
+
+## Session Focus: 2026-04-14
+
+This section is the live execution tracker for the current build-and-verify push.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| SX-01 | Review canonical restart docs and map current repo state to the next execution slice | Done | Canonical MVP brief, restart plan, backlog, API scaffold, and SwiftUI app shell reviewed at the start of the session |
+| SX-02 | Use this backlog as the status source while delivering the next slice | Done | Session goals, build attempts, and remaining blockers have been recorded here during implementation |
+| SX-03 | Harden local backend wiring for shared iOS + web development | Done | API now auto-loads repo `.env`, serves local CORS headers, and exposes `POST /v1/dev/session` with development-token auth support for `/v1/me` and situationship flows |
+| SX-04 | Build `/apps/web` with comparable JS onboarding, profile, and situationship features | Done | `/apps/web` now contains a dependency-light JS shell with local-dev sign-in, profile editing, situationship create/edit/delete/reorder, and honest roadmap panels for voting + AI |
+| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend | In Progress | Local API base URL override, development sign-in, profile contract alignment, and situationship route fixes are in place; simulator build is down to remaining voting/share view compile cleanup |
+| SX-06 | Add Tuist project generation and local build configuration docs | Done | `Project.swift`, `Workspace.swift`, `Tuist/Config.swift`, and `docs/Local_Development.md` added; `tuist generate` succeeded and produced `HINTO.xcworkspace` |
+| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build | In Progress | `npm run api:build` passed, targeted ESLint for new files passed, `tuist generate` passed, and iterative iOS builds were attempted; localhost server smoke tests still need an out-of-sandbox run and the iOS build still has one remaining SwiftUI compile blocker in the staged voting/share shell |
+| SX-08 | Capture dependency-install signal from the current root package graph | Done | `npm install` completed but confirmed the root dependency graph is still legacy-heavy; warnings were dominated by Expo/AWS/Amplify-era packages rather than the new web/API slice |
+| SX-09 | Implement the restart-era voting backend slice and update the backlog/docs to match branch reality | In Progress | Contracts, domain helpers, API routes, targeted node tests, and `supabase/migrations/011_voting_session_identity_support.sql` are now in tree; remote DB apply, client wiring, and end-to-end verification remain |
 
 ## Assumptions
 
@@ -145,7 +161,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-10 | Write a new canonical MVP brief that replaces Seattle-only and Expo/AWS assumptions | Agent | Done | See `docs/Canonical_MVP_Brief.md` |
 | EX-11 | Write a new system architecture doc for web + Swift + shared backend | Agent | Done | See `docs/Canonical_Architecture.md` |
-| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts` now exist; `/apps/web`, `/packages/prompts`, and `/legacy` remain open |
+| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/web` now exists alongside `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts`; `/packages/prompts` and `/legacy` remain open |
 | EX-13 | Remove or quarantine legacy docs that conflict with the restart plan | Agent | Done | Conflicting AWS/Amplify/Expo planning docs removed; restart docs are now the active source of truth |
 
 ### 2. Domain Model And Database Alignment
@@ -169,8 +185,8 @@ Evaluator output should always classify findings as:
 | EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
 | EX-35 | Add auth middleware and session/user resolution | Agent | Done | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts` |
 | EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
-| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | Todo | Apple and Meta/Facebook should use Supabase-managed auth where practical |
-| EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | Todo | Snapchat and TikTok likely require backend-owned OAuth/token-exchange flows layered onto the Supabase user/session model |
+| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | In Progress | Apple and Meta/Facebook should use Supabase-managed auth where practical; custom-provider backend wiring now exists alongside this work |
+| EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | In Progress | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` now exist; TikTok session bootstrap is wired, Snapchat still needs the provider external ID handshake finalized |
 
 ### 4. Backend Modules
 
@@ -178,9 +194,9 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
 | EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
-| EX-42 | Implement voting session routes/services | Agent | Todo | Create session, expire session, retrieve public voting view |
-| EX-43 | Implement vote submission routes/services | Agent | Todo | Best/worst selection, optional comment, idempotency safeguards |
-| EX-44 | Implement results aggregation routes/services | Agent | Todo | Owner-facing summaries, counts, comments, anonymity rules |
+| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` now exist on `restart-plan`; runtime verification against a live Supabase project is still pending |
+| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` now records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; live DB verification is still pending |
+| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` now computes ranked owner-facing results plus comment summaries; client integration and remote verification remain |
 | EX-45 | Implement report/block routes/services | Agent | Todo | Minimal moderation-safe MVP |
 | EX-46 | Implement AI conversation/message routes/services | Agent | Todo | Conversation persistence, moderation hooks, quotas |
 | EX-47 | Implement storage helpers for media/share assets | Agent | Todo | Use backend-compatible storage assumptions |
@@ -198,10 +214,10 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-60 | Scaffold `/apps/web` | Agent | Todo | Recommended: Next.js |
-| EX-61 | Implement app shell, auth entry, and session handling | Agent | Todo | Must target new backend, not Amplify |
-| EX-62 | Build profile flow on the new API | Agent | Todo | First vertical slice candidate |
-| EX-63 | Build situationship list/detail/create/edit flows | Agent | Todo | Reuse domain naming and copy where useful |
+| EX-60 | Scaffold `/apps/web` | Agent | Done | Restart-era web shell created under `/apps/web` with a local Node dev server and static JS entrypoint to avoid inventing a framework dependency before the first slice is stable |
+| EX-61 | Implement app shell, auth entry, and session handling | Agent | Done | Web shell now uses `POST /v1/dev/session`, stores the returned access token locally, and loads `/v1/me` plus `/v1/me/situationships` from the new backend |
+| EX-62 | Build profile flow on the new API | Agent | Done | Web profile form now edits username, display name, bio, and privacy through `PATCH /v1/me` |
+| EX-63 | Build situationship list/detail/create/edit flows | Agent | Done | Web shell now supports list, create, edit, delete, and reorder against the shared situationship routes |
 | EX-64 | Build voting session and vote submission flows | Agent | Todo | Public or semi-public share flow |
 | EX-65 | Build results view | Agent | Todo | Owner-facing |
 | EX-66 | Add admin-safe report triage view if needed for MVP | Agent | Todo | Could be deferred if manual ops suffice |
@@ -212,10 +228,10 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-70 | Decide whether `/apps/ios` will be created fresh or derived from current `ios/` shell | Agent | Done | Fresh SwiftUI is lower-complexity than reworking the existing Expo-native shell |
 | EX-71 | Scaffold native SwiftUI app structure | Agent | Done | Swift package and app structure exist under `apps/ios` with design tokens, models, navigation, and feature views |
-| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` exists for `/v1/me` and situationship routes, but route alignment and live session exchange still need hardening |
-| EX-73 | Build auth and onboarding shell | Agent | In Progress | `RootView`, `OnboardingView`, and `AuthManager` exist; Apple sign-in and other providers still use placeholder session handling |
-| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile and situationship screens exist with partial API wiring; they are not yet validated end-to-end against the live backend |
-| EX-75 | Build voting and results flows | Agent | In Progress | Native voting/results views exist, but backend voting routes do not yet exist and current submission behavior is placeholder-only |
+| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` now supports local base URL overrides, development session bootstrap, and the correct situationship reorder route; remaining work is full end-to-end validation after the simulator build is clean |
+| EX-73 | Build auth and onboarding shell | Agent | In Progress | `OnboardingView` now offers `Use Local API` in debug builds and `AuthManager` caches the restored profile/session; real Apple and other provider flows remain staged |
+| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile editing now matches the current backend contract more honestly and situationship CRUD/reorder wiring is improved, but simulator verification is still in progress |
+| EX-75 | Build voting and results flows | Agent | In Progress | SwiftUI share-session creation now targets the backend, but vote submission and results still use placeholder calls and need full API integration plus simulator verification |
 | EX-76 | Build AI coach UI against backend API | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet |
 
 ### 8. Client Migration And De-AWS Work
@@ -235,7 +251,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-90 | Add backend test harness | Agent | Todo | Unit + route/integration tests |
 | EX-91 | Add contract validation in CI | Agent | Todo | Prevent API drift across clients |
-| EX-92 | Add web app smoke tests | Agent | Todo | Critical flows only at first |
+| EX-92 | Add web app smoke tests | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
 | EX-93 | Add iOS networking/model tests | Agent | Todo | Expand as native app grows |
 | EX-94 | Add migration verification and seed/dev fixtures | Agent | Todo | Necessary for repeatable local setup |
 | EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |
@@ -312,11 +328,11 @@ If that works on web and the iOS networking layer, the foundation is credible.
 2. Verify Supabase connectivity and confirm the current remote project/env contract.
 3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
 4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
-5. Add backend route tests and DB connectivity checks for the first slice.
+5. Add broader backend route tests and DB connectivity checks for the first slice plus voting routes.
 6. Add provider-start and provider-callback flows after the canonical session path is wired.
-7. Implement voting session and vote submission routes (EX-42, EX-43).
-8. Scaffold `/apps/web` and build first vertical slice on the new API (EX-60 through EX-63).
-9. Align the existing SwiftUI app shell with the live backend contracts and replace placeholder auth/session behavior.
+7. Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes (EX-64, EX-65, EX-75).
+8. Replace active legacy AWS client calls with backend-neutral service clients (EX-82, EX-83).
+9. Align the existing SwiftUI app shell with the live backend contracts and replace remaining placeholder auth/voting/session behavior.
 
 ## Current Orchestrator Guidance
 
@@ -328,7 +344,7 @@ Use the following sequencing constraints while agents are active:
 - Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
 - Treat `apps/ios` as the current native baseline, but do not mistake its placeholder auth, vote submission, or AI responses for end-to-end integration.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
-- Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.
+- Voting backend routes now exist in-tree, but EX-90 still needs broader route and DB-backed verification before the voting stack should be treated as production-ready.
 - Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
 
 ## Completed Agent Packets
@@ -380,22 +396,23 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
 - Deliverables:
   - provider-start and provider-callback routes
   - identity-linking flow against `auth_identities`
+  - Supabase session bootstrap after custom-provider callback success
 - Guardrails:
   - Apple and Meta/Facebook should use Supabase-managed auth where supported
   - Snapchat and TikTok require custom backend OAuth flows
   - do not recreate Cognito-shaped client state
 
-### Packet G: EX-42, EX-43, EX-44
+### Packet G: EX-42, EX-43, EX-44 follow-up
 
-- Goal: implement voting session, vote submission, and results routes
+- Goal: verify and integrate the new voting session, vote submission, and results routes
 - Inputs:
   - `packages/contracts`, `packages/domain`
   - donor repo voting functions (`003_voting_functions.sql`)
   - `docs/Canonical_Domain_Model.md`
 - Deliverables:
-  - voting session create/expire/retrieve routes
-  - vote submission with best/worst, comments, idempotency
-  - results aggregation with anonymity rules
+  - DB-backed verification for create/expire/retrieve routes
+  - duplicate-vote and migration validation against a live Supabase project
+  - client-facing integration notes for web and Swift shells
 - Guardrails:
   - reuse donor DB functions where applicable
   - keep public vote flows auth-free
@@ -461,17 +478,17 @@ These are the next preferred bounded tasks after the accepted outputs above.
 | Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
 | --- | --- | --- | --- | --- |
 | Q9 | EX-90, EX-94 | Add backend route tests, migration verification, and DB connectivity checks for the first slice | accepted scaffold/packages plus Supabase project details | test harness, connectivity probe, and repeatable dev verification |
-| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes and identity-linking flow |
-| Q11 | EX-42, EX-43, EX-44 | Implement voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions | voting session CRUD, vote submission, results aggregation |
+| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
+| Q11 | EX-42, EX-43, EX-44 | Verify and integrate voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts` | DB verification, client integration, and follow-up hardening for voting routes |
 | Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
 | Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
 | Q14 | EX-72, EX-73, EX-74, EX-75, EX-76 | Align the existing SwiftUI shell with the live backend and current scope | `apps/ios`, `packages/contracts`, `services/api/src/routes/*` | route alignment, real session handling where available, and explicit placeholder boundaries |
 
 Queue constraints:
 
-- Q9 should complete before starting Q10 or Q11, to confirm the first slice is stable.
-- Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only.
-- Q11 should start with session creation and vote submission only, deferring AI integration.
+- Q9 should still complete before claiming Q11 production-ready, even though the initial voting route implementation now exists.
+- Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only; TikTok backend callback/session bootstrap is already in place, while Snapchat still needs the external-id completion step finalized.
+- Q11 should focus on DB verification, client wiring, and duplicate-vote hardening only; AI integration remains deferred.
 - Q13 can run in parallel with Q10/Q11 once Q9 passes.
 - Q14 should avoid over-integrating voting or AI before Q11 exists; profile and situationship wiring should come first.
 

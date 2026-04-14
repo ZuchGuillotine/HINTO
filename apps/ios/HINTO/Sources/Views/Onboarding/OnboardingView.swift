@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showEmailSignIn = false
 
     private let slides: [(emoji: String, title: String, description: String)] = [
         ("💖", "Welcome to HINTO", "Navigate your dating life with clarity and get the truth about your situationships."),
@@ -60,16 +61,34 @@ struct OnboardingView: View {
                 }
 
                 #if DEBUG
-                Button("Dev Sign In") {
-                    auth.devSignIn()
+                VStack(spacing: Spacing.xs) {
+                    Button("Use Local API") {
+                        Task { await handleLocalDevelopmentAuth() }
+                    }
+                    .font(.hintoCaption)
+                    .foregroundStyle(Color.hintoPink)
+
+                    Button("Preview Mode") {
+                        auth.devSignIn()
+                    }
+                    .font(.hintoCaption)
+                    .foregroundStyle(.tertiary)
                 }
-                .font(.hintoCaption)
-                .foregroundStyle(.tertiary)
                 .padding(.top, Spacing.xs)
                 #endif
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.xl)
+        }
+        .sheet(isPresented: $showEmailSignIn) {
+            NavigationStack {
+                EmailSignInView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showEmailSignIn = false }
+                        }
+                    }
+            }
         }
         .alert("Sign In Error", isPresented: $showError) {
             Button("OK") {}
@@ -79,6 +98,11 @@ struct OnboardingView: View {
     }
 
     private func handleAuth(_ provider: AuthProvider) async {
+        if provider == .email {
+            showEmailSignIn = true
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -86,6 +110,18 @@ struct OnboardingView: View {
             try await auth.signInWithProvider(provider)
         } catch AuthError.cancelled {
             // User cancelled, do nothing
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    private func handleLocalDevelopmentAuth() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try await auth.signInForLocalDevelopment()
         } catch {
             errorMessage = error.localizedDescription
             showError = true

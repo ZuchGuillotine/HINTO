@@ -38,6 +38,8 @@ struct VotingSession: Codable, Identifiable {
 
 struct VoteSubmission: Codable {
     let votingSessionId: String
+    let voterIdentity: String
+    var voterName: String?
     let bestSituationshipId: String
     let worstSituationshipId: String
     var comment: String?
@@ -62,7 +64,80 @@ struct VoteResult: Codable, Identifiable {
 }
 
 struct VoteResultsAggregate: Codable {
-    let votingSessionId: String
+    let session: VotingSession
+    let totalVotes: Int
     let totalVoters: Int
     let results: [VoteResult]
+    let comments: [VoteComment]
+}
+
+struct VoteComment: Codable, Identifiable {
+    let comment: String
+    let createdAt: String
+    let voteType: String
+    let situationshipId: String
+    let voterLabel: String?
+
+    var id: String {
+        "\(situationshipId)-\(createdAt)-\(voteType)"
+    }
+}
+
+struct CreateVotingSessionRequest: Encodable {
+    var title: String? = nil
+    var description: String? = nil
+    var anonymityMode: String = "anonymous"
+    var expiresInHours: Int = 48
+}
+
+struct CreateVotingSessionData: Decodable {
+    let session: VotingSession
+    let itemsCount: Int
+    let publicPath: String
+}
+
+struct VotingSessionMutationData: Decodable {
+    let session: VotingSession
+}
+
+struct PublicVotingSessionAggregate: Decodable {
+    let session: VotingSession
+    let ownerProfile: OwnerProfileSummary
+    let viewerContext: PublicVotingViewerContext
+    let items: [Situationship]
+    let capabilities: PublicVotingCapabilities
+    let audience: PublicVotingAudience
+}
+
+struct PublicVotingViewerContext: Decodable {
+    let mode: String
+}
+
+struct PublicVotingCapabilities: Decodable {
+    let canVote: Bool
+    let canComment: Bool
+}
+
+struct PublicVotingAudience: Decodable {
+    let mode: String
+}
+
+struct SubmitVoteRequest: Encodable {
+    let voterIdentity: String
+    let voterName: String?
+    let bestSituationshipId: String
+    let worstSituationshipId: String
+    let comment: String?
+}
+
+struct SubmitVoteData: Decodable {
+    let votingSessionId: String
+    let accepted: Bool
+    let votesRecorded: Int
+    let selections: VoteSelections
+}
+
+struct VoteSelections: Decodable {
+    let bestSituationshipId: String
+    let worstSituationshipId: String
 }

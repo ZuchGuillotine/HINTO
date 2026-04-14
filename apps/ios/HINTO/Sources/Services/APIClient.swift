@@ -29,7 +29,8 @@ final class APIClient {
         body: (any Encodable)? = nil,
         token: String? = nil
     ) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+        let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let url = baseURL.appendingPathComponent(normalizedPath)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -50,6 +51,9 @@ final class APIClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
             if let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data) {
                 throw APIError.server(
                     code: errorEnvelope.error.code,
@@ -73,6 +77,24 @@ final class APIClient {
         try await request(.patch, path: "/v1/me", body: update, token: token)
     }
 
+    func createDevelopmentSession(input: DevelopmentSessionRequest) async throws -> APIResponse<DevelopmentSessionData> {
+        try await request(.post, path: "/v1/dev/session", body: input)
+    }
+
+    // MARK: - Auth
+
+    func sendEmailOtp(email: String) async throws -> APIResponse<EmailOtpResponse> {
+        try await request(.post, path: "/v1/auth/email/otp", body: EmailOtpRequest(email: email))
+    }
+
+    func verifyEmailOtp(email: String, code: String) async throws -> APIResponse<AuthSessionData> {
+        try await request(.post, path: "/v1/auth/email/verify", body: EmailVerifyRequest(email: email, token: code))
+    }
+
+    func refreshSession(refreshToken: String) async throws -> APIResponse<AuthSessionData> {
+        try await request(.post, path: "/v1/auth/refresh", body: RefreshTokenRequest(refreshToken: refreshToken))
+    }
+
     // MARK: - Situationships
 
     func getSituationships(token: String) async throws -> APIResponse<SituationshipListAggregate> {
@@ -92,7 +114,29 @@ final class APIClient {
     }
 
     func reorderSituationships(token: String, order: ReorderRequest) async throws -> APIResponse<ReorderResponseData> {
-        try await request(.post, path: "/v1/me/situationships:reorder", body: order, token: token)
+        try await request(.put, path: "/v1/me/situationships/order", body: order, token: token)
+    }
+
+    // MARK: - Voting
+
+    func createVotingSession(token: String, input: CreateVotingSessionRequest = CreateVotingSessionRequest()) async throws -> APIResponse<CreateVotingSessionData> {
+        try await request(.post, path: "/v1/me/voting-sessions", body: input, token: token)
+    }
+
+    func expireVotingSession(token: String, votingSessionId: String) async throws -> APIResponse<VotingSessionMutationData> {
+        try await request(.post, path: "/v1/me/voting-sessions/\(votingSessionId)/expire", token: token)
+    }
+
+    func getPublicVotingSession(inviteCode: String) async throws -> APIResponse<PublicVotingSessionAggregate> {
+        try await request(.get, path: "/v1/voting-sessions/\(inviteCode)")
+    }
+
+    func submitVote(inviteCode: String, input: SubmitVoteRequest) async throws -> APIResponse<SubmitVoteData> {
+        try await request(.post, path: "/v1/voting-sessions/\(inviteCode)/votes", body: input)
+    }
+
+    func getVotingResults(token: String, votingSessionId: String) async throws -> APIResponse<VoteResultsAggregate> {
+        try await request(.get, path: "/v1/me/voting-sessions/\(votingSessionId)/results", token: token)
     }
 }
 
@@ -122,6 +166,47 @@ struct DeletedData: Decodable {
 struct ReorderResponseData: Decodable {
     let ordering: Ordering
     let items: [Situationship]
+}
+
+struct DevelopmentSessionRequest: Encodable {
+    var profileId: String
+    var username: String
+    var displayName: String
+    var email: String?
+    var privacy: ProfilePrivacy
+}
+
+struct DevelopmentSessionData: Decodable {
+    let accessToken: String
+    let me: MeAggregate
+    let development: Bool
+}
+
+// MARK: - Auth Types
+
+struct EmailOtpRequest: Encodable {
+    let email: String
+}
+
+struct EmailOtpResponse: Decodable {
+    let sent: Bool
+    let email: String
+}
+
+struct EmailVerifyRequest: Encodable {
+    let email: String
+    let token: String
+}
+
+struct AuthSessionData: Decodable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresAt: Int?
+    let me: MeAggregate
+}
+
+struct RefreshTokenRequest: Encodable {
+    let refreshToken: String
 }
 
 struct APIErrorEnvelope: Decodable {
@@ -164,10 +249,20 @@ struct AnyEncodable: Encodable {
 
 enum Configuration {
     static var apiBaseURL: String {
+        if let environmentValue = ProcessInfo.processInfo.environment["HINTO_API_BASE_URL"],
+           !environmentValue.isEmpty {
+            return environmentValue
+        }
+
+        if let infoValue = Bundle.main.object(forInfoDictionaryKey: "HINTOAPIBaseURL") as? String,
+           !infoValue.isEmpty {
+            return infoValue
+        }
+
         #if DEBUG
-        "http://localhost:3000"
+        return "http://127.0.0.1:3000"
         #else
-        "https://api.hinto.app"
+        return "https://api.hinto.app"
         #endif
     }
 }

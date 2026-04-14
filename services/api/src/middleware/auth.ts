@@ -23,6 +23,47 @@ function extractBearerToken(request: IncomingMessage): string | null {
   return header.slice(7);
 }
 
+async function resolveDevelopmentUser(
+  token: string,
+  config: AppConfig,
+): Promise<AuthenticatedUser | null> {
+  if (config.nodeEnv === 'production') {
+    return null;
+  }
+
+  const usesLegacyToken = token === 'dev-token';
+  const usesScopedToken = token.startsWith('dev-session:');
+  if (!usesLegacyToken && !usesScopedToken) {
+    return null;
+  }
+
+  const profileId = usesLegacyToken ? 'dev-user-001' : token.slice('dev-session:'.length).trim();
+  if (!profileId) {
+    throw new AppError('unauthorized', 'Invalid development session token', 401);
+  }
+
+  const supabase = getServiceClient(config);
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .eq('id', profileId)
+    .single();
+
+  if (error || !profile) {
+    throw new AppError(
+      'profile_not_found',
+      'Development profile not found. Create a development session first.',
+      404,
+    );
+  }
+
+  return {
+    authUserId: profileId,
+    profileId: profile.id,
+    email: profile.email ?? null,
+  };
+}
+
 /**
  * Resolves the authenticated user from a Supabase JWT.
  *
@@ -39,6 +80,15 @@ export async function resolveAuthenticatedUser(
   const token = extractBearerToken(request);
   if (!token) {
     throw new AppError('unauthorized', 'Missing or invalid Authorization header', 401);
+  }
+
+  const developmentUser = await resolveDevelopmentUser(token, config);
+  if (developmentUser) {
+    return {
+      ...context,
+      user: developmentUser,
+      accessToken: token,
+    };
   }
 
   const supabase = getServiceClient(config);

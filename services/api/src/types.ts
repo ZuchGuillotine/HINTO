@@ -4,12 +4,22 @@ export interface AppConfig {
   apiName: string;
   host: string;
   port: number;
+  corsAllowOrigin: string;
   logLevel: LogLevel;
   nodeEnv: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
   openAiApiKey?: string;
+  authStateSecret?: string;
+  tiktokClientKey?: string;
+  tiktokClientSecret?: string;
+  tiktokRedirectUri?: string;
+  tiktokScopes: string[];
+  snapchatClientId?: string;
+  snapchatClientSecret?: string;
+  snapchatRedirectUri?: string;
+  snapchatScopes: string[];
 }
 
 export interface RequestContext {

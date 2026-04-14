@@ -36,7 +36,7 @@ struct RootView: View {
 
                 Text("HINTO")
                     .font(.hintoDisplay)
-                    .foregroundStyle(.hintoPink)
+                    .foregroundStyle(Color.hintoPink)
 
                 ProgressView()
                     .padding(.top, Spacing.md)
