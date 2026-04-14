@@ -1,5 +1,8 @@
 import { MeAggregateDto, ProfilePrivacy } from './me.js';
 
+export type CustomAuthProviderDto = 'snapchat' | 'tiktok';
+export type CustomAuthPlatformDto = 'web' | 'mobile' | 'desktop';
+
 export interface CreateDevelopmentSessionRequestDto {
   profileId?: string;
   username?: string;
@@ -13,5 +16,19 @@ export interface CreateDevelopmentSessionResponseDto {
     accessToken: string;
     me: MeAggregateDto;
     development: true;
+  };
+}
+
+export interface StartCustomAuthRequestDto {
+  clientRedirectUri: string;
+  platform?: CustomAuthPlatformDto;
+}
+
+export interface StartCustomAuthResponseDto {
+  data: {
+    provider: CustomAuthProviderDto;
+    authorizationUrl: string;
+    expiresAt: string;
+    platform: CustomAuthPlatformDto;
   };
 }

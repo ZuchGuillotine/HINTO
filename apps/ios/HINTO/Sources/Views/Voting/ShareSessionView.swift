@@ -1,12 +1,16 @@
 import SwiftUI
 
 struct ShareSessionView: View {
+    @Environment(AuthManager.self) private var auth
+    @Environment(APIClient.self) private var api
     @Environment(\.dismiss) private var dismiss
     let situationships: [Situationship]
 
     @State private var isCreating = false
     @State private var shareURL: URL?
+    @State private var createdSession: VotingSession?
     @State private var showShareLink = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -94,8 +98,18 @@ struct ShareSessionView: View {
                     .disabled(situationships.count < 2)
                 }
 
+                if let createdSession {
+                    Text("Invite code: \(createdSession.inviteCode)")
+                        .font(.hintoCaption)
+                        .foregroundStyle(.secondary)
+                }
+
                 if situationships.count < 2 {
                     Text("Add at least 2 situationships to create a voting session")
+                        .font(.hintoCaption)
+                        .foregroundStyle(Color.hintoError)
+                } else if let errorMessage {
+                    Text(errorMessage)
                         .font(.hintoCaption)
                         .foregroundStyle(Color.hintoError)
                 }
@@ -114,12 +128,27 @@ struct ShareSessionView: View {
         isCreating = true
         defer { isCreating = false }
 
-        // In production, this would call the API to create a voting session
-        // and get back an invite code
-        try? await Task.sleep(for: .seconds(1))
+        guard let token = auth.accessToken else {
+            errorMessage = "Sign in is required before creating a voting session."
+            return
+        }
 
-        let mockCode = UUID().uuidString.prefix(8).lowercased()
-        shareURL = URL(string: "https://hinto.app/vote/\(mockCode)")
+        do {
+            errorMessage = nil
+            let response = try await api.createVotingSession(
+                token: token,
+                input: CreateVotingSessionRequest(
+                    title: "Rate my situationships",
+                    description: nil,
+                    anonymityMode: "anonymous",
+                    expiresInHours: 48
+                )
+            )
+            createdSession = response.data.session
+            shareURL = URL(string: "https://hinto.app/vote/\(response.data.session.inviteCode)")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

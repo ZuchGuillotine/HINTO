@@ -11,6 +11,7 @@
     "build": "npm run api:build",
     "dev": "npm run api:build && (tsc -p services/api/tsconfig.json --watch --preserveWatchOutput > /dev/null 2>&1 &) && node --watch-path services/api/dist services/api/dist/server.js",
     "api:build": "tsc -p services/api/tsconfig.json",
+    "api:test": "npm run api:build && node --test services/api/dist/routes/*.test.js",
     "api:start": "npm run api:build && node services/api/dist/server.js",
     "api:watch": "tsc -p services/api/tsconfig.json --watch",
     "tuist:generate": "tuist generate",

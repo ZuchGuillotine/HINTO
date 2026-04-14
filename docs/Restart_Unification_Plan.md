@@ -1,6 +1,6 @@
 # HINTO Restart And Unification Plan
 
-*Reviewed on: 2026-03-31*
+*Reviewed on: 2026-04-14*
 
 ## 1. Purpose
 
@@ -163,10 +163,11 @@ Target this structure:
 Current state in the repo:
 
 - `/apps/ios` exists
+- `/apps/web` exists
 - `/services/api` exists
 - `/packages/contracts` exists
 - `/packages/domain` exists
-- `/apps/web`, `/packages/prompts`, and `/legacy` do not yet exist
+- `/packages/prompts` and `/legacy` do not yet exist
 
 ### 4.3 Backend decision
 
@@ -284,9 +285,12 @@ The restart is no longer only a plan. The following execution artifacts now exis
 - restart auth model in `docs/Auth_Model.md`
 - AWS/Amplify blocker audit in `docs/Legacy_AWS_Audit.md`
 - backend scaffold plus first-slice auth/profile/situationship implementation in `/services/api`
+- restart-era voting routes in `/services/api/src/routes/voting.ts`
 - auth-linkage migration in `supabase/migrations/010_auth_identities.sql`
+- voting idempotency/results migration in `supabase/migrations/011_voting_session_identity_support.sql`
 - first-slice contracts scaffold in `/packages/contracts`
 - first-slice domain rules scaffold in `/packages/domain`
+- dependency-light web shell in `/apps/web`
 - native SwiftUI app shell in `/apps/ios`
 
 What is now settled:
@@ -303,18 +307,17 @@ What remains immediately in front of implementation:
 - confirm remote Supabase connectivity and current environment contract
 - add backend tests, DB verification, and repeatable migration/dev workflows
 - implement provider auth flows on top of the new auth identity model
-- implement voting session, vote submission, and results routes
-- scaffold `/apps/web`
-- align the existing SwiftUI app shell with the live backend contracts and replace placeholder auth/voting/AI behavior incrementally
+- wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes
+- align the existing SwiftUI app shell with the live backend contracts and replace remaining placeholder auth/voting/AI behavior incrementally
 
 ## 8. Current Risks
 
 - The active app bootstrap still depends on legacy Amplify/Cognito paths, so the current client runtime is not yet backend-neutral.
 - The repo-local environment and Supabase metadata are not yet confirmed as a complete end-to-end setup for remote DB verification, so connectivity work is still blocked pending a verified URL/key set or linked project workflow.
 - There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
-- Backend route tests and DB verification are not yet wired, so the backend slice is implemented but not yet verified end-to-end.
+- Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against a live Supabase environment.
 - The native iOS app currently mixes real API-facing structure with placeholder behavior: auth stores a temporary token locally, vote submission is mocked, and AI chat uses canned responses.
-- The repo shape is still only partially converged because `/apps/web`, `/packages/prompts`, and `/legacy` have not been created yet.
+- The repo shape is still only partially converged because `/packages/prompts` and `/legacy` have not been created yet.
 
 ## 9. Recommended Data Model Baseline
 
@@ -348,14 +351,14 @@ Optional later entities:
 ### Next step B: continue backend completion from the current baseline
 
 - implement provider auth flows
-- add voting session, vote submission, and results routes
+- verify the new voting session, vote submission, and results routes against a live Supabase project
 - keep AI routes behind the prompt/moderation package boundary
 
 ### Next step C: turn the existing clients into real consumers of the shared backend
 
-- scaffold `/apps/web`
 - align `apps/ios/HINTO/Sources/Services/APIClient.swift` with the current route contract
 - replace placeholder iOS auth, voting, and AI behavior incrementally as backend routes become available
+- add web voting session, vote submission, and results flows against the shared API
 
 ### Next step D: continue cleanup with a strict rule
 

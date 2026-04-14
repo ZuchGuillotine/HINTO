@@ -69,6 +69,19 @@ function parseLogLevel(value: string | undefined): LogLevel {
   return DEFAULT_LOG_LEVEL;
 }
 
+function parseScopes(value: string | undefined, fallback: string[]): string[] {
+  const raw = value
+    ?.split(/[,\s]+/u)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+
+  if (!raw || raw.length === 0) {
+    return fallback;
+  }
+
+  return Array.from(new Set(raw));
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   loadDotEnv(env);
 
@@ -89,5 +102,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     openAiApiKey: env.OPENAI_API_KEY,
+    authStateSecret: env.AUTH_STATE_SECRET,
+    tiktokClientKey: env.TIKTOK_CLIENT_KEY,
+    tiktokClientSecret: env.TIKTOK_CLIENT_SECRET,
+    tiktokRedirectUri: env.TIKTOK_REDIRECT_URI,
+    tiktokScopes: parseScopes(env.TIKTOK_SCOPES, ['user.info.basic']),
+    snapchatClientId: env.SNAPCHAT_CLIENT_ID,
+    snapchatClientSecret: env.SNAPCHAT_CLIENT_SECRET,
+    snapchatRedirectUri: env.SNAPCHAT_REDIRECT_URI,
+    snapchatScopes: parseScopes(env.SNAPCHAT_SCOPES, [
+      'https://auth.snapchat.com/oauth2/api/user.display_name',
+      'https://auth.snapchat.com/oauth2/api/user.external_id',
+    ]),
   };
 }

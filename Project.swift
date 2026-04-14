@@ -9,7 +9,9 @@ let project = Project(
     ),
     settings: .settings(
         base: [
-            "SWIFT_VERSION": "5.9"
+            "SWIFT_VERSION": "5.9",
+            "DEVELOPMENT_TEAM": "432862NB9P",
+            "CODE_SIGN_STYLE": "Automatic"
         ]
     ),
     targets: [

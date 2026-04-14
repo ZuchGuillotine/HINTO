@@ -116,6 +116,28 @@ final class APIClient {
     func reorderSituationships(token: String, order: ReorderRequest) async throws -> APIResponse<ReorderResponseData> {
         try await request(.put, path: "/v1/me/situationships/order", body: order, token: token)
     }
+
+    // MARK: - Voting
+
+    func createVotingSession(token: String, input: CreateVotingSessionRequest = CreateVotingSessionRequest()) async throws -> APIResponse<CreateVotingSessionData> {
+        try await request(.post, path: "/v1/me/voting-sessions", body: input, token: token)
+    }
+
+    func expireVotingSession(token: String, votingSessionId: String) async throws -> APIResponse<VotingSessionMutationData> {
+        try await request(.post, path: "/v1/me/voting-sessions/\(votingSessionId)/expire", token: token)
+    }
+
+    func getPublicVotingSession(inviteCode: String) async throws -> APIResponse<PublicVotingSessionAggregate> {
+        try await request(.get, path: "/v1/voting-sessions/\(inviteCode)")
+    }
+
+    func submitVote(inviteCode: String, input: SubmitVoteRequest) async throws -> APIResponse<SubmitVoteData> {
+        try await request(.post, path: "/v1/voting-sessions/\(inviteCode)/votes", body: input)
+    }
+
+    func getVotingResults(token: String, votingSessionId: String) async throws -> APIResponse<VoteResultsAggregate> {
+        try await request(.get, path: "/v1/me/voting-sessions/\(votingSessionId)/results", token: token)
+    }
 }
 
 // MARK: - Supporting Types
