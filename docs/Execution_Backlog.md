@@ -249,11 +249,11 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-90 | Add backend test harness | Agent | Todo | Unit + route/integration tests |
+| EX-90 | Add backend test harness | Agent | Done | 44 unit tests covering health, profile, situationship CRUD, reorder, and auth middleware. Jest + ts-jest under `services/api/src/__tests__/`. Run via `npm run api:test`. |
 | EX-91 | Add contract validation in CI | Agent | Todo | Prevent API drift across clients |
 | EX-92 | Add web app smoke tests | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
 | EX-93 | Add iOS networking/model tests | Agent | Todo | Expand as native app grows |
-| EX-94 | Add migration verification and seed/dev fixtures | Agent | Todo | Necessary for repeatable local setup |
+| EX-94 | Add migration verification and seed/dev fixtures | Agent | Done | Migration file verification tests in `migration.verify.test.ts`. Dev seed fixtures (3 users, 4 situationships, auth identities) with SQL generator in `seed.fixtures.ts`. |
 | EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |
 
 ## Recommended Sequence
@@ -328,7 +328,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 2. Verify Supabase connectivity and confirm the current remote project/env contract.
 3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
 4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
-5. Add broader backend route tests and DB connectivity checks for the first slice plus voting routes.
+5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main). Voting routes still need broader verification.
 6. Add provider-start and provider-callback flows after the canonical session path is wired.
 7. Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes (EX-64, EX-65, EX-75).
 8. Replace active legacy AWS client calls with backend-neutral service clients (EX-82, EX-83).
@@ -344,7 +344,8 @@ Use the following sequencing constraints while agents are active:
 - Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
 - Treat `apps/ios` as the current native baseline, but do not mistake its placeholder auth, vote submission, or AI responses for end-to-end integration.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
-- Voting backend routes now exist in-tree, but EX-90 still needs broader route and DB-backed verification before the voting stack should be treated as production-ready.
+- ~~Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.~~ - EX-90 is complete; voting/AI routes are now unblocked.
+- Voting backend routes now exist in-tree, but still need broader route and DB-backed verification before the voting stack should be treated as production-ready.
 - Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
 
 ## Completed Agent Packets
@@ -363,6 +364,10 @@ Additional deliverables in PR #1:
 - `services/api/src/body.ts` - JSON body parser with size limits
 - Route dispatcher refactored to async pattern
 
+The following was delivered and merged to main (2026-04-07):
+
+- **Packet E (EX-90, EX-94)**: backend test harness with 44 unit tests (health, profile, situationship CRUD/reorder, auth middleware, migration verification), dev seed fixtures, and `npm run api:test` script. Files under `services/api/src/__tests__/` and `services/api/jest.config.ts`.
+
 The current branch also includes a native SwiftUI app baseline under `/apps/ios` with:
 
 - app/navigation shell in `HINTOApp.swift`, `RootView.swift`, and `MainTabView.swift`
@@ -372,20 +377,7 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
 
 ## Next Agent Packets
 
-### Packet E: EX-90, EX-94
-
-- Goal: add backend route tests, migration verification, and DB connectivity checks
-- Inputs:
-  - `services/api/src/routes/*`
-  - `services/api/src/middleware/auth.ts`
-  - `supabase/migrations/010_auth_identities.sql`
-- Deliverables:
-  - test harness for profile and situationship routes
-  - DB connectivity probe
-  - migration verification and dev seed fixtures
-- Guardrails:
-  - focus on first-slice routes only
-  - do not add voting or AI test infrastructure yet
+### ~~Packet E: EX-90, EX-94~~ — Done (merged to main 2026-04-07)
 
 ### Packet F: EX-37, EX-38
 
@@ -477,7 +469,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 
 | Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
 | --- | --- | --- | --- | --- |
-| Q9 | EX-90, EX-94 | Add backend route tests, migration verification, and DB connectivity checks for the first slice | accepted scaffold/packages plus Supabase project details | test harness, connectivity probe, and repeatable dev verification |
+| ~~Q9~~ | ~~EX-90, EX-94~~ | ~~Add backend route tests, migration verification, and DB connectivity checks for the first slice~~ | — | **Done** (merged to main 2026-04-07) |
 | Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
 | Q11 | EX-42, EX-43, EX-44 | Verify and integrate voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts` | DB verification, client integration, and follow-up hardening for voting routes |
 | Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
@@ -486,7 +478,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 
 Queue constraints:
 
-- Q9 should still complete before claiming Q11 production-ready, even though the initial voting route implementation now exists.
+- ~~Q9 should complete before starting Q10 or Q11, to confirm the first slice is stable.~~ - Q9 is complete; Q10 and Q11 are unblocked.
 - Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only; TikTok backend callback/session bootstrap is already in place, while Snapchat still needs the external-id completion step finalized.
 - Q11 should focus on DB verification, client wiring, and duplicate-vote hardening only; AI integration remains deferred.
 - Q13 can run in parallel with Q10/Q11 once Q9 passes.
