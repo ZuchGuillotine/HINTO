@@ -1,11 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-
-import { testExports } from './auth-providers.js';
+import { testExports } from './auth-providers';
 
 test('deriveSyntheticEmail produces stable reserved-domain aliases', () => {
-  assert.equal(
-    testExports.deriveSyntheticEmail('tiktok', 'User 123'),
+  expect(testExports.deriveSyntheticEmail('tiktok', 'User 123')).toBe(
     'tiktok-user-123@users.hinto.invalid',
   );
 });
@@ -24,17 +20,16 @@ test('signState round-trips provider auth state payloads', () => {
   );
 
   const parsed = testExports.readSignedState(signed, 'tiktok', 'test-secret');
-  assert.equal(parsed.clientRedirectUri, 'hinto://auth/callback');
-  assert.equal(parsed.codeVerifier, 'verifier');
+  expect(parsed.clientRedirectUri).toBe('hinto://auth/callback');
+  expect(parsed.codeVerifier).toBe('verifier');
 });
 
 test('buildClientRedirectUrl encodes payload into URL fragments', () => {
-  assert.equal(
+  expect(
     testExports.buildClientRedirectUrl('hinto://auth/callback', {
       provider: 'tiktok',
       accessToken: 'abc',
       expiresAt: 42,
     }),
-    'hinto://auth/callback#provider=tiktok&accessToken=abc&expiresAt=42',
-  );
+  ).toBe('hinto://auth/callback#provider=tiktok&accessToken=abc&expiresAt=42');
 });

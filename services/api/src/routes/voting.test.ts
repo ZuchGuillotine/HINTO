@@ -1,54 +1,45 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-
 import {
   buildVotingResultsAggregate,
   generateInviteCode,
   normalizeInviteCode,
   resolveVotingSessionStatus,
   validateVoteSubmission,
-} from './voting-shared.js';
+} from './voting-shared';
 
 test('normalizeInviteCode trims and uppercases values', () => {
-  assert.equal(normalizeInviteCode(' ab12cd '), 'AB12CD');
+  expect(normalizeInviteCode(' ab12cd ')).toBe('AB12CD');
 });
 
 test('resolveVotingSessionStatus distinguishes active, closed, and expired sessions', () => {
   const now = new Date('2026-04-14T10:00:00.000Z');
 
-  assert.equal(
+  expect(
     resolveVotingSessionStatus({
       isActive: true,
       expiresAt: '2026-04-15T10:00:00.000Z',
       now,
     }),
-    'active',
-  );
+  ).toBe('active');
 
-  assert.equal(
+  expect(
     resolveVotingSessionStatus({
       isActive: false,
       expiresAt: '2026-04-15T10:00:00.000Z',
       now,
     }),
-    'closed',
-  );
+  ).toBe('closed');
 
-  assert.equal(
+  expect(
     resolveVotingSessionStatus({
       isActive: true,
       expiresAt: '2026-04-13T10:00:00.000Z',
       now,
     }),
-    'expired',
-  );
+  ).toBe('expired');
 });
 
 test('validateVoteSubmission rejects duplicate selections', () => {
-  assert.throws(
-    () => validateVoteSubmission(['one', 'two'], 'one', 'one'),
-    /must be different/u,
-  );
+  expect(() => validateVoteSubmission(['one', 'two'], 'one', 'one')).toThrow(/must be different/u);
 });
 
 test('buildVotingResultsAggregate ranks by score and preserves anonymous comments', () => {
@@ -80,14 +71,14 @@ test('buildVotingResultsAggregate ranks by score and preserves anonymous comment
     { isAnonymous: true },
   );
 
-  assert.equal(aggregate.totalVotes, 2);
-  assert.equal(aggregate.totalVoters, 1);
-  assert.equal(aggregate.results[0]?.situationshipId, 'one');
-  assert.equal(aggregate.comments[0]?.voterLabel, null);
+  expect(aggregate.totalVotes).toBe(2);
+  expect(aggregate.totalVoters).toBe(1);
+  expect(aggregate.results[0]?.situationshipId).toBe('one');
+  expect(aggregate.comments[0]?.voterLabel).toBeNull();
 });
 
 test('generateInviteCode returns eight uppercase characters', () => {
   const inviteCode = generateInviteCode();
 
-  assert.match(inviteCode, /^[A-Z0-9]{8}$/u);
+  expect(inviteCode).toMatch(/^[A-Z0-9]{8}$/u);
 });
