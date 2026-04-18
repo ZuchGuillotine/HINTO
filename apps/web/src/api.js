@@ -1,4 +1,7 @@
-const DEFAULT_API_BASE_URL = window.HINTO_API_BASE_URL ?? 'http://127.0.0.1:3000';
+const DEFAULT_API_BASE_URL =
+  typeof window !== 'undefined' && window.HINTO_API_BASE_URL
+    ? window.HINTO_API_BASE_URL
+    : 'http://127.0.0.1:3000';
 
 function buildUrl(path) {
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
@@ -56,5 +59,20 @@ export const api = {
       token,
       body: { orderedSituationshipIds },
     });
+  },
+  getVotingSessions(token) {
+    return request('/v1/me/voting-sessions', { token });
+  },
+  createVotingSession(token, input) {
+    return request('/v1/me/voting-sessions', { method: 'POST', token, body: input });
+  },
+  getVotingResults(token, votingSessionId) {
+    return request(`/v1/me/voting-sessions/${votingSessionId}/results`, { token });
+  },
+  getPublicVotingSession(inviteCode) {
+    return request(`/v1/voting-sessions/${inviteCode}`);
+  },
+  submitVote(inviteCode, input) {
+    return request(`/v1/voting-sessions/${inviteCode}/votes`, { method: 'POST', body: input });
   },
 };

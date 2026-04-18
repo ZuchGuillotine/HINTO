@@ -1,11 +1,17 @@
 import SwiftUI
 
 struct VoteResultsView: View {
-    let situationships: [Situationship]
+    @Environment(AuthManager.self) private var auth
+    @Environment(APIClient.self) private var api
+
+    let votingSessionId: String
 
     @State private var results: [VoteResult] = []
+    @State private var comments: [VoteComment] = []
     @State private var totalVoters = 0
+    @State private var totalVotes = 0
     @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -13,6 +19,8 @@ struct VoteResultsView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let errorMessage {
+                    errorState(errorMessage)
                 } else if results.isEmpty {
                     emptyState
                 } else {
@@ -22,13 +30,13 @@ struct VoteResultsView: View {
             .navigationTitle("Results")
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadResults() }
+            .refreshable { await loadResults() }
         }
     }
 
     private var resultsList: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
-                // Summary card
                 VStack(spacing: Spacing.xs) {
                     Text("\(totalVoters)")
                         .font(.hintoDisplay)
@@ -44,9 +52,34 @@ struct VoteResultsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
                 .padding(.horizontal, Spacing.md)
 
-                // Individual results
+                Text("\(totalVotes) total votes recorded")
+                    .font(.hintoCaption)
+                    .foregroundStyle(.secondary)
+
                 ForEach(Array(results.sorted { $0.score > $1.score }.enumerated()), id: \.element.id) { index, result in
                     resultCard(result, rank: index + 1)
+                }
+
+                if !comments.isEmpty {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Comments")
+                            .font(.hintoH4)
+                            .padding(.horizontal, Spacing.md)
+
+                        ForEach(comments) { comment in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(comment.comment)
+                                    .font(.hintoBody)
+                                Text(comment.voterLabel ?? "Anonymous")
+                                    .font(.hintoCaption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(Spacing.md)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+                            .padding(.horizontal, Spacing.md)
+                        }
+                    }
                 }
             }
             .padding(.vertical, Spacing.md)
@@ -57,7 +90,6 @@ struct VoteResultsView: View {
     private func resultCard(_ result: VoteResult, rank: Int) -> some View {
         VStack(spacing: Spacing.sm) {
             HStack {
-                // Rank + name
                 HStack(spacing: Spacing.sm) {
                     ZStack {
                         Circle()
@@ -78,7 +110,6 @@ struct VoteResultsView: View {
 
                 Spacer()
 
-                // Score
                 VStack(alignment: .trailing) {
                     Text(result.score > 0 ? "+\(result.score)" : "\(result.score)")
                         .font(.hintoH4)
@@ -95,9 +126,7 @@ struct VoteResultsView: View {
                 }
             }
 
-            // Vote bars
             HStack(spacing: Spacing.sm) {
-                // Best votes
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
                         Image(systemName: "heart.fill")
@@ -118,7 +147,6 @@ struct VoteResultsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
 
-                // Worst votes
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.circle.fill")
@@ -166,28 +194,53 @@ struct VoteResultsView: View {
         .padding(Spacing.xl)
     }
 
-    private func loadResults() async {
-        // In production, fetch from API
-        try? await Task.sleep(for: .seconds(0.5))
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.hintoError)
 
-        // Mock results
-        results = situationships.map { s in
-            let best = Int.random(in: 0...8)
-            let worst = Int.random(in: 0...5)
-            return VoteResult(
-                situationshipId: s.id,
-                name: s.name,
-                emoji: s.displayEmoji,
-                bestVotes: best,
-                worstVotes: worst,
-                totalVotes: best + worst
-            )
+            Text("Could not load results")
+                .font(.hintoH3)
+
+            Text(message)
+                .font(.hintoBody)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.xl)
         }
-        totalVoters = Int.random(in: 3...12)
+        .padding(Spacing.xl)
+    }
+
+    private func loadResults() async {
+        guard let token = auth.accessToken else {
+            errorMessage = "Sign in is required before viewing results."
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+
+        do {
+            let response = try await api.getVotingResults(
+                token: token,
+                votingSessionId: votingSessionId
+            )
+            results = response.data.results
+            comments = response.data.comments
+            totalVotes = response.data.totalVotes
+            totalVoters = response.data.totalVoters
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
         isLoading = false
     }
 }
 
 #Preview {
-    VoteResultsView(situationships: SituationshipListView.mockSituationships)
+    VoteResultsView(votingSessionId: "preview")
+        .environment(AuthManager())
+        .environment(APIClient())
 }

@@ -175,6 +175,33 @@ async function getVotingSessionByIdForOwner(
 }
 
 /**
+ * GET /v1/me/voting-sessions - List owner voting sessions.
+ */
+export async function handleListOwnerVotingSessions(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+  const supabase = getServiceClient(config);
+
+  const { data, error } = await supabase
+    .from('voting_sessions')
+    .select('*')
+    .eq('owner_id', authCtx.user.profileId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new AppError('fetch_failed', 'Failed to fetch owner voting sessions', 500);
+  }
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    sessions: (data ?? []).map((row) => toVotingSessionDto(row as VotingSessionRow)),
+  });
+}
+
+/**
  * POST /v1/me/voting-sessions - Create an owner voting session for active situationships.
  */
 export async function handleCreateVotingSession(

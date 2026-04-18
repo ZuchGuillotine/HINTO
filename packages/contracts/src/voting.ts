@@ -33,6 +33,14 @@ export interface CreateVotingSessionResponseDto {
   };
 }
 
+export interface OwnerVotingSessionsAggregateDto {
+  sessions: VotingSessionDto[];
+}
+
+export interface GetOwnerVotingSessionsResponseDto {
+  data: OwnerVotingSessionsAggregateDto;
+}
+
 export interface ExpireVotingSessionResponseDto {
   data: {
     session: VotingSessionDto;

@@ -50,7 +50,7 @@ struct EmailSignInView: View {
         VStack(spacing: Spacing.xs) {
             Image(systemName: step == .email ? "envelope.fill" : "lock.fill")
                 .font(.system(size: 40))
-                .foregroundStyle(.hintoPink)
+                .foregroundStyle(Color.hintoPink)
 
             Text(step == .email ? "Sign in with Email" : "Enter your code")
                 .font(.hintoH2)
@@ -120,7 +120,7 @@ struct EmailSignInView: View {
                 Task { await sendOtp() }
             }
             .font(.hintoCaption)
-            .foregroundStyle(.hintoPink)
+            .foregroundStyle(Color.hintoPink)
             .disabled(isLoading)
 
             Button("Use a different email") {

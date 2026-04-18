@@ -19,6 +19,11 @@ HINTO is a social relationship voting platform with an AI relationship coach, ta
 - `npm run api:build` — Compile TypeScript (`tsc -p services/api/tsconfig.json`)
 - `npm run api:start` — Build and run (`node services/api/dist/server.js`)
 - `npm run api:watch` — Watch mode for API TypeScript
+- `npm run dev` — Build + watch API and restart server on dist changes
+
+### Web App (apps/web)
+- `npm run web:dev` — Static dev server via `apps/web/dev-server.mjs`
+- `npm run web:test` — Jest for web (`apps/web/jest.config.cjs`)
 
 ### Code Quality
 - `npm run lint` / `npm run lint:fix` — ESLint
@@ -26,7 +31,10 @@ HINTO is a social relationship voting platform with an AI relationship coach, ta
 - Pre-commit hooks via Husky + lint-staged (auto-runs eslint --fix + prettier on staged files)
 
 ### Testing
-- `npx jest` — Run tests (Jest is installed but no `npm test` script is wired up)
+- `npm test` — Runs API + web Jest suites
+- `npm run api:test` — API Jest only (`services/api/jest.config.ts`)
+- `npm run web:test` — Web Jest only
+- Single test: `npx jest --config services/api/jest.config.ts -t "<name>"` (or pass a file path)
 
 ## Repository Structure
 
@@ -61,7 +69,7 @@ Defined in `docs/Canonical_Architecture.md`. First vertical slice (profile + sit
 - **Database**: PostgreSQL via Supabase with RLS policies
 - **Auth**: Supabase Auth + provider linkage tables (Apple, Meta/Facebook required for MVP; Snapchat, TikTok deferred). See `docs/Auth_Model.md`
 - **iOS**: SwiftUI app under `/apps/ios/` with design system, models, API client, auth manager
-- **Web**: Planned under `/apps/web/` (not yet scaffolded)
+- **Web**: Scaffolded under `/apps/web/` (vanilla JS + static dev server; see `apps/web/README.md`)
 - **API Style**: REST/JSON — no GraphQL, no tRPC
 - **Contracts**: OpenAPI definitions in `/packages/contracts/` consumed by Swift and web clients
 - **Domain Logic**: Vendor-neutral rules in `/packages/domain/` (profile privacy, situationship ordering, viewer/audience modeling)
@@ -71,6 +79,9 @@ Defined in `docs/Canonical_Architecture.md`. First vertical slice (profile + sit
 - `GET /v1/me`, `PATCH /v1/me` (profile)
 - `GET|POST /v1/me/situationships`, `PATCH|DELETE /v1/me/situationships/:id`
 - `PUT /v1/me/situationships/order` (reorder)
+- Auth provider linking (`routes/auth-providers.ts`, `routes/auth.ts`)
+- Voting sessions + shared-session flow (`routes/voting.ts`, `routes/voting-shared.ts`)
+- Dev-only helpers (`routes/dev.ts`)
 
 ### Environment Variables (services/api)
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`
@@ -113,8 +124,8 @@ Defined in `docs/Canonical_Domain_Model.md`:
 ## Known Issues
 
 - **Reanimated disabled**: Babel plugin permanently removed due to incompatibility with optional chaining and modern JS syntax. Standard FlatList used instead of DraggableFlatList.
-- **No wired test script**: Jest is a dependency but `npm test` is not defined in package.json. Use `npx jest` directly.
 - **Missing amplifyconfiguration.json import**: Legacy app startup risk documented in AWS audit.
+- **Mixed Jest configs**: API uses `services/api/jest.config.ts`, web uses `apps/web/jest.config.cjs`. Always pass `--config` when invoking Jest directly.
 
 ## Key Documentation
 

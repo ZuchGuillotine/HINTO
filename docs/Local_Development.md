@@ -13,7 +13,7 @@ Working local slice in this repo:
 Still staged:
 
 - real provider auth flows beyond the local development bootstrap
-- client wiring for voting session creation, vote submission, results aggregation, and AI flows
+- deeper voting navigation polish, browser/simulator verification, and AI flows
 
 ## Local Ports
 
@@ -107,4 +107,4 @@ The current verification goal is:
 4. profile edit persists
 5. situationship create/edit/delete/reorder persists
 
-Voting backend routes now exist in `services/api`, but the web and SwiftUI voting/results experiences should still be treated as staged shells until the new endpoints are wired and exercised against a live Supabase project.
+Voting backend routes now exist in `services/api`, and the current web/SwiftUI shells now hit them for session creation, vote submission, session listing, and results. Browser and simulator verification are still follow-up work.

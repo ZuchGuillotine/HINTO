@@ -1,30 +1,43 @@
 import SwiftUI
 
 struct VotingView: View {
-    let situationships: [Situationship]
-    let sessionId: String
-
+    @Environment(APIClient.self) private var api
     @Environment(\.dismiss) private var dismiss
+
+    let inviteCode: String
+
+    @AppStorage("hinto_voter_identity") private var voterIdentity = UUID().uuidString
+    @State private var session: PublicVotingSessionAggregate?
     @State private var bestPick: Situationship?
     @State private var worstPick: Situationship?
+    @State private var voterName = ""
     @State private var comment = ""
+    @State private var isLoading = true
     @State private var isSubmitting = false
     @State private var hasVoted = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
-            if hasVoted {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if hasVoted {
                 votedState
+            } else if let session, session.capabilities.canVote {
+                votingContent(session: session)
             } else {
-                votingContent
+                unavailableState
             }
+        }
+        .task {
+            await loadVotingSession()
         }
     }
 
-    private var votingContent: some View {
+    private func votingContent(session: PublicVotingSessionAggregate) -> some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
-                // Header
                 VStack(spacing: Spacing.xs) {
                     Text("Cast Your Vote")
                         .font(.hintoH2)
@@ -32,16 +45,19 @@ struct VotingView: View {
                     Text("Pick the best fit and the one that's not it")
                         .font(.hintoBody)
                         .foregroundStyle(.secondary)
+
+                    Text("for \(session.ownerProfile.displayName)")
+                        .font(.hintoCaption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.top, Spacing.md)
 
-                // Best pick
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Best Fit", systemImage: "heart.fill")
                         .font(.hintoH4)
                         .foregroundStyle(Color.hintoSuccess)
 
-                    ForEach(situationships) { item in
+                    ForEach(session.items) { item in
                         voteOption(item, selected: bestPick?.id == item.id, color: .hintoSuccess) {
                             withAnimation(.spring(response: 0.3)) {
                                 bestPick = item
@@ -52,13 +68,12 @@ struct VotingView: View {
                 }
                 .padding(.horizontal, Spacing.md)
 
-                // Worst pick
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Not the One", systemImage: "xmark.circle.fill")
                         .font(.hintoH4)
                         .foregroundStyle(Color.hintoError)
 
-                    ForEach(situationships) { item in
+                    ForEach(session.items) { item in
                         voteOption(item, selected: worstPick?.id == item.id, color: .hintoError) {
                             withAnimation(.spring(response: 0.3)) {
                                 worstPick = item
@@ -71,7 +86,19 @@ struct VotingView: View {
                 }
                 .padding(.horizontal, Spacing.md)
 
-                // Optional comment
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Your name (optional)")
+                        .font(.hintoLabel)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Anonymous voter", text: $voterName)
+                        .font(.hintoBody)
+                        .padding(Spacing.sm)
+                        .background(Color(.tertiarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.base))
+                }
+                .padding(.horizontal, Spacing.md)
+
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text("Leave a comment (optional)")
                         .font(.hintoLabel)
@@ -86,7 +113,6 @@ struct VotingView: View {
                 }
                 .padding(.horizontal, Spacing.md)
 
-                // Submit
                 HINTOButton(
                     title: "Submit Vote",
                     style: .primary,
@@ -102,6 +128,14 @@ struct VotingView: View {
         }
         .navigationTitle("Vote")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Vote", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -132,6 +166,24 @@ struct VotingView: View {
                 .padding(.horizontal, Spacing.lg)
         }
         .padding(.bottom, Spacing.xl)
+    }
+
+    private var unavailableState: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 52))
+                .foregroundStyle(.tertiary)
+
+            Text("Voting unavailable")
+                .font(.hintoH3)
+
+            Text(errorMessage ?? "This voting session is no longer accepting votes.")
+                .font(.hintoBody)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.xl)
+        }
+        .padding(Spacing.xl)
     }
 
     @ViewBuilder
@@ -172,22 +224,48 @@ struct VotingView: View {
     }
 
     private func submitVote() async {
-        guard bestPick != nil, worstPick != nil else { return }
+        guard let bestPick, let worstPick else { return }
         isSubmitting = true
+        defer { isSubmitting = false }
 
-        // In production, this calls the API
-        try? await Task.sleep(for: .seconds(1))
+        do {
+            let response = try await api.submitVote(
+                inviteCode: inviteCode,
+                input: SubmitVoteRequest(
+                    voterIdentity: voterIdentity,
+                    voterName: voterName.isEmpty ? nil : voterName,
+                    bestSituationshipId: bestPick.id,
+                    worstSituationshipId: worstPick.id,
+                    comment: comment.isEmpty ? nil : comment
+                )
+            )
 
-        withAnimation(.spring) {
-            hasVoted = true
-            isSubmitting = false
+            if response.data.accepted {
+                withAnimation(.spring) {
+                    hasVoted = true
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func loadVotingSession() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let response = try await api.getPublicVotingSession(inviteCode: inviteCode)
+            session = response.data
+            errorMessage = nil
+        } catch {
+            session = nil
+            errorMessage = error.localizedDescription
         }
     }
 }
 
 #Preview {
-    VotingView(
-        situationships: SituationshipListView.mockSituationships,
-        sessionId: "preview"
-    )
+    VotingView(inviteCode: "PREVIEW")
+        .environment(APIClient())
 }

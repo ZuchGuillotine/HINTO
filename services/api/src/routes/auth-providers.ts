@@ -48,6 +48,9 @@ const TIKTOK_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 const TIKTOK_USER_INFO_URL = 'https://open.tiktokapis.com/v2/user/info/';
 const SNAPCHAT_AUTHORIZE_URL = 'https://accounts.snapchat.com/accounts/oauth2/auth';
 const SNAPCHAT_TOKEN_URL = 'https://accounts.snapchat.com/accounts/oauth2/token';
+const SNAPCHAT_USER_INFO_URL = 'https://kit.snapchat.com/v1/me';
+const SNAPCHAT_USER_INFO_QUERY =
+  '{me{externalId,displayName,bitmoji{avatar}}}';
 
 function assertSupportedProvider(value: string): CustomAuthProvider | null {
   return value === 'snapchat' || value === 'tiktok' ? value : null;
@@ -379,6 +382,65 @@ async function exchangeSnapchatCode(
   return data;
 }
 
+async function fetchSnapchatIdentity(
+  accessToken: string,
+  tokenData: Record<string, unknown>,
+): Promise<ProviderIdentity> {
+  const url = new URL(SNAPCHAT_USER_INFO_URL);
+  url.searchParams.set('query', SNAPCHAT_USER_INFO_QUERY);
+
+  const response = await fetch(url, {
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const data = (await response.json()) as Record<string, unknown>;
+
+  const me =
+    ((data.data ?? null) as { me?: Record<string, unknown> } | null)?.me ?? null;
+  const errors = Array.isArray(data.errors) ? (data.errors as Array<Record<string, unknown>>) : [];
+
+  if (!response.ok || !me) {
+    const firstError = errors[0];
+    const errorMessage =
+      typeof firstError?.message === 'string'
+        ? firstError.message
+        : 'Failed to fetch Snapchat user profile';
+
+    throw new AppError('provider_profile_fetch_failed', errorMessage, 401, {
+      provider: 'snapchat',
+      providerError: firstError?.extensions ?? null,
+    });
+  }
+
+  const externalId = typeof me.externalId === 'string' ? me.externalId : null;
+  if (!externalId) {
+    throw new AppError(
+      'provider_profile_fetch_failed',
+      'Snapchat did not return an externalId',
+      401,
+      { provider: 'snapchat' },
+    );
+  }
+
+  const bitmoji = (me.bitmoji ?? null) as { avatar?: unknown } | null;
+  const avatarUrl = typeof bitmoji?.avatar === 'string' ? bitmoji.avatar : null;
+
+  return {
+    providerUserId: externalId,
+    providerEmail: null,
+    emailVerified: false,
+    providerUsername: null,
+    providerDisplayName: typeof me.displayName === 'string' ? me.displayName : null,
+    providerAvatarUrl: avatarUrl,
+    providerMetadata: {
+      externalId,
+      scope: typeof tokenData.scope === 'string' ? tokenData.scope : null,
+      tokenType: typeof tokenData.token_type === 'string' ? tokenData.token_type : null,
+    },
+  };
+}
+
 async function resolveProviderIdentity(
   provider: CustomAuthProvider,
   state: SignedProviderState,
@@ -392,15 +454,8 @@ async function resolveProviderIdentity(
   }
 
   const tokenData = await exchangeSnapchatCode(code, state, config);
-  throw new AppError(
-    'snapchat_identity_unavailable',
-    'Snapchat token exchange succeeded, but HINTO still needs the provider external_id handshake wired before a canonical session can be created.',
-    501,
-    {
-      provider: 'snapchat',
-      grantedScope: typeof tokenData.scope === 'string' ? tokenData.scope : null,
-    },
-  );
+  const identity = await fetchSnapchatIdentity(String(tokenData.access_token), tokenData);
+  return { identity, tokenData };
 }
 
 function deriveSyntheticEmail(provider: CustomAuthProvider, providerUserId: string): string {

@@ -9,8 +9,9 @@ struct ShareSessionView: View {
     @State private var isCreating = false
     @State private var shareURL: URL?
     @State private var createdSession: VotingSession?
-    @State private var showShareLink = false
     @State private var errorMessage: String?
+    @State private var showVotePreview = false
+    @State private var showResults = false
 
     var body: some View {
         NavigationStack {
@@ -75,14 +76,46 @@ struct ShareSessionView: View {
                 }
 
                 if let shareURL {
-                    ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
-                        Label("Share Link", systemImage: "square.and.arrow.up")
-                            .font(.hintoButton)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .foregroundStyle(.white)
-                            .background(Color.hintoPink)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    VStack(spacing: Spacing.sm) {
+                        ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                                .font(.hintoButton)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .foregroundStyle(.white)
+                                .background(Color.hintoPink)
+                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        }
+
+                        if let session = createdSession {
+                            HStack(spacing: Spacing.sm) {
+                                Button {
+                                    showVotePreview = true
+                                } label: {
+                                    Label("Open Vote Preview", systemImage: "hand.tap")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+
+                                Button {
+                                    showResults = true
+                                } label: {
+                                    Label("View Results", systemImage: "chart.bar")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.hintoBlue)
+                            }
+                            .sheet(isPresented: $showVotePreview) {
+                                VotingView(inviteCode: session.inviteCode)
+                                    .environment(api)
+                            }
+                            .sheet(isPresented: $showResults) {
+                                VoteResultsView(votingSessionId: session.votingSessionId)
+                                    .environment(auth)
+                                    .environment(api)
+                            }
+                        }
                     }
                     .padding(.horizontal, Spacing.md)
                 } else {

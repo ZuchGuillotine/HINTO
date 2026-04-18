@@ -19,12 +19,26 @@ import {
   handleReorderSituationships,
 } from './routes/situationships.js';
 import {
+  handleListOwnerVotingSessions,
   handleCreateVotingSession,
   handleExpireVotingSession,
   handleGetPublicVotingSession,
   handleGetVotingResults,
   handleSubmitVote,
 } from './routes/voting.js';
+import {
+  handleCreateBlock,
+  handleCreateReport,
+  handleDeleteBlock,
+  handleListBlocks,
+} from './routes/moderation.js';
+import {
+  handleCreateConversation,
+  handleDeleteConversation,
+  handleGetConversation,
+  handleListConversations,
+  handleSendMessage,
+} from './routes/ai.js';
 
 /**
  * Extracts a path parameter from a pattern like /v1/me/situationships/:id.
@@ -45,6 +59,21 @@ function matchOwnerVotingAction(path: string): { votingSessionId: string; action
     votingSessionId: match[1],
     action: match[2] as 'expire' | 'results',
   };
+}
+
+function matchBlockProfileId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/blocks\/([0-9a-f-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchConversationId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/conversations\/([a-f0-9-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchConversationMessages(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/conversations\/([a-f0-9-]+)\/messages$/);
+  return match ? match[1] : null;
 }
 
 function matchPublicVotingPath(path: string): { inviteCode: string; action: 'session' | 'votes' } | null {
@@ -116,11 +145,21 @@ async function routeAsync(
         'PATCH /v1/me/situationships/:id',
         'DELETE /v1/me/situationships/:id',
         'PUT  /v1/me/situationships/order',
+        'GET  /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions/:id/expire',
         'GET  /v1/me/voting-sessions/:id/results',
         'GET  /v1/voting-sessions/:inviteCode',
         'POST /v1/voting-sessions/:inviteCode/votes',
+        'GET  /v1/me/blocks',
+        'POST /v1/me/blocks',
+        'DELETE /v1/me/blocks/:blockedProfileId',
+        'POST /v1/reports',
+        'GET  /v1/me/conversations',
+        'POST /v1/me/conversations',
+        'GET  /v1/me/conversations/:id',
+        'DELETE /v1/me/conversations/:id',
+        'POST /v1/me/conversations/:id/messages',
       ],
     });
     return true;
@@ -205,6 +244,64 @@ async function routeAsync(
   if (method === 'POST' && path === '/v1/me/voting-sessions') {
     await handleCreateVotingSession(request, response, context, config);
     return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/voting-sessions') {
+    await handleListOwnerVotingSessions(request, response, context, config);
+    return true;
+  }
+
+  // ── Moderation routes (authenticated) ──────────────────────
+
+  if (method === 'GET' && path === '/v1/me/blocks') {
+    await handleListBlocks(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/blocks') {
+    await handleCreateBlock(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/reports') {
+    await handleCreateReport(request, response, context, config);
+    return true;
+  }
+
+  const blockedProfileId = matchBlockProfileId(path);
+  if (blockedProfileId && method === 'DELETE') {
+    await handleDeleteBlock(request, response, context, config, blockedProfileId);
+    return true;
+  }
+
+  // ── AI conversation routes (authenticated) ─────────────────
+
+  if (method === 'GET' && path === '/v1/me/conversations') {
+    await handleListConversations(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/conversations') {
+    await handleCreateConversation(request, response, context, config);
+    return true;
+  }
+
+  const conversationMessagesId = matchConversationMessages(path);
+  if (conversationMessagesId && method === 'POST') {
+    await handleSendMessage(request, response, context, config, conversationMessagesId);
+    return true;
+  }
+
+  const conversationId = matchConversationId(path);
+  if (conversationId) {
+    if (method === 'GET') {
+      await handleGetConversation(request, response, context, config, conversationId);
+      return true;
+    }
+    if (method === 'DELETE') {
+      await handleDeleteConversation(request, response, context, config, conversationId);
+      return true;
+    }
   }
 
   // Parameterized: /v1/me/situationships/:id

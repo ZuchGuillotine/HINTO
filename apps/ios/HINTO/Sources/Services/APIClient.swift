@@ -123,6 +123,10 @@ final class APIClient {
         try await request(.post, path: "/v1/me/voting-sessions", body: input, token: token)
     }
 
+    func getVotingSessions(token: String) async throws -> APIResponse<OwnerVotingSessionsData> {
+        try await request(.get, path: "/v1/me/voting-sessions", token: token)
+    }
+
     func expireVotingSession(token: String, votingSessionId: String) async throws -> APIResponse<VotingSessionMutationData> {
         try await request(.post, path: "/v1/me/voting-sessions/\(votingSessionId)/expire", token: token)
     }

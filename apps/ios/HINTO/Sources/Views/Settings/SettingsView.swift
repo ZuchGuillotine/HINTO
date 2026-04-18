@@ -56,7 +56,7 @@ struct SettingsView: View {
                 // Voting
                 Section("Voting") {
                     NavigationLink {
-                        VoteResultsView(situationships: [])
+                        VotingSessionsView()
                     } label: {
                         Label("Past Results", systemImage: "chart.bar.fill")
                     }

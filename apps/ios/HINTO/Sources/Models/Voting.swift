@@ -10,6 +10,10 @@ struct VotingSession: Codable, Identifiable {
     let votingSessionId: String
     let ownerProfileId: String
     let inviteCode: String
+    let title: String
+    let description: String?
+    let visibility: String
+    let anonymityMode: String
     let status: VotingSessionStatus
     let expiresAt: String
     let createdAt: String
@@ -98,6 +102,10 @@ struct CreateVotingSessionData: Decodable {
 
 struct VotingSessionMutationData: Decodable {
     let session: VotingSession
+}
+
+struct OwnerVotingSessionsData: Decodable {
+    let sessions: [VotingSession]
 }
 
 struct PublicVotingSessionAggregate: Decodable {

@@ -9,23 +9,30 @@ import { readJsonBody } from '../body.js';
 
 export interface ProfileRow {
   id: string;
-  username: string;
-  name: string;
+  username: string | null;
+  name: string | null;
+  display_name?: string | null;
   email: string | null;
+  bio?: string | null;
   avatar_url: string | null;
-  is_public: boolean;
-  mutuals_only: boolean;
+  privacy?: string | null;
+  is_public?: boolean | null;
+  mutuals_only?: boolean | null;
   subscription_tier: string | null;
   age: number | null;
-  age_verified: boolean;
+  age_verified?: boolean | null;
   profile_image_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-function derivePrivacy(isPublic: boolean, mutualsOnly: boolean): 'public' | 'private' | 'mutuals_only' {
-  if (mutualsOnly) return 'mutuals_only';
-  if (isPublic) return 'public';
+function derivePrivacy(row: Pick<ProfileRow, 'privacy' | 'is_public' | 'mutuals_only'>): 'public' | 'private' | 'mutuals_only' {
+  if (row.privacy === 'public' || row.privacy === 'private' || row.privacy === 'mutuals_only') {
+    return row.privacy;
+  }
+
+  if (row.mutuals_only) return 'mutuals_only';
+  if (row.is_public) return 'public';
   return 'private';
 }
 
@@ -40,13 +47,14 @@ export function toProfileDto(row: ProfileRow) {
   return {
     profileId: row.id,
     username: row.username ?? row.id,
-    displayName: row.name ?? '',
+    displayName: row.name ?? row.display_name ?? '',
     email: row.email,
+    bio: row.bio ?? null,
     avatarUrl: row.avatar_url,
-    privacy: derivePrivacy(row.is_public, row.mutuals_only),
+    privacy: derivePrivacy(row),
     subscriptionTier: normalizeTier(row.subscription_tier),
     age: row.age,
-    ageVerified: row.age_verified,
+    ageVerified: Boolean(row.age_verified),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -163,7 +171,16 @@ export async function handlePatchMe(
     updateFields.username = (body.username as string).trim().toLowerCase();
   }
   if (body.displayName !== undefined) {
+    if (typeof body.displayName !== 'string') {
+      throw new AppError('validation_error', 'displayName must be a string', 400);
+    }
     updateFields.name = body.displayName;
+  }
+  if (body.bio !== undefined) {
+    if (body.bio !== null && typeof body.bio !== 'string') {
+      throw new AppError('validation_error', 'bio must be a string or null', 400);
+    }
+    updateFields.bio = body.bio;
   }
   if (body.avatarUrl !== undefined) {
     updateFields.avatar_url = body.avatarUrl;

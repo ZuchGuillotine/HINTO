@@ -10,12 +10,14 @@ type SupabaseResult = { data: unknown; error: unknown };
 interface MockQueryBuilder {
   select: jest.Mock;
   insert: jest.Mock;
+  upsert: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
   eq: jest.Mock;
   order: jest.Mock;
   limit: jest.Mock;
   single: jest.Mock;
+  maybeSingle: jest.Mock;
   // Terminal result — set this to control what the chain resolves to
   _result: SupabaseResult;
 }
@@ -27,18 +29,20 @@ function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
     _result: defaultResult,
     select: jest.fn(),
     insert: jest.fn(),
+    upsert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     eq: jest.fn(),
     order: jest.fn(),
     limit: jest.fn(),
     single: jest.fn(),
+    maybeSingle: jest.fn(),
   };
 
   // Each method returns the builder for chaining, except when used as a
   // thenable (the last call in a chain). We make every method return the
   // builder, and also make the builder thenable so `await` works.
-  for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'limit', 'single'] as const) {
+  for (const method of ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'order', 'limit', 'single', 'maybeSingle'] as const) {
     builder[method].mockReturnValue(builder);
   }
 
