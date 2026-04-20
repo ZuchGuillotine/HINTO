@@ -9,6 +9,53 @@ import { fetchMeAggregateForProfileId } from './profile.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
+async function ensureEmailIdentity(
+  userId: string,
+  email: string,
+  config: AppConfig,
+): Promise<void> {
+  const supabase = getServiceClient(config);
+  const { data: primaryIdentities, error: primaryLookupError } = await supabase
+    .from('auth_identities')
+    .select('provider')
+    .eq('user_id', userId)
+    .eq('is_primary', true)
+    .limit(1);
+
+  if (primaryLookupError) {
+    throw new AppError(
+      'identity_lookup_failed',
+      `Failed to inspect existing auth identities: ${primaryLookupError.message}`,
+      500,
+    );
+  }
+
+  const hasPrimaryIdentity =
+    Array.isArray(primaryIdentities) && primaryIdentities.length > 0;
+
+  const { error } = await supabase
+    .from('auth_identities')
+    .upsert(
+      {
+        user_id: userId,
+        provider: 'email',
+        provider_user_id: userId,
+        provider_email: email,
+        is_primary: !hasPrimaryIdentity,
+        last_used_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,provider' },
+    );
+
+  if (error) {
+    throw new AppError(
+      'identity_link_failed',
+      `Failed to link email auth identity: ${error.message}`,
+      500,
+    );
+  }
+}
+
 /**
  * POST /v1/auth/email/otp
  * Sends a one-time verification code to the given email address.
@@ -79,6 +126,8 @@ export async function handleEmailVerify(
       401,
     );
   }
+
+  await ensureEmailIdentity(data.user.id, email, config);
 
   // The handle_new_user trigger auto-creates the profile row.
   const me = await fetchMeAggregateForProfileId(

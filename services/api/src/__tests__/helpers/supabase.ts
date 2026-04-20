@@ -20,13 +20,15 @@ interface MockQueryBuilder {
   maybeSingle: jest.Mock;
   // Terminal result — set this to control what the chain resolves to
   _result: SupabaseResult;
+  _results: SupabaseResult[];
 }
 
-function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
+function createQueryBuilder(result?: SupabaseResult, results: SupabaseResult[] = []): MockQueryBuilder {
   const defaultResult: SupabaseResult = result ?? { data: null, error: null };
 
   const builder: MockQueryBuilder = {
     _result: defaultResult,
+    _results: [...results],
     select: jest.fn(),
     insert: jest.fn(),
     upsert: jest.fn(),
@@ -51,7 +53,8 @@ function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
     resolve: (v: SupabaseResult) => void,
     reject?: (e: unknown) => void,
   ) {
-    return Promise.resolve(builder._result).then(resolve, reject);
+    const result = builder._results.length > 0 ? builder._results.shift()! : builder._result;
+    return Promise.resolve(result).then(resolve, reject);
   };
 
   return builder;
@@ -61,6 +64,9 @@ export interface MockSupabaseClient {
   from: jest.Mock;
   auth: {
     getUser: jest.Mock;
+    refreshSession: jest.Mock;
+    signInWithOtp: jest.Mock;
+    verifyOtp: jest.Mock;
   };
   _builders: Map<string, MockQueryBuilder>;
   /**
@@ -68,6 +74,7 @@ export interface MockSupabaseClient {
    * Call this before the route handler runs.
    */
   _mockTable(table: string, result: SupabaseResult): MockQueryBuilder;
+  _mockTableSequence(table: string, results: SupabaseResult[]): MockQueryBuilder;
   /**
    * Get (or create) the builder for a table, so you can further customize
    * individual method return values.
@@ -93,10 +100,29 @@ export function createMockSupabaseClient(): MockSupabaseClient {
         data: { user: null },
         error: { message: 'No token' },
       }),
+      refreshSession: jest.fn().mockResolvedValue({
+        data: { session: null, user: null },
+        error: { message: 'No refresh token' },
+      }),
+      signInWithOtp: jest.fn().mockResolvedValue({
+        data: {},
+        error: null,
+      }),
+      verifyOtp: jest.fn().mockResolvedValue({
+        data: { session: null, user: null },
+        error: { message: 'Invalid token' },
+      }),
     },
 
     _mockTable(table: string, result: SupabaseResult): MockQueryBuilder {
       const builder = createQueryBuilder(result);
+      builders.set(table, builder);
+      return builder;
+    },
+
+    _mockTableSequence(table: string, results: SupabaseResult[]): MockQueryBuilder {
+      const fallback = results[results.length - 1] ?? { data: null, error: null };
+      const builder = createQueryBuilder(fallback, results);
       builders.set(table, builder);
       return builder;
     },

@@ -139,7 +139,7 @@ struct EmailSignInView: View {
     // MARK: - Actions
 
     private func sendOtp() async {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return }
 
         isLoading = true
@@ -147,6 +147,8 @@ struct EmailSignInView: View {
 
         do {
             try await auth.sendEmailOtp(email: trimmed)
+            email = trimmed
+            code = ""
             withAnimation {
                 step = .code
             }
@@ -168,8 +170,7 @@ struct EmailSignInView: View {
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
                 code: trimmedCode
             )
-            // Auth state updates automatically via AuthManager;
-            // RootView will navigate away from onboarding.
+            dismiss()
         } catch {
             errorMessage = error.localizedDescription
             showError = true

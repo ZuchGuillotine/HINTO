@@ -119,6 +119,49 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(envelope.error.requestId, "req-123")
     }
 
+    func testEmailVerifySessionDecodes() throws {
+        let payload = """
+        {
+          "data": {
+            "accessToken": "access-token",
+            "refreshToken": "refresh-token",
+            "expiresAt": 1770000000,
+            "me": {
+              "profile": {
+                "profileId": "11111111-1111-1111-1111-111111111111",
+                "username": "alex",
+                "displayName": "Alex",
+                "email": "alex@example.com",
+                "bio": null,
+                "avatarUrl": null,
+                "privacy": "private",
+                "subscriptionTier": "free",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-02T00:00:00Z"
+              },
+              "auth": {
+                "authUserId": "11111111-1111-1111-1111-111111111111",
+                "profileId": "11111111-1111-1111-1111-111111111111",
+                "primaryProvider": "email",
+                "linkedProviders": ["email"],
+                "status": "active"
+              },
+              "capabilities": {
+                "canEditProfile": true,
+                "canCreateSituationship": true,
+                "canUseAiCoach": false
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let response = try decoder.decode(APIResponse<AuthSessionData>.self, from: payload)
+        XCTAssertEqual(response.data.accessToken, "access-token")
+        XCTAssertEqual(response.data.refreshToken, "refresh-token")
+        XCTAssertEqual(response.data.me.auth.primaryProvider, "email")
+    }
+
     func testSubmitVoteRequestEncodesExpectedKeys() throws {
         let request = SubmitVoteRequest(
             voterIdentity: "device-001",

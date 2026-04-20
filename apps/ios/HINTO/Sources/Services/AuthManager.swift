@@ -133,14 +133,21 @@ final class AuthManager: NSObject {
 
     // MARK: - Email Auth
 
+    private func normalizeEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     func sendEmailOtp(email: String) async throws {
         let client = APIClient()
-        let _ = try await client.sendEmailOtp(email: email)
+        let _ = try await client.sendEmailOtp(email: normalizeEmail(email))
     }
 
     func verifyEmailOtp(email: String, code: String) async throws {
         let client = APIClient()
-        let response = try await client.verifyEmailOtp(email: email, code: code)
+        let response = try await client.verifyEmailOtp(
+            email: normalizeEmail(email),
+            code: code.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
         setSession(
             token: response.data.accessToken,
             refreshToken: response.data.refreshToken,
