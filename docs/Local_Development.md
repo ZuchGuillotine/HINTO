@@ -22,6 +22,21 @@ Defaults used by the current repo:
 - API: `http://127.0.0.1:3000`
 - Web: `http://127.0.0.1:3001`
 
+For a physical iPhone, `127.0.0.1` points at the phone, not the Mac. Start the
+API on all interfaces and point the Xcode scheme at the Mac's LAN IP:
+
+```bash
+npm run api:start:device
+```
+
+Then set the Xcode scheme environment variable:
+
+```text
+HINTO_API_BASE_URL=http://<your-mac-lan-ip>:3000
+```
+
+The iPhone and Mac must be on the same network.
+
 ## Environment
 
 The API now loads the repo-root `.env` automatically when present.
@@ -34,8 +49,29 @@ Important environment variables for the current slice:
 - `API_HOST`
 - `API_PORT`
 - `API_CORS_ALLOW_ORIGIN`
+- `DISABLE_EMAIL_OTP_DELIVERY`
 
 If `API_CORS_ALLOW_ORIGIN` is unset, the API defaults to `*` outside production.
+
+`DISABLE_EMAIL_OTP_DELIVERY` defaults to enabled outside production. Local email
+sign-in does not call Supabase SMTP; it creates or loads a confirmed development
+session for the entered email. Set `DISABLE_EMAIL_OTP_DELIVERY=false` when
+testing the real Supabase email OTP flow.
+
+Current remote Supabase status:
+
+- migrations `001` through `011` are recorded in the remote migration table
+- service-role PostgREST reads work against the expected product tables
+- direct DB host resolution is unreliable from this machine; DB admin scripts should use the transaction pooler URL, not `SUPABASE_CONNECTION_STRING`
+- the currently working pooler env var is named `SUPABQSE_TRANSACTION_POOLER`; keep that typo in mind until it is intentionally normalized
+- API runtime code currently uses Supabase URL/key values, not the direct DB connection string
+
+Production infrastructure direction:
+
+- Supabase remains a transition/local verification surface, not the production platform target.
+- Production should use AWS RDS PostgreSQL through `DATABASE_URL`.
+- Production deployment guidance lives in [`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md).
+- The first RDS/platform identity migration lives in [`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql).
 
 ## Start The API
 
@@ -48,9 +84,20 @@ npm install
 Build and run the API:
 
 ```bash
-npm run api:build
-npm run api:start
+npm start
 ```
+
+`npm start` is the restart-era API startup command. It no longer starts Expo.
+
+For physical-device testing from Xcode, run:
+
+```bash
+npm run api:start:device
+```
+
+The API writes JSON logs to stdout. A successful startup prints a
+`server_started` record, and every request prints a `request_completed` record
+with `requestId`, path, method, status code, and duration.
 
 ## Start The Web Shell
 
@@ -59,7 +106,7 @@ The web shell does not need a framework-specific install beyond the repo depende
 Run:
 
 ```bash
-npm run web:dev
+npm run web
 ```
 
 Then open:
@@ -81,7 +128,7 @@ This repo now includes:
 Generate the Xcode project:
 
 ```bash
-tuist generate
+npm run ios
 ```
 
 The generated app target reads its default backend base URL from the `HINTOAPIBaseURL` Info.plist key.
@@ -108,3 +155,15 @@ The current verification goal is:
 5. situationship create/edit/delete/reorder persists
 
 Voting backend routes now exist in `services/api`, and the current web/SwiftUI shells now hit them for session creation, vote submission, session listing, and results. Browser and simulator verification are still follow-up work.
+
+## Legacy Expo Commands
+
+The legacy Expo/React Native app is still in the repo for reference, but it is
+not the default startup path. Use explicit legacy commands only when inspecting
+that app:
+
+```bash
+npm run legacy:expo:start
+npm run legacy:expo:ios
+npm run legacy:expo:web
+```

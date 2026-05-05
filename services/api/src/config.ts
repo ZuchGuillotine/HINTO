@@ -82,6 +82,21 @@ function parseScopes(value: string | undefined, fallback: string[]): string[] {
   return Array.from(new Set(raw));
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   loadDotEnv(env);
 
@@ -94,6 +109,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       (env.NODE_ENV === 'production' ? 'https://hinto.app' : '*'),
     logLevel: parseLogLevel(env.API_LOG_LEVEL),
     nodeEnv: env.NODE_ENV ?? 'development',
+    databaseUrl: env.DATABASE_URL,
     supabaseUrl:
       env.SUPABASE_URL ?? env.PUBLIC_SUPABASE_URL ?? env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey:
@@ -102,7 +118,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     openAiApiKey: env.OPENAI_API_KEY,
+    emailOtpDeliveryDisabled: parseBoolean(
+      env.DISABLE_EMAIL_OTP_DELIVERY,
+      (env.NODE_ENV ?? 'development') !== 'production',
+    ),
+    awsRegion: env.AWS_REGION,
+    s3MediaBucket: env.S3_MEDIA_BUCKET,
+    s3WebBucket: env.S3_WEB_BUCKET,
+    cloudfrontMediaDomain: env.CLOUDFRONT_MEDIA_DOMAIN,
+    sesFromEmail: env.SES_FROM_EMAIL,
+    jwtIssuer: env.JWT_ISSUER,
+    jwtAudience: env.JWT_AUDIENCE,
+    jwtAccessTokenSecret: env.JWT_ACCESS_TOKEN_SECRET,
+    refreshTokenPepper: env.REFRESH_TOKEN_PEPPER,
     authStateSecret: env.AUTH_STATE_SECRET,
+    appleClientId: env.APPLE_CLIENT_ID,
+    appleTeamId: env.APPLE_TEAM_ID,
+    appleKeyId: env.APPLE_KEY_ID,
+    applePrivateKey: env.APPLE_PRIVATE_KEY,
+    metaClientId: env.META_CLIENT_ID,
+    metaClientSecret: env.META_CLIENT_SECRET,
     tiktokClientKey: env.TIKTOK_CLIENT_KEY,
     tiktokClientSecret: env.TIKTOK_CLIENT_SECRET,
     tiktokRedirectUri: env.TIKTOK_REDIRECT_URI,

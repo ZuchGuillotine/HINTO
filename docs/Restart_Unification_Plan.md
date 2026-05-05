@@ -167,25 +167,31 @@ Current state in the repo:
 - `/services/api` exists
 - `/packages/contracts` exists
 - `/packages/domain` exists
-- `/packages/prompts` and `/legacy` do not yet exist
+- `/packages/prompts` now exists; `/legacy` does not yet exist
 
 ### 4.3 Backend decision
 
 Recommended MVP backend:
 
 - PostgreSQL as the source of truth
-- Supabase for DB/Auth/Storage in MVP
+- AWS RDS PostgreSQL for production data
+- HINTO-owned platform auth for production sessions and provider linkage
+- S3 + CloudFront for media/share assets
+- ECS Express Mode on Fargate for the API container
+- SES for transactional email
 - small TypeScript API service for AI calls, moderation, admin tasks, and webhooks
-- deploy API/web on Hetzner if desired
+- S3 + CloudFront for the static web app
 
 Why this is the best default:
 
-- it is the fastest path from the current repos to a working MVP
-- the Supabase repo already contains reusable schema and voting logic
+- it avoids the App Runner maintenance path while keeping low-ops container deployment
+- it uses the existing AWS billing organization while separating HINTO production into its own workload account
+- the Supabase repo still contains reusable schema and voting logic as history/input
 - it avoids reviving Amplify/Cognito/AppSync complexity
 - it keeps future self-hosting possible because the core data model remains Postgres
+- it creates early platform identity and consent primitives for future wellness apps without forcing shared product schemas
 
-If vendor minimization becomes more important than speed, a later phase can replace Supabase Auth/Storage with self-hosted equivalents on Hetzner. That should not be the first move.
+Supabase remains transition infrastructure and schema history. New production-facing backend work should not deepen Supabase Auth, Supabase Storage, or direct client-to-Supabase coupling.
 
 ### 4.4 API style decision
 
@@ -227,12 +233,12 @@ Reason:
 
 Start with:
 
-- Supabase Auth as the canonical user/session system
+- HINTO-owned platform auth as the canonical user/session system
 - Sign in with Apple
 - Meta/Facebook login to cover the Instagram-discovery use case
 - email magic link or other passwordless fallback
 
-Then layer in:
+Also support:
 
 - Snapchat login
 - TikTok login
@@ -242,8 +248,7 @@ Clarification:
 - We do not need Instagram data access as part of MVP.
 - We need a low-friction path for users who discover HINTO via Instagram.
 - Meta/Facebook-backed login is acceptable for that requirement.
-- Supabase can manage auth directly where it has provider support.
-- For providers without built-in support, HINTO should own the provider integration and map the result into the canonical app identity model.
+- HINTO should own provider integration and map the result into the canonical platform identity plus HINTO app-user model.
 
 ## 6. Repo Unification Plan
 
@@ -317,7 +322,7 @@ What remains immediately in front of implementation:
 - There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
 - Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against a live Supabase environment.
 - The native iOS app currently mixes real API-facing structure with placeholder behavior: auth stores a temporary token locally, vote submission is mocked, and AI chat uses canned responses.
-- The repo shape is still only partially converged because `/packages/prompts` and `/legacy` have not been created yet.
+- The repo shape is still only partially converged because `/legacy` has not been created yet.
 
 ## 9. Recommended Data Model Baseline
 

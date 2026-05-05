@@ -12,25 +12,28 @@ It is intended to remove ambiguity before backend scaffolding begins.
 
 - There must be one canonical HINTO user identity.
 - Authentication method and social-account linkage are separate concerns.
-- Supabase Auth is the canonical user/session backbone.
-- Use Supabase-managed provider auth where available.
-- Use backend-owned provider integration where Supabase does not natively support the provider.
+- HINTO-owned platform auth is the canonical user/session backbone.
+- Use backend-owned provider integration for Apple, Meta/Facebook, Snapchat, and TikTok.
+- Do not use Cognito or Supabase Auth as the production session issuer.
 - iOS and web must share the same identity model even if provider UX differs by platform.
 
 ## Canonical Identity Model
 
 There are three layers:
 
-1. `auth.users`
-   The canonical authenticated user record managed by Supabase Auth.
+1. `platform_users`
+   The canonical authenticated user record managed by the HINTO platform.
 
-2. `public.profiles`
-   The application profile record keyed by `auth.users.id`.
+2. `app_users`
+   The mapping between a platform user and a product-specific user record, such as the HINTO profile owner.
 
-3. `public.auth_identities`
+3. `profiles`
+   The HINTO application profile record.
+
+4. `auth_identities`
    App-owned linkage records that describe which providers are attached to the user.
 
-The donor schema already includes `public.profiles` keyed to `auth.users.id`, which is the correct base pattern.
+The donor schema already includes useful profile and provider-linkage concepts, but production should normalize them into RDS/Postgres tables independent of Supabase Auth.
 
 ## Supported Sign-In Methods
 
@@ -54,22 +57,30 @@ Explicitly not required for MVP:
 
 Canonical session behavior:
 
-- Supabase Auth issues and refreshes the user session
-- clients hold the canonical authenticated session
-- the TypeScript API validates the incoming Supabase-backed identity on every authenticated request
-- the API resolves the HINTO user from `auth.users.id`
+- the API issues short-lived HINTO access tokens
+- refresh sessions are stored as hashes in Postgres
+- clients hold the canonical authenticated HINTO session
+- the TypeScript API validates the incoming HINTO token on every authenticated request
+- the API resolves the platform user, then the HINTO app user
 
-The API should not mint a second independent user system unless a specific provider constraint makes it unavoidable.
+The API should not mint provider-specific user systems. Provider accounts link into the platform user identity.
 
 ## Database Baseline
 
-Existing donor baseline:
+Production baseline:
 
-- `auth.users`
-- `public.profiles`
-- `public.daily_usage`
+- `platform_users`
+- `app_users`
+- `auth_identities`
+- `auth_sessions`
+- `auth_login_events`
+- `oauth_states`
+- `email_magic_links`
+- `user_consents`
+- `data_sharing_grants`
+- HINTO app-domain tables such as `profiles` and `daily_usage`
 
-Existing app-domain tables already key to `profiles.id`:
+Existing app-domain tables already key to `profiles.id` or should continue to key to the HINTO app user/profile:
 
 - `situationships.user_id`
 - `voting_sessions.owner_id`
@@ -147,21 +158,22 @@ This can also live in a short-TTL cache if preferred.
 
 Preferred path:
 
-- Supabase-managed sign-in if the provider is supported in the project auth configuration
+- backend-owned token verification and identity resolution
 
 Expected flow:
 
 1. client initiates Apple sign-in
-2. Supabase completes authentication
-3. `auth.users` session is established
-4. profile is created if missing
+2. client sends the Apple credential or callback result to the API
+3. API verifies the provider token and nonce
+4. API resolves or creates the platform user and HINTO app user
 5. `auth_identities` entry is inserted or refreshed
+6. API issues HINTO access/refresh session
 
 ### Meta/Facebook
 
 Preferred path:
 
-- Supabase-managed sign-in where supported
+- backend-owned OAuth exchange and identity resolution
 
 Product note:
 
@@ -186,7 +198,7 @@ Expected flow:
 
 ### TikTok
 
-Same design as Snapchat unless later proven to be directly supportable through Supabase-managed provider auth.
+Same design as Snapchat.
 
 ## User Resolution Rules
 
@@ -195,16 +207,17 @@ When a provider callback or sign-in succeeds:
 1. resolve by existing `(provider, provider_user_id)` linkage first
 2. if no linkage exists, attempt safe email-based match only when the provider email is verified and policy allows merge
 3. if no safe match exists, create a new canonical user
-4. create or update the `profiles` row
+4. create or update the `app_users` and `profiles` rows
 5. create or update the `auth_identities` row
+6. create an `auth_sessions` row for refresh-token tracking
 
 Unsafe automatic merges must be avoided.
 
 ## Profile Creation Rules
 
-The donor schema already includes `handle_new_user()` to create `public.profiles` when a new `auth.users` row is inserted.
+The donor schema includes a Supabase-specific `handle_new_user()` trigger. Production RDS should replace this with API-owned bootstrap logic.
 
-That remains a good default, but the restart should extend it to:
+Bootstrap should:
 
 - handle name fallback consistently across providers
 - avoid overwriting user-edited profile fields on later logins
@@ -221,9 +234,7 @@ The TypeScript API should own:
 - profile hydration rules
 - audit logging
 
-The API should not duplicate:
-
-- core passwordless/session issuance logic already handled cleanly by Supabase Auth
+The API should own passwordless/session issuance for production.
 
 ## Security Rules
 
@@ -236,16 +247,9 @@ The API should not duplicate:
 
 ## Open Design Questions
 
-- whether backend-owned custom provider flows should create Supabase custom tokens directly or reconcile by a controlled bootstrap exchange
 - whether TikTok and Snapchat should both be MVP-day-one or staged immediately after Apple and Meta/Facebook
 - whether phone-based identity fallback is needed later for invite conversion
 
 ## Recommended Next Step
 
-Implement the first migration for:
-
-- `auth_identities`
-- `auth_login_events`
-- any supporting indexes and RLS rules
-
-Then wire the API auth middleware against `auth.users` and `profiles` before building feature routes.
+Apply [`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql), then wire the API auth middleware against `platform_users`, `app_users`, `auth_identities`, and `auth_sessions`.

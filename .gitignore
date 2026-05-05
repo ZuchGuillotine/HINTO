@@ -35,6 +35,12 @@ web-build/
 .env.production.local
 supabase/.temp/
 
+# Local cloud credentials
+*_accessKeys.csv
+*AccessKeys.csv
+*accessKeys.csv
+credentials.csv
+
 # Typescript
 *.tsbuildinfo
 

@@ -13,9 +13,9 @@ The active target is:
 
 - one canonical repo
 - shared backend that serves both web and native iOS
-- PostgreSQL/Supabase-backed data model
+- RDS PostgreSQL-backed production data model
 - HTTP API and contracts that are clean for both Swift and web clients
-- gradual retirement of AWS Amplify, Cognito, AppSync, and Expo-first assumptions
+- gradual retirement of AWS Amplify, Cognito, AppSync, Supabase production assumptions, and Expo-first assumptions
 
 ## Session Focus: 2026-04-14
 
@@ -149,11 +149,11 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files | Human | In Progress | Likely donor repo: `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/` |
-| EX-01 | Confirm the intended backend stack for the restart | Human | Done | Use Supabase Postgres + Supabase Auth + Supabase Storage + TypeScript API |
+| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files | Human | Done | Remote Supabase migration history records all 11 in-repo migrations, `001` through `011`; donor repo remains a historical input, not a separate source of truth |
+| EX-01 | Confirm the intended backend stack for the restart | Human | Done | Use AWS RDS PostgreSQL + HINTO-owned platform auth + S3/CloudFront + SES + TypeScript API on ECS Express Mode |
 | EX-02 | Confirm the intended web stack | Human | Assumed | Defaulting to Next.js unless changed |
 | EX-03 | Confirm whether the first iOS milestone is native SwiftUI from this repo or a staged bridge from existing React Native flows | Agent | Done | Recommendation: fresh SwiftUI app under `/apps/ios`; current `ios/` is Expo shell only |
-| EX-04 | Capture external service decisions still in scope for MVP | Human | Done | Supabase Auth is the canonical auth/session system. Apple auth is required. Meta/Facebook login is acceptable for the Instagram-discovery use case. Snapchat and TikTok also remain in scope. |
+| EX-04 | Capture external service decisions still in scope for MVP | Human | Done | HINTO-owned platform auth is the production session system. Apple, Meta/Facebook, Snapchat, and TikTok are launch-scope provider flows. |
 
 ### 1. Canonical Product And Architecture Reset
 
@@ -172,7 +172,7 @@ Evaluator output should always classify findings as:
 | EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Done | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md` |
 | EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Done | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
 | EX-23 | Identify schema gaps for web + Swift support | Agent | Done | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics. |
-| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Migration `010_auth_identities.sql` adds `auth_identities` and `auth_login_events` tables with RLS policies |
+| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Transition migration `010_auth_identities.sql` exists under `supabase/migrations`; production platform identity baseline now exists at `db/migrations/001_platform_identity.sql` |
 
 ### 3. Backend Foundation
 
@@ -183,9 +183,9 @@ Evaluator output should always classify findings as:
 | EX-32 | Add environment/config management for local and deployed backend | Agent | Done | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md` |
 | EX-33 | Establish API error model and shared response envelope rules | Agent | Done | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md` |
 | EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
-| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts` |
+| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Current middleware resolves Supabase transition sessions; next production pass should replace it with platform JWT + RDS session resolution |
 | EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
-| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | In Progress | Apple and Meta/Facebook should use Supabase-managed auth where practical; custom-provider backend wiring now exists alongside this work |
+| EX-37 | Implement provider auth flows through platform auth | Agent | In Progress | Apple, Meta/Facebook, Snapchat, and TikTok should all terminate in backend-owned provider flows and HINTO-issued sessions |
 | EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | Done (pending creds) | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` exist; TikTok and Snapchat (`kit.snapchat.com/v1/me` external_id handshake) session bootstrap are wired. Live verification is blocked on user-supplied client IDs/secrets/redirect URIs (`TIKTOK_*`, `SNAPCHAT_*`, `AUTH_STATE_SECRET`). |
 
 ### 4. Backend Modules
@@ -194,9 +194,9 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
 | EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
-| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` now exist on `restart-plan`; runtime verification against a live Supabase project is still pending |
-| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` now records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; live DB verification is still pending |
-| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` now computes ranked owner-facing results plus comment summaries; client integration and remote verification remain |
+| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` exist; remote Supabase connectivity and migration presence are verified, but route-level live smoke remains |
+| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; remote Supabase has votes data, but route-level live smoke remains |
+| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` computes ranked owner-facing results plus comment summaries; web/client integration exists, but route-level live smoke and presentation polish remain |
 | EX-45 | Implement report/block routes/services | Agent | Done | `POST /v1/reports`, `GET\|POST /v1/me/blocks`, `DELETE /v1/me/blocks/:blockedProfileId` in `services/api/src/routes/moderation.ts`; reuses donor `blocks` and `reports` tables from migration 001 |
 | EX-46 | Implement AI conversation/message routes/services | Agent | Done | Conversations + messages CRUD, OpenAI `gpt-4o-mini` integration with mock fallback, daily quota (30 msgs/user/day), and substring-based safety moderation in `services/api/src/routes/ai.ts` |
 | EX-47 | Implement storage helpers for media/share assets | Agent | Todo | Use backend-compatible storage assumptions |
@@ -207,7 +207,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs | Agent | Done | Scaffolded under `packages/contracts` for the first slice with `me` and situationship DTOs, aggregates, and reorder/create/update contracts |
 | EX-51 | Create `/packages/domain` for shared business rules and validators | Agent | Done | Scaffolded under `packages/domain` with profile privacy normalization, capability resolution, audience/access types, and reorder invariants |
-| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Todo | Salvage from donor repo if better |
+| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Done | `@hinto/prompts` now centralizes the relationship-coach system prompt, prompt assembly, conversation starters, and deterministic crisis/violence safety triggers consumed by `services/api/src/routes/ai.ts` |
 | EX-53 | Generate typed clients or client helpers for web and Swift consumption | Agent | Todo | Web can use generated TS types; Swift can use OpenAPI generation later |
 
 ### 6. Web App Foundation
@@ -254,7 +254,7 @@ Evaluator output should always classify findings as:
 | EX-92 | Add web app smoke tests | Agent | Done | Jest smoke coverage now lives under `apps/web/src/app-core.test.js` and covers development sign-in, owner voting-session creation/results loading, public invite-code loading, and vote submission. Manual localhost browser verification remains tracked separately under SX-07. |
 | EX-93 | Add iOS networking/model tests | Agent | Done | XCTest target added in `apps/ios/Package.swift`; contract-decode tests for `MeAggregate`, `VotingSession`, `PublicVotingSessionAggregate`, `APIErrorEnvelope`, and `SubmitVoteRequest` in `apps/ios/HINTO/Tests/ContractDecodingTests.swift`. Run via `xcodebuild test -scheme HINTO -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4'`. |
 | EX-94 | Add migration verification and seed/dev fixtures | Agent | Done | Migration file verification tests in `migration.verify.test.ts`. Dev seed fixtures (3 users, 4 situationships, auth identities) with SQL generator in `seed.fixtures.ts`. |
-| EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |
+| EX-95 | Define deployment path for API and web | Agent | Done | Production path documented in `docs/AWS_Infrastructure_Plan.md` and `infra/aws/README.md`: ECS Express Mode API, RDS PostgreSQL, S3/CloudFront web/media, SES, AWS Organizations account separation |
 
 ## Recommended Sequence
 
@@ -325,7 +325,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 ## Immediate Next Actions
 
 1. ~~Normalize the first auth migration around `auth_identities` and related audit tables.~~ - Done (PR #1)
-2. Verify Supabase connectivity and confirm the current remote project/env contract.
+2. ~~Verify Supabase connectivity and confirm the current remote project/env contract.~~ - Done 2026-04-28. Remote migration history has `001` through `011`; PostgREST service-role reads and pooler `psql` row counts both work. Direct DB host in `SUPABASE_CONNECTION_STRING` does not resolve locally; use the pooler URL for DB admin scripts.
 3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
 4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
 5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main).
@@ -344,6 +344,24 @@ This session closed out the remaining Phase C items and shipped the first iOS te
 - **EX-46** — `services/api/src/routes/ai.ts` added with conversations CRUD, messaging with OpenAI `gpt-4o-mini` (mock fallback when key unset), substring moderation, and `daily_usage`-backed 30-msg/day quota. 9 new Jest suites.
 - **EX-93** — XCTest target added in `apps/ios/Package.swift`; `apps/ios/HINTO/Tests/ContractDecodingTests.swift` exercises `MeAggregate`, `VotingSession`, `PublicVotingSessionAggregate`, `APIErrorEnvelope`, and `SubmitVoteRequest`.
 - **SX-05/SX-07** — iOS simulator build is green after fixing `ShapeStyle.hintoPink` shorthand in `EmailSignInView.swift`; 77 API + 5 web + 5 iOS tests all pass.
+
+## 2026-04-28 Session Delta
+
+This session closed the shared prompt-package gap:
+
+- **EX-52** — `packages/prompts` added with the HINTO relationship-coach system prompt, prompt assembly helpers, conversation starter helpers, and crisis/violence safety trigger detection.
+- **EX-46 follow-up** — `services/api/src/routes/ai.ts` now consumes the prompt package instead of owning inline prompt/moderation logic. Crisis and active-violence inputs return deterministic safety guidance without calling OpenAI.
+- Verification: `npm run api:build` passes, `npm run api:test -- routes.ai.test.ts` passes at 10/10, and the full API suite passes at 82/82 across 10 suites.
+
+## 2026-04-28 Supabase Verification
+
+Human-provided remote verification closed the Supabase connectivity blocker:
+
+- `supabase_migrations.schema_migrations` records all 11 migrations in `supabase/migrations`, `001` through `011`.
+- PostgREST service-role calls return successful responses for `profiles`, `situationships`, `votes`, `voting_sessions`, `auth_identities`, `auth_login_events`, `images`, `friendships`, `contacts`, `friend_groups`, and `friend_group_members`.
+- Pooler `psql` at `aws-0-us-west-2.pooler.supabase.com:6543` returns row counts: `profiles=4`, `situationships=3`, `voting_sessions=2`, `votes=2`, `auth_identities=0`.
+- The direct DB host in `SUPABASE_CONNECTION_STRING` does not resolve from this machine. Any future DB admin script should use the transaction pooler URL instead. Current source code does not read `SUPABASE_CONNECTION_STRING`.
+- `auth_identities=0`, so provider-linkage still needs live exercise after provider credentials are configured.
 
 ### Remaining human-owned follow-ups
 

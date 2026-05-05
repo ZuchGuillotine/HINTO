@@ -16,18 +16,20 @@ Current scope:
 - situationship CRUD and reorder routes
 - voting session create/expire/public-view routes
 - public vote submission and owner-facing results routes
+- report/block moderation routes
+- AI conversation/message routes backed by `@hinto/prompts`
+- container build support for the AWS ECS Express Mode production path
 
 Still out of scope:
 
-- AI routes and prompt orchestration
-- report/block moderation routes
 - fully automated migration verification and DB-backed integration tests
+- full replacement of Supabase data/session calls with the RDS-backed repository layer
 
 Current provider-auth status:
 
-- Apple and Meta/Facebook are still expected to use Supabase-managed auth where practical
-- TikTok custom backend OAuth is wired and bootstraps a normal Supabase session after callback success
-- Snapchat custom backend OAuth start/callback routing is scaffolded, but canonical-session completion still needs the provider external ID handshake finalized
+- Production direction is platform-owned auth backed by RDS/Postgres, not Supabase Auth or Cognito
+- Apple, Meta/Facebook, TikTok, and Snapchat should all be backend-owned provider flows
+- Existing Supabase-backed route code remains a transition implementation until the RDS repository/session layer replaces it
 
 ## API Style
 
@@ -66,6 +68,15 @@ This intentionally avoids:
 - `GET /v1/me/voting-sessions/:id/results`
 - `GET /v1/voting-sessions/:inviteCode`
 - `POST /v1/voting-sessions/:inviteCode/votes`
+- `GET /v1/me/blocks`
+- `POST /v1/me/blocks`
+- `DELETE /v1/me/blocks/:blockedProfileId`
+- `POST /v1/reports`
+- `GET /v1/me/conversations`
+- `POST /v1/me/conversations`
+- `GET /v1/me/conversations/:id`
+- `DELETE /v1/me/conversations/:id`
+- `POST /v1/me/conversations/:id/messages`
 
 ## Environment Contract
 
@@ -76,11 +87,28 @@ Supported environment variables:
 - `API_LOG_LEVEL`
 - `API_NAME`
 - `NODE_ENV`
+- `DATABASE_URL`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `AWS_REGION`
+- `S3_MEDIA_BUCKET`
+- `S3_WEB_BUCKET`
+- `CLOUDFRONT_MEDIA_DOMAIN`
+- `SES_FROM_EMAIL`
+- `JWT_ISSUER`
+- `JWT_AUDIENCE`
+- `JWT_ACCESS_TOKEN_SECRET`
+- `REFRESH_TOKEN_PEPPER`
 - `OPENAI_API_KEY`
+- `DISABLE_EMAIL_OTP_DELIVERY`
 - `AUTH_STATE_SECRET`
+- `APPLE_CLIENT_ID`
+- `APPLE_TEAM_ID`
+- `APPLE_KEY_ID`
+- `APPLE_PRIVATE_KEY`
+- `META_CLIENT_ID`
+- `META_CLIENT_SECRET`
 - `TIKTOK_CLIENT_KEY`
 - `TIKTOK_CLIENT_SECRET`
 - `TIKTOK_REDIRECT_URI`
@@ -90,7 +118,42 @@ Supported environment variables:
 - `SNAPCHAT_REDIRECT_URI`
 - `SNAPCHAT_SCOPES`
 
-The current routes use the Supabase values for auth, profile, situationship, and voting access.
+The current routes still use the Supabase values for transition-era auth, profile,
+situationship, voting, moderation, and AI conversation persistence. Production
+deployment should use `DATABASE_URL` and the RDS-backed repository/session layer
+once that replacement work lands.
+
+For local development, `DISABLE_EMAIL_OTP_DELIVERY` defaults to `true` unless
+`NODE_ENV=production`. In that mode, `/v1/auth/email/otp` does not call Supabase
+email delivery, and `/v1/auth/email/verify` creates or loads a confirmed
+development session for the email. Set it to `false` to exercise real Supabase
+email OTP delivery after SMTP is configured.
+
+The AWS production target uses RDS PostgreSQL through `DATABASE_URL`. Supabase
+connection settings are retained for local/prototype compatibility until the
+RDS-backed data layer fully replaces them.
+
+## Container Use
+
+Build from the repo root:
+
+```bash
+docker build -t hinto-api:local .
+```
+
+Run locally:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e API_HOST=0.0.0.0 \
+  -e API_PORT=3000 \
+  hinto-api:local
+```
+
+Production deployment guidance lives in
+[`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md)
+and [`infra/aws/README.md`](/Users/benjamincox/Downloads/HINTO/infra/aws/README.md).
 
 ## Error Envelope
 
@@ -139,11 +202,23 @@ npm run api:build
 Run:
 
 ```bash
-npm run api:start
+npm start
 ```
+
+`npm start` runs the restart-era API. It does not start Expo.
+
+Run for physical iPhone testing from Xcode:
+
+```bash
+npm run api:start:device
+```
+
+This binds the API to `0.0.0.0` and enables debug-level logging. Set the Xcode
+scheme environment variable `HINTO_API_BASE_URL` to
+`http://<your-mac-lan-ip>:3000`.
 
 Dev watch:
 
 ```bash
-npm run api:watch
+npm run dev
 ```
