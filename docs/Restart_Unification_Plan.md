@@ -309,18 +309,19 @@ What is now settled:
 
 What remains immediately in front of implementation:
 
-- confirm remote Supabase connectivity and current environment contract
-- add backend tests, DB verification, and repeatable migration/dev workflows
-- implement provider auth flows on top of the new auth identity model
+- continue AWS staging deployment and RDS migration workflow
+- replace transition Supabase persistence/session code with RDS repositories and HINTO platform auth
+- implement provider auth flows on top of the platform identity model
 - wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes
 - align the existing SwiftUI app shell with the live backend contracts and replace remaining placeholder auth/voting/AI behavior incrementally
 
 ## 8. Current Risks
 
 - The active app bootstrap still depends on legacy Amplify/Cognito paths, so the current client runtime is not yet backend-neutral.
-- The repo-local environment and Supabase metadata are not yet confirmed as a complete end-to-end setup for remote DB verification, so connectivity work is still blocked pending a verified URL/key set or linked project workflow.
-- There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
-- Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against a live Supabase environment.
+- Transition-era API routes still use Supabase client access in places; production needs RDS/Postgres repositories and HINTO platform session validation.
+- RDS exists in staging, but migrations still need to be applied from inside the VPC.
+- The GitHub-to-ECR workflow exists, but the first image push and ECS service creation are still pending.
+- Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against RDS.
 - The native iOS app currently mixes real API-facing structure with placeholder behavior: auth stores a temporary token locally, vote submission is mocked, and AI chat uses canned responses.
 - The repo shape is still only partially converged because `/legacy` has not been created yet.
 
@@ -347,16 +348,17 @@ Optional later entities:
 
 ## 10. Immediate Next Steps
 
-### Next step A: verify the backend slice against a real Supabase environment
+### Next step A: finish AWS staging deployment
 
-- confirm working `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
-- verify migration `010_auth_identities.sql`
-- add route tests and DB connectivity checks for `/v1/me` and situationships
+- run the GitHub Actions staging workflow to push the first API image to ECR
+- create the ECS service/ALB target group/listener
+- apply `db/migrations` to RDS from inside the VPC
 
 ### Next step B: continue backend completion from the current baseline
 
+- replace Supabase session/data access with HINTO platform auth and RDS repositories
 - implement provider auth flows
-- verify the new voting session, vote submission, and results routes against a live Supabase project
+- verify the new voting session, vote submission, and results routes against RDS
 - keep AI routes behind the prompt/moderation package boundary
 
 ### Next step C: turn the existing clients into real consumers of the shared backend

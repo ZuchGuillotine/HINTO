@@ -194,7 +194,7 @@ Expected flow:
 4. API validates state, exchanges code, fetches provider identity
 5. API finds or creates the canonical HINTO user
 6. API links `auth_identities`
-7. API completes the authenticated app session through the canonical Supabase user model
+7. API completes the authenticated app session through the canonical HINTO platform auth model
 
 ### TikTok
 

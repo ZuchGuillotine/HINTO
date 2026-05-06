@@ -35,9 +35,9 @@ This section is the live execution tracker for the current build-and-verify push
 
 ## Assumptions
 
-- A Supabase database already exists and at least one migration has already been applied.
-- The most likely current schema source is `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/migrations/`.
-- The current repo now contains the restart-era backend foundation under `/services/api`, shared first-slice packages under `/packages/contracts` and `/packages/domain`, migration `supabase/migrations/010_auth_identities.sql`, and a native SwiftUI app shell under `/apps/ios`.
+- Supabase exists as transition infrastructure and schema history, not the production platform target.
+- The production staging database is AWS RDS PostgreSQL, with production migrations under `db/migrations`.
+- The current repo now contains the restart-era backend foundation under `/services/api`, shared first-slice packages under `/packages/contracts` and `/packages/domain`, production platform identity migration `db/migrations/001_platform_identity.sql`, and a native SwiftUI app shell under `/apps/ios`.
 - The legacy Expo client is still largely coupled to Amplify Auth and GraphQL, while the SwiftUI app contains partial API wiring and placeholder auth/voting/AI behavior.
 - Native iOS and web are both first-class targets, so backend design must be client-agnostic.
 
@@ -194,8 +194,8 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
 | EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
-| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` exist; remote Supabase connectivity and migration presence are verified, but route-level live smoke remains |
-| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; remote Supabase has votes data, but route-level live smoke remains |
+| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` exist; RDS-backed live smoke remains |
+| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; RDS-backed live smoke remains |
 | EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` computes ranked owner-facing results plus comment summaries; web/client integration exists, but route-level live smoke and presentation polish remain |
 | EX-45 | Implement report/block routes/services | Agent | Done | `POST /v1/reports`, `GET\|POST /v1/me/blocks`, `DELETE /v1/me/blocks/:blockedProfileId` in `services/api/src/routes/moderation.ts`; reuses donor `blocks` and `reports` tables from migration 001 |
 | EX-46 | Implement AI conversation/message routes/services | Agent | Done | Conversations + messages CRUD, OpenAI `gpt-4o-mini` integration with mock fallback, daily quota (30 msgs/user/day), and substring-based safety moderation in `services/api/src/routes/ai.ts` |
@@ -275,7 +275,7 @@ This phase is largely complete in the repo:
 
 The first vertical slice should be:
 
-- authenticate user with the canonical Supabase-backed session model
+- authenticate user with the canonical HINTO platform session model
 - fetch or create profile
 - list situationships
 - create/edit/reorder situationships
@@ -300,7 +300,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 
 - final product scope decisions
 - stack decisions that affect long-term maintenance
-- Supabase project access and secret management
+- AWS account/domain access and provider secret management
 - external provider credentials
 - go/no-go decisions for deletions and archival
 
@@ -329,7 +329,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
 4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
 5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main).
-6. ~~Add provider-start and provider-callback flows after the canonical session path is wired.~~ - Done (EX-37/38). Live verification still needs user-supplied `TIKTOK_*` / `SNAPCHAT_*` / `AUTH_STATE_SECRET` env vars and Apple/Meta provider configuration in the Supabase dashboard.
+6. ~~Add provider-start and provider-callback flows after the canonical session path is wired.~~ - Done for transition implementation (EX-37/38). Production verification still needs provider credentials, callback URLs, and platform-session replacement work.
 7. ~~Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes.~~ - Done for profile/situationship/voting; AI coach + moderation UI still pending in both clients.
 8. Replace active legacy AWS client calls with backend-neutral service clients (EX-82, EX-83). Blocked on go/no-go for moving `apps/hnnt-app` under `/legacy` (EX-84).
 9. ~~Align the existing SwiftUI app shell with the live backend contracts.~~ - Done via SX-05 + EX-93 contract-decode tests. AI chat view still uses mocked responses at the view layer.
@@ -355,7 +355,7 @@ This session closed the shared prompt-package gap:
 
 ## 2026-04-28 Supabase Verification
 
-Human-provided remote verification closed the Supabase connectivity blocker:
+Historical note: this closed the transition-era Supabase connectivity blocker. Supabase is no longer the production platform target.
 
 - `supabase_migrations.schema_migrations` records all 11 migrations in `supabase/migrations`, `001` through `011`.
 - PostgREST service-role calls return successful responses for `profiles`, `situationships`, `votes`, `voting_sessions`, `auth_identities`, `auth_login_events`, `images`, `friendships`, `contacts`, `friend_groups`, and `friend_group_members`.
@@ -365,10 +365,10 @@ Human-provided remote verification closed the Supabase connectivity blocker:
 
 ### Remaining human-owned follow-ups
 
-- Configure Apple and Meta/Facebook OAuth in Supabase dashboard (EX-37).
-- Provision `.env` secrets for TikTok + Snapchat to exercise custom-provider flows live (EX-38).
+- Configure Apple, Meta/Facebook, TikTok, and Snapchat OAuth callback URLs for the HINTO platform auth flow.
+- Provision provider secrets in AWS Secrets Manager for staging/production.
 - Decide go/no-go on moving `apps/hnnt-app` under `/legacy` (EX-84) so EX-81/82/83 can proceed destructively.
-- Deployment path decision (EX-95).
+- Continue AWS staging deployment from `infra/aws/staging-resources.md` and `.github/workflows/deploy-api-staging.yml`.
 
 ## Current Orchestrator Guidance
 
@@ -382,14 +382,14 @@ Use the following sequencing constraints while agents are active:
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
 - ~~Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.~~ - EX-90 is complete; voting/AI routes are now unblocked.
 - Voting backend routes now exist in-tree, but still need broader route and DB-backed verification before the voting stack should be treated as production-ready.
-- Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
+- Provider auth (EX-37, EX-38) should proceed against the HINTO platform auth model, with Supabase code treated as transition implementation only.
 
 ## Completed Agent Packets
 
 The following packets were delivered and merged in PR #1 (2026-03-28):
 
 - **Packet A (EX-50, EX-51)**: contracts and domain packages scaffolded
-- **Packet B (EX-35)**: auth middleware with Supabase JWT session resolution
+- **Packet B (EX-35)**: transition auth middleware with Supabase JWT session resolution
 - **Packet C (EX-40)**: profile routes with MeAggregate responses
 - **Packet D (EX-41)**: situationship CRUD, reorder, and delete routes
 
@@ -417,17 +417,16 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
 
 ### Packet F: EX-37, EX-38
 
-- Goal: implement provider auth flows (Apple, Meta/Facebook via Supabase; Snapchat, TikTok via custom backend)
+- Goal: replace provider auth flows with HINTO platform-owned sessions for Apple, Meta/Facebook, Snapchat, and TikTok
 - Inputs:
   - `docs/Auth_Model.md`
   - `services/api/src/middleware/auth.ts`
 - Deliverables:
   - provider-start and provider-callback routes
   - identity-linking flow against `auth_identities`
-  - Supabase session bootstrap after custom-provider callback success
+  - HINTO access/refresh session creation after provider callback success
 - Guardrails:
-  - Apple and Meta/Facebook should use Supabase-managed auth where supported
-  - Snapchat and TikTok require custom backend OAuth flows
+  - all social providers should terminate in backend-owned platform auth
   - do not recreate Cognito-shaped client state
 
 ### Packet G: EX-42, EX-43, EX-44 follow-up
@@ -439,7 +438,7 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
   - `docs/Canonical_Domain_Model.md`
 - Deliverables:
   - DB-backed verification for create/expire/retrieve routes
-  - duplicate-vote and migration validation against a live Supabase project
+  - duplicate-vote and migration validation against RDS/Postgres
   - client-facing integration notes for web and Swift shells
 - Guardrails:
   - reuse donor DB functions where applicable
@@ -453,7 +452,7 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
   - `services/api` routes
 - Deliverables:
   - Next.js app under `/apps/web`
-  - auth entry and session handling against Supabase
+  - auth entry and session handling against HINTO platform auth
   - profile and situationship flows consuming the new API
 - Guardrails:
   - must target new backend, not Amplify
@@ -506,7 +505,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 | Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
 | --- | --- | --- | --- | --- |
 | ~~Q9~~ | ~~EX-90, EX-94~~ | ~~Add backend route tests, migration verification, and DB connectivity checks for the first slice~~ | — | **Done** (merged to main 2026-04-07) |
-| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
+| Q10 | EX-37, EX-38 | Implement provider auth flows with HINTO platform sessions | `docs/Auth_Model.md`, `db/migrations/001_platform_identity.sql`, `services/api/src/middleware/auth.ts` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
 | Q11 | EX-42, EX-43, EX-44 | Verify and integrate voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts` | DB verification, client integration, and follow-up hardening for voting routes |
 | Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
 | Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
@@ -515,7 +514,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 Queue constraints:
 
 - ~~Q9 should complete before starting Q10 or Q11, to confirm the first slice is stable.~~ - Q9 is complete; Q10 and Q11 are unblocked.
-- Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only; TikTok backend callback/session bootstrap is already in place, while Snapchat still needs the external-id completion step finalized.
+- Q10 should replace Supabase-managed auth assumptions with backend-owned platform auth for Apple/Meta/Snapchat/TikTok.
 - Q11 should focus on DB verification, client wiring, and duplicate-vote hardening only; AI integration remains deferred.
 - Q13 can run in parallel with Q10/Q11 once Q9 passes.
 - Q14 should avoid over-integrating voting or AI before Q11 exists; profile and situationship wiring should come first.
@@ -546,5 +545,4 @@ The donor schema is strong enough to use as the initial baseline, but it should 
 - `images` and image attachments may be useful, but should be validated against the new web + Swift share flow
 - DB functions for invite-code generation, vote stats, and results ranking are useful patterns
 - tRPC/Hono implementation details in the donor repo should not become the contract by default; the restart should still prefer a clean HTTP API and OpenAPI contract
-- the donor auth/client implementation should be treated as reference only; social auth needs to be rebuilt around Supabase-compatible backend flows
-- the donor auth/client implementation should be treated as reference only; use Supabase-managed auth where supported and custom backend-owned provider integration where not supported
+- the donor auth/client implementation should be treated as reference only; social auth needs to be rebuilt around HINTO platform-owned backend flows

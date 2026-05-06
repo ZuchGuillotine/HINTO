@@ -2,6 +2,10 @@
 
 *Created: 2026-03-27*
 
+## Current Status
+
+This document is historical implementation context for the first restart backend slice. It describes the transition-era Supabase-backed wiring that was useful while salvaging the donor schema. The current production direction is AWS RDS PostgreSQL, HINTO-owned platform auth, S3/CloudFront, SES, and ECS. See `docs/AWS_Infrastructure_Plan.md`, `docs/Canonical_Architecture.md`, and `infra/aws/access-and-workflows.md` for the current deployment and auth direction.
+
 ## Purpose
 
 This document turns the restart architecture into an initial backend implementation plan grounded in the donor Supabase schema at:
@@ -81,17 +85,19 @@ Recommended supporting packages:
 Responsibilities:
 
 - validate authenticated caller
-- resolve current user from Supabase identity
+- resolve current user from the HINTO platform auth session
 - bootstrap profile if missing
 - handle provider linkage records
 - host custom provider start/callback flows where needed
 
 Primary tables:
 
-- `auth.users`
+- `platform_users`
+- `app_users`
 - `profiles`
-- proposed `auth_identities`
-- proposed `auth_login_events`
+- `auth_identities`
+- `auth_sessions`
+- `auth_login_events`
 
 ### Profiles module
 
@@ -197,7 +203,7 @@ Responsibilities:
 
 Primary storage:
 
-- Supabase Storage
+- S3, with upload/download policy owned by the API
 
 ## Contract Style
 
@@ -230,7 +236,7 @@ Use a service/repository split:
 
 - route handlers validate contract input and auth context
 - service layer owns business rules
-- repository layer owns SQL or Supabase admin access
+- repository layer owns SQL/Postgres access
 
 Do not spread raw table access across handlers.
 
@@ -261,8 +267,15 @@ These may be useful later, but they should not block the first vertical slice.
 
 ### Add next
 
+- `platform_users`
+- `app_users`
 - `auth_identities`
+- `auth_sessions`
 - `auth_login_events`
+- `oauth_states`
+- `email_magic_links`
+- `user_consents`
+- `data_sharing_grants`
 
 Potential later additions:
 
@@ -274,9 +287,9 @@ Potential later additions:
 
 For authenticated routes:
 
-1. client sends Supabase-backed access token
+1. client sends HINTO platform access token
 2. auth middleware validates identity
-3. API resolves `profiles.id`
+3. API resolves `platform_users`, `app_users`, and `profiles.id`
 4. service executes business rules
 5. repository reads/writes app tables
 6. response is shaped through explicit contracts
@@ -300,7 +313,7 @@ For public vote flows:
 
 1. ~~create `/services/api`~~ - Done
 2. ~~wire config, logger, health route, and request ID middleware~~ - Done
-3. ~~add auth middleware against Supabase-backed identity~~ - Done (PR #1, `services/api/src/middleware/auth.ts`)
+3. ~~add auth middleware against Supabase-backed identity~~ - Done for transition implementation (PR #1, `services/api/src/middleware/auth.ts`); production replacement is platform JWT + RDS session resolution
 4. ~~add `GET /v1/me` and `PATCH /v1/me`~~ - Done (PR #1, `services/api/src/routes/profile.ts`)
 5. ~~add situationship CRUD and reorder endpoints~~ - Done (PR #1, `services/api/src/routes/situationships.ts`)
 6. ~~add `auth_identities` migration~~ - Done (PR #1, `supabase/migrations/010_auth_identities.sql`)
@@ -310,6 +323,6 @@ For public vote flows:
 
 ## Practical Conclusion
 
-The initial backend foundation is now wired. Steps 1-6 are complete as of PR #1 (merged 2026-03-28). The Supabase-backed auth middleware, profile routes, situationship CRUD/reorder, and `auth_identities` migration are all in place.
+The initial backend foundation is now wired. Steps 1-6 are complete as of PR #1 (merged 2026-03-28). The Supabase-backed auth middleware, profile routes, situationship CRUD/reorder, and `auth_identities` migration are transition-era implementation details.
 
-The next priorities are provider auth flows (step 7), voting/results endpoints (step 8), and AI routes (step 9).
+The current production priorities are replacing Supabase session/data access with the RDS/platform-auth layer, running production migrations under `db/migrations`, and deploying the API through the AWS staging workflow.

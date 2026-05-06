@@ -2,6 +2,8 @@
 
 Created: 2026-03-27
 
+Status note: this audit is historical. It was written when the restart path still used a Supabase-backed HTTP API. The current production direction is AWS RDS PostgreSQL plus HINTO-owned platform auth. The AWS Amplify/Cognito/AppSync findings still stand as legacy-retirement guidance.
+
 Scope: audit only. No product code was changed. Codegraph was used to identify active coupling points before classifying legacy surfaces.
 
 ## Executive Summary
@@ -13,7 +15,7 @@ The repo still contains a live Amplify/Cognito/AppSync client path that blocks t
 - profile state in `apps/hnnt-app/src/context/useUserProfile.tsx`
 - situationship state in `apps/hnnt-app/src/context/useSituationships.tsx`
 
-Those are not just references. They are wired into the current screens and navigation, so they must be replaced or isolated before the restart can move to a Supabase-backed HTTP API.
+Those are not just references. They are wired into the current screens and navigation, so they must be replaced or isolated before the restart can move fully to the shared HTTP API.
 
 Legacy backend assets under `amplify/`, AWS helper scripts, and the Expo/Amplify iOS shell can wait until replacements exist. They are not the first-slice blocker unless the team keeps trying to run the old stack.
 
@@ -41,7 +43,7 @@ Codegraph signals:
 Why this matters:
 
 - `AppRoot`, `EmailLoginScreen`, and `SituationshipsProvider` all depend on it
-- replacing this hook is a prerequisite for swapping in Supabase-backed session handling
+- replacing this hook is a prerequisite for swapping in HINTO platform session handling
 
 ### 3. Profile flow still uses AppSync plus Cognito sign-out
 
