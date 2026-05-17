@@ -62,10 +62,16 @@ No NAT Gateway was created. This is intentional for MVP cost control. API tasks 
 - Log group: `/ecs/hinto-staging-api`
 - Task execution role: `hinto-staging-ecs-task-execution-role`
 - API task role: `hinto-staging-api-task-role`
-- Task definition: `arn:aws:ecs:us-west-2:881490119784:task-definition/hinto-staging-api:1`
+- Task definition (latest): `arn:aws:ecs:us-west-2:881490119784:task-definition/hinto-staging-api:2`
+  - v2 corrects `API_CORS_ALLOW_ORIGIN` from `https://hinto.app` (typo) to `https://hnnt.app`
 - GitHub deploy role: `arn:aws:iam::881490119784:role/hinto-staging-github-deploy-role`
-
-No ECS service has been created yet. The GitHub Actions workflow can build/push the API image and register a new task definition revision before the service exists.
+- ECS service: `hinto-staging-api`
+  - Launch type: Fargate, platform `LATEST`
+  - Desired count: **0** (will be bumped to 1 after the first image is pushed; image `hinto-api:latest` does not yet exist in ECR)
+  - Network: public subnets, public IP assigned, API task SG `sg-09f8e92276f4bd55b`
+  - Load balancer: target group `hinto-staging-api-tg` on container `api`/port 3000
+  - Deployment circuit breaker enabled with rollback; min healthy 100%, max 200%
+  - Health check grace period: 60s
 
 ## Buckets
 
@@ -95,6 +101,28 @@ Both buckets currently have:
 
 The S3 bucket policy on `hinto-staging-web-881490119784-us-west-2` allows `s3:GetObject` only when the request `SourceArn` matches the distribution above. Direct S3 URL access remains blocked.
 
+## API Load Balancer (api.hnnt.app)
+
+- ALB: `hinto-staging-api-alb`
+  - ARN: `arn:aws:elasticloadbalancing:us-west-2:881490119784:loadbalancer/app/hinto-staging-api-alb/a1c0d3eb9a4756e5`
+  - DNS: `hinto-staging-api-alb-699272350.us-west-2.elb.amazonaws.com` (use `dualstack.<dns>` form for Route 53 aliases)
+  - Canonical hosted zone (for Route 53 alias `HostedZoneId`): `Z1H1FL5HABSF5`
+  - Scheme: `internet-facing`, IPv4 (target group health checks operate over IPv4; AAAA records on `api.hnnt.app` still resolve through the dualstack DNS)
+  - Subnets: `subnet-0c33fb699c0a1cfa6`, `subnet-0b9a57ad96c26869d`
+  - Security group: `sg-0bd45fac3df9f8749` (ALB SG, inbound 80/443 from internet)
+- Target group: `hinto-staging-api-tg`
+  - ARN: `arn:aws:elasticloadbalancing:us-west-2:881490119784:targetgroup/hinto-staging-api-tg/08c29dd7d7461345`
+  - Protocol/port: HTTP/3000, target type `ip` (required for Fargate awsvpc tasks)
+  - Health check: HTTP `GET /health`, interval 30s, timeout 5s, healthy=2, unhealthy=3, matcher `200`
+  - Deregistration delay: 20s
+- Listeners:
+  - HTTPS:443 → forward to target group; TLS policy `ELBSecurityPolicy-TLS13-1-2-2021-06`; cert below
+  - HTTP:80 → 301 redirect to HTTPS (preserves host/path/query)
+- ACM certificate (us-west-2, regional, ALB): `arn:aws:acm:us-west-2:881490119784:certificate/a3d05361-dbb8-4a19-8acf-f4734c68d8dd`
+  - Domain: `api.hnnt.app`
+  - DNS-validated via Route 53; renews automatically
+  - Note: this is a *separate* cert from the CloudFront cert in us-east-1. CloudFront requires us-east-1; ALBs require the cert in the same region as the load balancer.
+
 ## DNS
 
 - Public hosted zone: `Z051205036XUDYVK1UKX6` (`hnnt.app.`)
@@ -109,9 +137,10 @@ Records:
 
 - `hnnt.app` A + AAAA ALIAS → CloudFront `d2t823dyxow063.cloudfront.net`
 - `www.hnnt.app` A + AAAA ALIAS → CloudFront `d2t823dyxow063.cloudfront.net`
-- ACM validation CNAMEs for the cert above (long random `_*.hnnt.app` names; required for cert renewal — do not delete)
+- `api.hnnt.app` A + AAAA ALIAS → ALB `dualstack.hinto-staging-api-alb-699272350.us-west-2.elb.amazonaws.com`
+- ACM validation CNAMEs for both certs (long random `_*.hnnt.app` and `_*.api.hnnt.app` names; required for cert renewal — do not delete)
 
-`hnnt.app` is the canonical apex; `www.hnnt.app` is treated as an alias of the apex. `api.hnnt.app` is reserved for the API ALB.
+`hnnt.app` is the canonical apex; `www.hnnt.app` is an alias of the apex. `api.hnnt.app` serves the HINTO API via the ALB above.
 
 ## SSM Parameters
 
@@ -138,8 +167,29 @@ Created under `/hinto/staging/infra/`:
 
 ## Next Steps
 
-1. Run the GitHub Actions staging workflow to build/push the API image to ECR.
-2. Create the ECS service/ALB target group/listener.
-3. Run RDS migrations from inside the VPC.
-4. Configure SES sender/domain and production OAuth callback URLs.
-5. Add budget notifications once a recipient email is chosen.
+The ALB, target group, listeners, ECS service, regional cert, and DNS alias all exist. To take the API live:
+
+1. Trigger the staging GitHub Actions workflow to build and push the first API image to ECR. The workflow registers a new task definition revision (templated off `:2`, so the CORS fix is preserved) and updates the service.
+   ```bash
+   gh workflow run deploy-api-staging.yml -R ZuchGuillotine/HINTO
+   ```
+2. Bump the ECS service from 0 to 1 desired task.
+   ```bash
+   aws ecs update-service --cluster hinto-staging-cluster \
+     --service hinto-staging-api --desired-count 1 \
+     --profile HNNT --region us-west-2
+   ```
+3. Watch the target turn healthy and smoke-test the endpoint.
+   ```bash
+   aws elbv2 describe-target-health \
+     --target-group-arn arn:aws:elasticloadbalancing:us-west-2:881490119784:targetgroup/hinto-staging-api-tg/08c29dd7d7461345 \
+     --profile HNNT --region us-west-2 \
+     --query 'TargetHealthDescriptions[].TargetHealth.State'
+   curl -sS https://api.hnnt.app/health
+   ```
+4. Run RDS migrations from inside the VPC (one-shot Fargate task on `hinto-staging-cluster` or via a bastion).
+5. Configure SES sender/domain (DKIM, mail-from, sandbox exit if needed).
+6. Register OAuth callback URLs in the Apple/Meta/Snapchat/TikTok dev portals once the API is live.
+7. Add budget notifications once a recipient email is chosen.
+
+If the first task fails to become healthy, the deployment circuit breaker will roll it back rather than loop. Most likely causes: (a) missing RDS schema (step 4), or (b) Secrets Manager read permission gap on the task execution role for any new secret added to the task def. Logs land in CloudWatch group `/ecs/hinto-staging-api`.
