@@ -46,6 +46,29 @@ export interface SituationshipListAggregateDto {
   audience: AudienceSummaryDto;
 }
 
+export interface FeedOwnerProfileDto {
+  profileId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface FeedItemDto {
+  feedItemId: string;
+  ownerProfile: FeedOwnerProfileDto;
+  viewerContext: ViewerContextDto;
+  situationship: SituationshipDto;
+}
+
+export interface FriendsFeedAggregateDto {
+  viewerProfileId: string;
+  items: FeedItemDto[];
+}
+
+export interface GetFriendsFeedResponseDto {
+  data: FriendsFeedAggregateDto;
+}
+
 export interface GetSituationshipsResponseDto {
   data: SituationshipListAggregateDto;
 }

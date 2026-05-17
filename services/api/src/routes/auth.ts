@@ -8,6 +8,36 @@ import { getServiceClient } from '../supabase.js';
 import { fetchMeAggregateForProfileId } from './profile.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+type EmailAuthIntent = 'sign_in' | 'sign_up';
+
+function parseEmailAuthIntent(value: unknown): EmailAuthIntent {
+  return value === 'sign_up' ? 'sign_up' : 'sign_in';
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function assertDevelopmentEmailAuthEnabled(config: AppConfig): void {
+  if (config.nodeEnv === 'production' || !config.developmentAuthEnabled) {
+    throw new AppError(
+      'development_auth_disabled',
+      'Email OTP delivery bypass requires ENABLE_DEVELOPMENT_AUTH=true outside production',
+      403,
+    );
+  }
+}
+
+function usernameFromEmail(email: string): string {
+  const localPart = email.split('@')[0] ?? 'user';
+  return (
+    localPart
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/gu, '_')
+      .replace(/_{2,}/gu, '_')
+      .replace(/^_|_$/gu, '') || 'user'
+  );
+}
 
 async function ensureEmailIdentity(
   userId: string,
@@ -56,6 +86,148 @@ async function ensureEmailIdentity(
   }
 }
 
+async function findProfileIdByEmail(email: string, config: AppConfig): Promise<string | null> {
+  const supabase = getServiceClient(config);
+  const { data: existingProfile, error: profileLookupError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    throw new AppError('profile_lookup_failed', 'Failed to load email profile', 500);
+  }
+
+  return (existingProfile as { id: string } | null)?.id ?? null;
+}
+
+async function assertEmailIntentAllowed(
+  intent: EmailAuthIntent,
+  email: string,
+  config: AppConfig,
+): Promise<void> {
+  const profileId = await findProfileIdByEmail(email, config);
+
+  if (intent === 'sign_in' && !profileId) {
+    throw new AppError(
+      'account_not_found',
+      'No HINTO account exists for this email. Use sign up first.',
+      404,
+    );
+  }
+
+  if (intent === 'sign_up' && profileId) {
+    throw new AppError(
+      'account_exists',
+      'A HINTO account already exists for this email. Use sign in instead.',
+      409,
+    );
+  }
+}
+
+async function createOrLoadEmailDevSessionForIntent(
+  email: string,
+  intent: EmailAuthIntent,
+  config: AppConfig,
+  profileInput: {
+    username?: string | null;
+    displayName?: string | null;
+  } = {},
+) {
+  const supabase = getServiceClient(config);
+  const now = new Date().toISOString();
+
+  const { data: existingProfile, error: profileLookupError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    throw new AppError('profile_lookup_failed', 'Failed to load email test profile', 500);
+  }
+
+  let profileId = (existingProfile as { id: string } | null)?.id;
+
+  if (intent === 'sign_in' && !profileId) {
+    throw new AppError(
+      'account_not_found',
+      'No HINTO account exists for this email. Use sign up first.',
+      404,
+    );
+  }
+
+  if (intent === 'sign_up' && profileId) {
+    throw new AppError(
+      'account_exists',
+      'A HINTO account already exists for this email. Use sign in instead.',
+      409,
+    );
+  }
+
+  if (!profileId) {
+    const username = profileInput.username ?? usernameFromEmail(email);
+    const displayName =
+      profileInput.displayName ??
+      username
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        dev: true,
+        email_auth_bypass: true,
+        username,
+        display_name: displayName,
+      },
+    });
+
+    if (authError || !authUser.user) {
+      throw new AppError(
+        'email_test_session_failed',
+        `Failed to create email test user: ${authError?.message}`,
+        500,
+      );
+    }
+
+    profileId = authUser.user.id;
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        username,
+        name: displayName,
+        email,
+        is_public: false,
+        mutuals_only: false,
+        updated_at: now,
+      })
+      .eq('id', profileId);
+
+    if (updateError) {
+      throw new AppError(
+        'email_test_session_failed',
+        'Failed to update email test profile',
+        500,
+      );
+    }
+  }
+
+  await ensureEmailIdentity(profileId, email, config);
+  const me = await fetchMeAggregateForProfileId(profileId, profileId, config);
+
+  return {
+    accessToken: `dev-session:${profileId}`,
+    refreshToken: `dev-refresh:${profileId}`,
+    expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+    me,
+    developmentBypass: true,
+  };
+}
+
 /**
  * POST /v1/auth/email/otp
  * Sends a one-time verification code to the given email address.
@@ -70,13 +242,44 @@ export async function handleEmailOtp(
   const body = await readJsonBody(request);
   const email =
     typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const intent = parseEmailAuthIntent(body.intent);
+  const username = normalizeOptionalString(body.username);
+  const displayName = normalizeOptionalString(body.displayName);
 
   if (!email || !EMAIL_RE.test(email)) {
     throw new AppError('validation_error', 'A valid email address is required', 400);
   }
+  if (intent === 'sign_up' && (!username || !displayName)) {
+    throw new AppError(
+      'validation_error',
+      'username and displayName are required for sign up',
+      400,
+    );
+  }
+  await assertEmailIntentAllowed(intent, email, config);
+
+  if (config.emailOtpDeliveryDisabled) {
+    assertDevelopmentEmailAuthEnabled(config);
+    sendJsonSuccess(response, 200, context.requestId, {
+      sent: true,
+      email,
+      deliveryDisabled: true,
+      developmentCode: 'any',
+    });
+    return;
+  }
 
   const supabase = getServiceClient(config);
-  const { error } = await supabase.auth.signInWithOtp({ email });
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: intent === 'sign_up',
+      data: {
+        username: username ?? usernameFromEmail(email),
+        display_name: displayName ?? username ?? usernameFromEmail(email),
+      },
+    },
+  });
 
   if (error) {
     throw new AppError(
@@ -104,12 +307,32 @@ export async function handleEmailVerify(
   const email =
     typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const token = typeof body.token === 'string' ? body.token.trim() : '';
+  const intent = parseEmailAuthIntent(body.intent);
+  const username = normalizeOptionalString(body.username);
+  const displayName = normalizeOptionalString(body.displayName);
 
   if (!email || !EMAIL_RE.test(email)) {
     throw new AppError('validation_error', 'A valid email address is required', 400);
   }
   if (!token) {
     throw new AppError('validation_error', 'Verification code is required', 400);
+  }
+  if (intent === 'sign_up' && (!username || !displayName)) {
+    throw new AppError(
+      'validation_error',
+      'username and displayName are required for sign up',
+      400,
+    );
+  }
+
+  if (config.emailOtpDeliveryDisabled) {
+    assertDevelopmentEmailAuthEnabled(config);
+    const session = await createOrLoadEmailDevSessionForIntent(email, intent, config, {
+      username,
+      displayName,
+    });
+    sendJsonSuccess(response, 200, context.requestId, session);
+    return;
   }
 
   const supabase = getServiceClient(config);
@@ -128,6 +351,25 @@ export async function handleEmailVerify(
   }
 
   await ensureEmailIdentity(data.user.id, email, config);
+
+  if (intent === 'sign_up') {
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        username,
+        name: displayName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', data.user.id);
+
+    if (profileUpdateError) {
+      throw new AppError(
+        'profile_update_failed',
+        'Failed to complete signup profile',
+        500,
+      );
+    }
+  }
 
   // The handle_new_user trigger auto-creates the profile row.
   const me = await fetchMeAggregateForProfileId(

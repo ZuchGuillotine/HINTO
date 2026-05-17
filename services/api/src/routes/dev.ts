@@ -50,7 +50,7 @@ export async function handleCreateDevelopmentSession(
   context: RequestContext,
   config: AppConfig,
 ): Promise<void> {
-  if (config.nodeEnv === 'production') {
+  if (config.nodeEnv === 'production' || !config.developmentAuthEnabled) {
     throw new AppError('not_found', 'Route not found', 404);
   }
 

@@ -279,6 +279,77 @@ describe('POST /v1/me/conversations/:id/messages', () => {
     expect(upsertArgs?.[1]).toEqual({ onConflict: 'user_id,date' });
   });
 
+  test('returns deterministic safety guidance without calling OpenAI for crisis content', async () => {
+    const apiKey = 'sk-test-123';
+    const config = createTestConfig({ openAiApiKey: apiKey });
+
+    mockClient._mockTable('ai_conversations', { data: CONVERSATION_ROW, error: null });
+    mockClient._mockTable('daily_usage', { data: null, error: null });
+
+    const now = '2026-04-17T13:30:00Z';
+    queueTableResults(mockClient, 'ai_messages', [
+      {
+        data: {
+          id: 'msg-user-safety',
+          conversation_id: CONVERSATION_ID,
+          content: 'I want to kill myself',
+          is_user: true,
+          tokens_used: 0,
+          moderation_flagged: true,
+          created_at: now,
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: 'msg-assistant-safety',
+          conversation_id: CONVERSATION_ID,
+          content:
+            'I hear that you are going through something really difficult right now, and your safety matters. Please call or text 988, the Suicide and Crisis Lifeline, for immediate support from a trained counselor.',
+          is_user: false,
+          tokens_used: 0,
+          moderation_flagged: false,
+          created_at: now,
+        },
+        error: null,
+      },
+    ]);
+
+    const fetchMock = jest.fn();
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await dispatchAndWait(
+      'POST',
+      `/v1/me/conversations/${CONVERSATION_ID}/messages`,
+      { body: { content: 'I want to kill myself' }, config },
+    );
+
+    expect(res._getStatusCode()).toBe(201);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const body = res._getJson() as {
+      data: {
+        userMessage: { moderationFlagged: boolean };
+        assistantMessage: { content: string; tokensUsed: number };
+      };
+    };
+    expect(body.data.userMessage.moderationFlagged).toBe(true);
+    expect(body.data.assistantMessage.content).toContain('988');
+    expect(body.data.assistantMessage.tokensUsed).toBe(0);
+
+    const aiMessagesBuilder = mockClient._getBuilder('ai_messages');
+    expect(aiMessagesBuilder.insert).toHaveBeenCalledTimes(2);
+    expect(aiMessagesBuilder.insert.mock.calls[0]?.[0]).toMatchObject({
+      content: 'I want to kill myself',
+      moderation_flagged: true,
+    });
+    expect(aiMessagesBuilder.insert.mock.calls[1]?.[0]).toMatchObject({
+      tokens_used: 0,
+      moderation_flagged: false,
+    });
+    expect(aiMessagesBuilder.insert.mock.calls[1]?.[0].content).toContain('988');
+  });
+
   test('calls OpenAI and persists assistant reply when OPENAI_API_KEY is set', async () => {
     const apiKey = 'sk-test-123';
     const config = createTestConfig({ openAiApiKey: apiKey });
@@ -366,5 +437,10 @@ describe('POST /v1/me/conversations/:id/messages', () => {
     expect(payload.model).toBe('gpt-4o-mini');
     expect(Array.isArray(payload.messages)).toBe(true);
     expect(payload.messages[0].role).toBe('system');
+    expect(payload.messages[0].content).toContain('Safety rules');
+    expect(payload.messages[payload.messages.length - 1].role).toBe('user');
+    expect(payload.messages[payload.messages.length - 1].content).toContain(
+      'Latest user message: """what should I do?"""',
+    );
   });
 });

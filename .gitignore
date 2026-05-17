@@ -12,6 +12,8 @@ yarn-error.log
 dist/
 web-build/
 *.jks
+AuthKey_*.p8
+AuthKey_U5L7DR4AND.p8
 *.p8
 *.p12
 *.key

@@ -19,14 +19,20 @@ let project = Project(
             name: "HINTO",
             destinations: .iOS,
             product: .app,
-            bundleId: "app.hinto.restart",
+            bundleId: "app.hnnt",
             deploymentTargets: .iOS("17.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": .string("HINTO"),
                 "CFBundleShortVersionString": .string("1.0"),
                 "CFBundleVersion": .string("1"),
-                "HINTOAPIBaseURL": .string("http://127.0.0.1:3000"),
                 "LSRequiresIPhoneOS": .boolean(true),
+                "CFBundleURLTypes": .array([
+                    .dictionary([
+                        "CFBundleURLName": .string("app.hnnt.auth"),
+                        "CFBundleURLSchemes": .array([.string("hinto")])
+                    ])
+                ]),
+                "NSLocalNetworkUsageDescription": .string("HINTO connects to the local development API while testing on this device."),
                 "NSAppTransportSecurity": .dictionary([
                     "NSAllowsLocalNetworking": .boolean(true)
                 ]),

@@ -27,7 +27,7 @@ async function resolveDevelopmentUser(
   token: string,
   config: AppConfig,
 ): Promise<AuthenticatedUser | null> {
-  if (config.nodeEnv === 'production') {
+  if (config.nodeEnv === 'production' || !config.developmentAuthEnabled) {
     return null;
   }
 

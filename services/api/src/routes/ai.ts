@@ -6,24 +6,20 @@ import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
+import {
+  HINTO_AI_MODEL,
+  buildCoachMessages,
+  moderateCoachInput,
+  type CoachMessage,
+} from '../../../../packages/prompts/src/index.js';
 
 export const DAILY_AI_MESSAGE_LIMIT = 30;
 
-const OPENAI_MODEL = 'gpt-4o-mini';
+const OPENAI_MODEL = HINTO_AI_MODEL;
 const OPENAI_CHAT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
-const SYSTEM_PROMPT =
-  "You are HINTO's relationship coach — empathetic, direct, supportive, gives one specific suggestion.";
 const MOCK_ASSISTANT_REPLY = 'AI coach is not configured in this environment.';
 const MAX_HISTORY_MESSAGES = 10;
 const MAX_CONTENT_LENGTH = 4000;
-
-const MODERATION_TRIGGERS = [
-  'kill myself',
-  'suicide',
-  'self harm',
-  'self-harm',
-  'end my life',
-];
 
 interface ConversationRow {
   id: string;
@@ -78,17 +74,12 @@ function toMessageDto(row: MessageRow) {
 }
 
 /**
- * Extremely simple keyword-based moderation check. Does not block messages,
- * only annotates rows so ops can review later. Extracted for testability.
+ * Prompt-package wrapper kept local so existing route tests can exercise the
+ * API-facing moderation shape without knowing package internals.
  */
 export function moderateContent(content: string): { flagged: boolean; reason: string | null } {
-  const normalized = content.toLowerCase();
-  for (const trigger of MODERATION_TRIGGERS) {
-    if (normalized.includes(trigger)) {
-      return { flagged: true, reason: `matched_trigger:${trigger}` };
-    }
-  }
-  return { flagged: false, reason: null };
+  const moderation = moderateCoachInput(content);
+  return { flagged: moderation.flagged, reason: moderation.reason };
 }
 
 function todayDateString(): string {
@@ -115,11 +106,6 @@ async function getConversationForUser(
   return data as ConversationRow;
 }
 
-interface OpenAiChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
 interface OpenAiResult {
   content: string;
   tokensUsed: number;
@@ -127,11 +113,15 @@ interface OpenAiResult {
 
 async function callOpenAi(
   apiKey: string,
-  history: OpenAiChatMessage[],
+  latestUserMessage: string,
+  history: CoachMessage[],
 ): Promise<OpenAiResult> {
   const payload = {
     model: OPENAI_MODEL,
-    messages: [{ role: 'system' as const, content: SYSTEM_PROMPT }, ...history],
+    messages: buildCoachMessages({
+      latestUserMessage,
+      history,
+    }),
   };
 
   let response: Response;
@@ -369,7 +359,7 @@ export async function handleSendMessage(
   }
 
   // ── Moderation + user message insert ───────────────────────
-  const moderation = moderateContent(content);
+  const moderation = moderateCoachInput(content);
 
   const { data: insertedUser, error: userInsertError } = await supabase
     .from('ai_messages')
@@ -400,38 +390,46 @@ export async function handleSendMessage(
         conversationId,
         userId,
         reason: moderation.reason,
+        category: moderation.category,
       }),
     );
   }
-
-  // ── Load recent history for the model ──────────────────────
-  const { data: historyRows, error: historyError } = await supabase
-    .from('ai_messages')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: false })
-    .limit(MAX_HISTORY_MESSAGES);
-
-  if (historyError) {
-    throw new AppError('fetch_failed', 'Failed to load conversation history', 500);
-  }
-
-  const historyAsc = ((historyRows ?? []) as MessageRow[]).slice().reverse();
-  const history: OpenAiChatMessage[] = historyAsc.map((row) => ({
-    role: row.is_user ? ('user' as const) : ('assistant' as const),
-    content: row.content,
-  }));
 
   // ── Get assistant reply (real or mocked) ───────────────────
   let assistantContent: string;
   let assistantTokens = 0;
 
-  if (config.openAiApiKey) {
-    const result = await callOpenAi(config.openAiApiKey, history);
-    assistantContent = result.content;
-    assistantTokens = result.tokensUsed;
+  if (moderation.emergencyResponse) {
+    assistantContent = moderation.emergencyResponse;
   } else {
-    assistantContent = MOCK_ASSISTANT_REPLY;
+    // ── Load recent history for the model ────────────────────
+    const { data: historyRows, error: historyError } = await supabase
+      .from('ai_messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(MAX_HISTORY_MESSAGES);
+
+    if (historyError) {
+      throw new AppError('fetch_failed', 'Failed to load conversation history', 500);
+    }
+
+    const historyAsc = ((historyRows ?? []) as MessageRow[])
+      .slice()
+      .reverse()
+      .filter((row) => row.id !== userMessage.id);
+    const history: CoachMessage[] = historyAsc.map((row) => ({
+      role: row.is_user ? ('user' as const) : ('assistant' as const),
+      content: row.content,
+    }));
+
+    if (config.openAiApiKey) {
+      const result = await callOpenAi(config.openAiApiKey, content, history);
+      assistantContent = result.content;
+      assistantTokens = result.tokensUsed;
+    } else {
+      assistantContent = MOCK_ASSISTANT_REPLY;
+    }
   }
 
   const { data: insertedAssistant, error: assistantInsertError } = await supabase

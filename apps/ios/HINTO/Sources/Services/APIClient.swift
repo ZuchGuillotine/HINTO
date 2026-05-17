@@ -13,12 +13,16 @@ final class APIClient {
 
     init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 10
+        config.waitsForConnectivity = false
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+
+        #if DEBUG
+        print("[HINTO API] baseURL=\(Configuration.apiBaseURL)")
+        #endif
     }
 
     // MARK: - Generic Request
@@ -44,11 +48,28 @@ final class APIClient {
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
-        let (data, response) = try await session.data(for: request)
+        #if DEBUG
+        print("[HINTO API] request \(method.rawValue) \(url.absoluteString)")
+        #endif
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            #if DEBUG
+            print("[HINTO API] transport_error \(method.rawValue) \(url.absoluteString): \(error.localizedDescription)")
+            #endif
+            throw APIError.network(message: "Cannot reach HINTO API at \(baseURL.absoluteString)")
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
+
+        #if DEBUG
+        print("[HINTO API] response \(method.rawValue) \(url.absoluteString) status=\(httpResponse.statusCode)")
+        #endif
 
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 {
@@ -83,22 +104,70 @@ final class APIClient {
 
     // MARK: - Auth
 
-    func sendEmailOtp(email: String) async throws -> APIResponse<EmailOtpResponse> {
-        try await request(.post, path: "/v1/auth/email/otp", body: EmailOtpRequest(email: email))
+    func sendEmailOtp(
+        email: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws -> APIResponse<EmailOtpResponse> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/otp",
+            body: EmailOtpRequest(
+                email: email,
+                intent: intent.apiValue,
+                username: username,
+                displayName: displayName
+            )
+        )
     }
 
-    func verifyEmailOtp(email: String, code: String) async throws -> APIResponse<AuthSessionData> {
-        try await request(.post, path: "/v1/auth/email/verify", body: EmailVerifyRequest(email: email, token: code))
+    func verifyEmailOtp(
+        email: String,
+        code: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/verify",
+            body: EmailVerifyRequest(
+                email: email,
+                token: code,
+                intent: intent.apiValue,
+                username: username,
+                displayName: displayName
+            )
+        )
     }
 
     func refreshSession(refreshToken: String) async throws -> APIResponse<AuthSessionData> {
         try await request(.post, path: "/v1/auth/refresh", body: RefreshTokenRequest(refreshToken: refreshToken))
     }
 
+    func startProviderAuth(
+        provider: AuthProvider,
+        clientRedirectUri: String
+    ) async throws -> APIResponse<ProviderAuthStartData> {
+        try await request(
+            .post,
+            path: "/v1/auth/providers/\(provider.rawValue)/start",
+            body: ProviderAuthStartRequest(
+                clientRedirectUri: clientRedirectUri,
+                platform: "mobile"
+            )
+        )
+    }
+
     // MARK: - Situationships
 
     func getSituationships(token: String) async throws -> APIResponse<SituationshipListAggregate> {
         try await request(.get, path: "/v1/me/situationships", token: token)
+    }
+
+    func getFriendsFeed(token: String) async throws -> APIResponse<FriendsFeedAggregate> {
+        try await request(.get, path: "/v1/me/feed", token: token)
     }
 
     func createSituationship(token: String, input: CreateSituationshipRequest) async throws -> APIResponse<SituationshipMutationData> {
@@ -190,16 +259,24 @@ struct DevelopmentSessionData: Decodable {
 
 struct EmailOtpRequest: Encodable {
     let email: String
+    let intent: String
+    let username: String?
+    let displayName: String?
 }
 
 struct EmailOtpResponse: Decodable {
     let sent: Bool
     let email: String
+    let deliveryDisabled: Bool?
+    let developmentCode: String?
 }
 
 struct EmailVerifyRequest: Encodable {
     let email: String
     let token: String
+    let intent: String
+    let username: String?
+    let displayName: String?
 }
 
 struct AuthSessionData: Decodable {
@@ -211,6 +288,18 @@ struct AuthSessionData: Decodable {
 
 struct RefreshTokenRequest: Encodable {
     let refreshToken: String
+}
+
+struct ProviderAuthStartRequest: Encodable {
+    let clientRedirectUri: String
+    let platform: String
+}
+
+struct ProviderAuthStartData: Decodable {
+    let provider: String
+    let authorizationUrl: String
+    let expiresAt: String
+    let platform: String
 }
 
 struct APIErrorEnvelope: Decodable {
@@ -228,6 +317,7 @@ enum APIError: LocalizedError {
     case httpError(statusCode: Int)
     case server(code: String, message: String, statusCode: Int)
     case unauthorized
+    case network(message: String)
 
     var errorDescription: String? {
         switch self {
@@ -235,6 +325,7 @@ enum APIError: LocalizedError {
         case .httpError(let code): "Request failed (\(code))"
         case .server(_, let message, _): message
         case .unauthorized: "Please sign in again"
+        case .network(let message): message
         }
     }
 }

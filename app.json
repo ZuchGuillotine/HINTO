@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hnnt.app"
+      "bundleIdentifier": "app.hnnt"
     },
     "android": {
       "adaptiveIcon": {

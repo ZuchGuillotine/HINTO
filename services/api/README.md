@@ -13,6 +13,7 @@ Current scope:
 - email OTP and refresh auth helpers
 - custom provider auth start/callback helpers for TikTok and Snapchat
 - `GET /v1/me` and `PATCH /v1/me`
+- `GET /v1/me/feed`
 - situationship CRUD and reorder routes
 - voting session create/expire/public-view routes
 - public vote submission and owner-facing results routes
@@ -53,6 +54,7 @@ This intentionally avoids:
 - `GET /v1/me`
 - `PATCH /v1/me`
 - `POST /v1/dev/session`
+- `GET /v1/me/feed`
 - `POST /v1/auth/email/otp`
 - `POST /v1/auth/email/verify`
 - `POST /v1/auth/refresh`
@@ -91,6 +93,7 @@ Supported environment variables:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `ENABLE_DEVELOPMENT_AUTH`
 - `AWS_REGION`
 - `S3_MEDIA_BUCKET`
 - `S3_WEB_BUCKET`
@@ -103,17 +106,21 @@ Supported environment variables:
 - `OPENAI_API_KEY`
 - `DISABLE_EMAIL_OTP_DELIVERY`
 - `AUTH_STATE_SECRET`
-- `APPLE_CLIENT_ID`
-- `APPLE_TEAM_ID`
-- `APPLE_KEY_ID`
-- `APPLE_PRIVATE_KEY`
+- `APPLE_CLIENT_ID` defaults to `app.hnnt` for the native iOS app
+- `APPLE_TEAM_ID` defaults to `432862NB9P`
+- `APPLE_KEY_ID` defaults to `U5L7DR4AND`
+- `APPLE_PRIVATE_KEY` or `APPLE_PRIVATE_KEY_FILE`; local development defaults to `AuthKey_U5L7DR4AND.p8` when present
 - `META_CLIENT_ID`
+- `META_APP_ID`
 - `META_CLIENT_SECRET`
 - `TIKTOK_CLIENT_KEY`
+- `TIKTOK_CLIENT_ID_PUBLIC`
 - `TIKTOK_CLIENT_SECRET`
 - `TIKTOK_REDIRECT_URI`
 - `TIKTOK_SCOPES`
 - `SNAPCHAT_CLIENT_ID`
+- `SNAPCHAT_CLIENT_CONFIDENTIAL`
+- `SNAPCHAT_CLIENT_ID_PUBLIC`
 - `SNAPCHAT_CLIENT_SECRET`
 - `SNAPCHAT_REDIRECT_URI`
 - `SNAPCHAT_SCOPES`
@@ -123,11 +130,16 @@ situationship, voting, moderation, and AI conversation persistence. Production
 deployment should use `DATABASE_URL` and the RDS-backed repository/session layer
 once that replacement work lands.
 
-For local development, `DISABLE_EMAIL_OTP_DELIVERY` defaults to `true` unless
-`NODE_ENV=production`. In that mode, `/v1/auth/email/otp` does not call Supabase
-email delivery, and `/v1/auth/email/verify` creates or loads a confirmed
-development session for the email. Set it to `false` to exercise real Supabase
-email OTP delivery after SMTP is configured.
+For local development, `ENABLE_DEVELOPMENT_AUTH` defaults to `false` and
+`DISABLE_EMAIL_OTP_DELIVERY` defaults to `false`. Set both to `true` only for a
+private local API when you want `/v1/dev/session`, `dev-session:*` bearer tokens,
+or the local email OTP bypass. Shared staging should leave the development auth
+gate disabled.
+
+Custom provider auth requires `AUTH_STATE_SECRET`. Outside production, Snapchat
+and TikTok redirect URIs default to localhost callbacks when the explicit env
+vars are absent, but the same URIs must still be registered in the provider
+developer portals before OAuth can complete.
 
 The AWS production target uses RDS PostgreSQL through `DATABASE_URL`. Supabase
 connection settings are retained for local/prototype compatibility until the

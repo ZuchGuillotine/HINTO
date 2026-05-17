@@ -18,6 +18,7 @@ import {
   handleDeleteSituationship,
   handleReorderSituationships,
 } from './routes/situationships.js';
+import { handleGetFriendsFeed } from './routes/feed.js';
 import {
   handleListOwnerVotingSessions,
   handleCreateVotingSession,
@@ -140,6 +141,7 @@ async function routeAsync(
         'GET  /v1/me',
         'PATCH /v1/me',
         'POST /v1/dev/session',
+        'GET  /v1/me/feed',
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
@@ -221,6 +223,11 @@ async function routeAsync(
 
   if (method === 'PATCH' && path === '/v1/me') {
     await handlePatchMe(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/feed') {
+    await handleGetFriendsFeed(request, response, context, config);
     return true;
   }
 

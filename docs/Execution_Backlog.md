@@ -17,6 +17,27 @@ The active target is:
 - HTTP API and contracts that are clean for both Swift and web clients
 - gradual retirement of AWS Amplify, Cognito, AppSync, Supabase production assumptions, and Expo-first assumptions
 
+## Session Focus: 2026-05-17
+
+This section is the live tracker for the current product-surface push: sign-in/sign-up split, friends feed, and Snapchat auth end-to-end.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| SX-09 | Split sign-in vs sign-up entry on iOS onboarding | Done | Email auth now carries explicit `sign_in` / `sign_up` intent. Sign-in rejects unknown emails, sign-up rejects existing emails, and iOS sign-up captures username + display name before OTP. |
+| SX-10 | Friends feed: browse situationships shared by friends | Done (first pass) | `GET /v1/me/feed` returns active situationships from accepted `friendships`; web has a Friends panel and iOS has a Friends tab. This intentionally uses accepted friendships as the first `sharedWith` replacement until explicit per-item audience tables are designed. |
+| SX-11 | Wire Snapchat provider into iOS auth flow | Done (local-ready) | iOS uses `ASWebAuthenticationSession` against `POST /v1/auth/providers/snapchat/start` and consumes the backend callback into a HINTO session. Live completion remains blocked on Snap app approval, registered redirect URI, and `AUTH_STATE_SECRET`. |
+| SX-12 | Reconcile Snapchat env vars and add redirect URI | Done (code) / Blocked (portal) | Config now accepts `SNAPCHAT_CLIENT_CONFIDENTIAL` / `SNAPCHAT_CLIENT_ID_PUBLIC` aliases and defaults the local redirect URI to `http://localhost:3000/v1/auth/providers/snapchat/callback` outside production. User still must register the redirect URI in Snap and provide `AUTH_STATE_SECRET`. |
+| SX-13 | Username/display-name capture step on sign-up | Done | Sign-up no longer silently derives all profile data from the email local-part; the backend writes supplied username/display name after OTP verification and the local bypass path uses the same intent-aware payload. |
+
+### 2026-05-17 Execution Notes
+
+- Hardened development auth: `DISABLE_EMAIL_OTP_DELIVERY` and `dev-session:*` tokens now require explicit `ENABLE_DEVELOPMENT_AUTH=true` and are never enabled by default.
+- Removed the checked-in local LAN API base URL from `Project.swift`; the Swift client now relies on `HINTO_API_BASE_URL` or its localhost/debug fallback.
+- Wired TikTok through the same iOS custom-provider flow as Snapchat. Backend config accepts `TIKTOK_CLIENT_ID_PUBLIC` as the local client-key alias and defaults the local callback URI outside production.
+- Meta/Facebook remains blocked at the backend-provider layer. Credentials are present under `META_APP_ID` / `META_CLIENT_SECRET`, but no `/v1/auth/providers/meta|facebook/*` route exists yet and provider app approval remains external.
+- Current temporary landing page/domain state is documented under `infra/aws/staging-resources.md` and `apps/web/landing/README.md`: `hnnt.app` / `www.hnnt.app` route through Route 53 to CloudFront/S3. No AWS deployment was performed in this session.
+- Verification: `npm run api:build`; `npm run api:test -- --runInBand` at 96/96 across 12 suites; `npm run web:test -- --runInBand` at 6/6; `xcodebuild test -scheme HINTO -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4'` at 7/7; local API smoke on port 3010 confirmed `/health` and `/v1` route discovery include `GET /v1/me/feed`.
+
 ## Session Focus: 2026-04-14
 
 This section is the live execution tracker for the current build-and-verify push.

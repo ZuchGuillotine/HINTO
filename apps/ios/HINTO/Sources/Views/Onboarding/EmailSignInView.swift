@@ -4,7 +4,11 @@ struct EmailSignInView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
+    let intent: AuthIntent
+
     @State private var email = ""
+    @State private var username = ""
+    @State private var displayName = ""
     @State private var code = ""
     @State private var step: Step = .email
     @State private var isLoading = false
@@ -12,6 +16,10 @@ struct EmailSignInView: View {
     @State private var showError = false
 
     @FocusState private var focusedField: Field?
+
+    init(intent: AuthIntent = .signIn) {
+        self.intent = intent
+    }
 
     private enum Step {
         case email, code
@@ -52,11 +60,11 @@ struct EmailSignInView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(Color.hintoPink)
 
-            Text(step == .email ? "Sign in with Email" : "Enter your code")
+            Text(step == .email ? intent.emailHeading : "Enter your code")
                 .font(.hintoH2)
 
             Text(step == .email
-                 ? "We'll send a verification code to your email"
+                 ? intent.emailSubheading
                  : "Check \(email) for a 6-digit code")
                 .font(.hintoBodySmall)
                 .foregroundStyle(.secondary)
@@ -79,6 +87,22 @@ struct EmailSignInView: View {
                 .background(Color.secondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
+            if intent == .signUp {
+                TextField("Username", text: $username)
+                    .textContentType(.username)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .padding(Spacing.md)
+                    .background(Color.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
+                TextField("Display name", text: $displayName)
+                    .textContentType(.name)
+                    .padding(Spacing.md)
+                    .background(Color.secondaryBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            }
+
             HINTOButton(
                 title: "Send Code",
                 style: .primary,
@@ -87,9 +111,16 @@ struct EmailSignInView: View {
             ) {
                 Task { await sendOtp() }
             }
-            .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(!canSubmitEmailStep)
         }
         .onAppear { focusedField = .email }
+    }
+
+    private var canSubmitEmailStep: Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            (intent == .signIn ||
+             (!username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+              !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
     }
 
     // MARK: - Code Step
@@ -146,9 +177,14 @@ struct EmailSignInView: View {
         defer { isLoading = false }
 
         do {
-            try await auth.sendEmailOtp(email: trimmed)
+            let otpResponse = try await auth.sendEmailOtp(
+                email: trimmed,
+                intent: intent,
+                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
             email = trimmed
-            code = ""
+            code = otpResponse.deliveryDisabled == true ? (otpResponse.developmentCode ?? "") : ""
             withAnimation {
                 step = .code
             }
@@ -168,7 +204,10 @@ struct EmailSignInView: View {
         do {
             try await auth.verifyEmailOtp(
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                code: trimmedCode
+                code: trimmedCode,
+                intent: intent,
+                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             dismiss()
         } catch {

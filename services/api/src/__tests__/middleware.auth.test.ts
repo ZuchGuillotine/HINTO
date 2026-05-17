@@ -124,4 +124,29 @@ describe('resolveAuthenticatedUser', () => {
     expect(result.accessToken).toBe('valid-token');
     expect(result.requestId).toBe('test-request-id');
   });
+
+  test('does not accept development session tokens unless development auth is enabled', async () => {
+    const req = createMockRequest({
+      method: 'GET',
+      url: '/v1/me',
+      headers: { authorization: `Bearer dev-session:${TEST_USER_ID}` },
+    });
+    const ctx = createTestContext();
+
+    mockClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'Invalid JWT' },
+    });
+
+    await expect(
+      resolveAuthenticatedUser(
+        req,
+        ctx,
+        createTestConfig({ developmentAuthEnabled: false }),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'unauthorized',
+    });
+  });
 });

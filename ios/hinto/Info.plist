@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>hnnt</string>
-          <string>com.hnnt.app</string>
+          <string>app.hnnt</string>
         </array>
       </dict>
       <dict>

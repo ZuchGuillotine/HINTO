@@ -68,6 +68,34 @@ function createSituationships() {
   ];
 }
 
+function createFriendsFeed() {
+  return [
+    {
+      feedItemId: 'friend-1:ship-1',
+      ownerProfile: {
+        profileId: 'friend-1',
+        username: 'mira',
+        displayName: 'Mira',
+        avatarUrl: null,
+      },
+      viewerContext: {
+        mode: 'authorized_viewer',
+        viewerProfileId: 'dev-user-001',
+      },
+      situationship: {
+        situationshipId: 'ship-1',
+        name: 'Avery',
+        emoji: '💖',
+        category: 'Crush',
+        description: 'Promising.',
+        rank: 0,
+        status: 'active',
+      },
+    },
+  ];
+}
+
+
 function createPublicVotingSession() {
   return {
     session: {
@@ -98,6 +126,7 @@ function createApi(overrides = {}) {
   return {
     createDevelopmentSession: jest.fn(),
     getMe: jest.fn(),
+    getFriendsFeed: jest.fn().mockResolvedValue({ data: { items: [] } }),
     updateMe: jest.fn(),
     getSituationships: jest.fn(),
     createSituationship: jest.fn(),
@@ -225,6 +254,33 @@ describe('web app core', () => {
     expect(app.state.activePanel).toBe('voting');
     expect(app.state.selectedVotingSessionId).toBe('session-1');
     expect(app.state.selectedVotingResults.totalVotes).toBe(4);
+  });
+
+  test('handleLoadFeedPanel loads accepted friends feed items', async () => {
+    const feed = createFriendsFeed();
+    const apiClient = createApi({
+      getFriendsFeed: jest.fn().mockResolvedValue({
+        data: {
+          viewerProfileId: 'dev-user-001',
+          items: feed,
+        },
+      }),
+    });
+
+    const app = createApp({
+      apiClient,
+      root: createRoot(),
+      storage: createMemoryStorage({
+        [SESSION_KEY]: 'token-feed',
+      }),
+      cryptoImpl: { randomUUID: () => 'voter-feed' },
+      FormDataCtor: FakeFormData,
+    });
+
+    await app.handleLoadFeedPanel();
+
+    expect(apiClient.getFriendsFeed).toHaveBeenCalledWith('token-feed');
+    expect(app.state.friendsFeed).toEqual(feed);
   });
 
   test('handleLoadPublicVotingSession normalizes invite codes and resets submit state', async () => {

@@ -7,7 +7,7 @@ import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
-interface SituationshipRow {
+export interface SituationshipRow {
   id: string;
   user_id: string;
   name: string;
@@ -23,7 +23,7 @@ interface SituationshipRow {
   has_images: boolean;
 }
 
-function toSituationshipDto(row: SituationshipRow) {
+export function toSituationshipDto(row: SituationshipRow) {
   return {
     situationshipId: row.id,
     ownerProfileId: row.user_id,

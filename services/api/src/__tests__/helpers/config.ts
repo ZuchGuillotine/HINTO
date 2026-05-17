@@ -16,6 +16,7 @@ export function createTestConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     supabaseUrl: 'https://test.supabase.co',
     supabaseAnonKey: 'test-anon-key',
     supabaseServiceRoleKey: 'test-service-role-key',
+    developmentAuthEnabled: true,
     emailOtpDeliveryDisabled: true,
     awsRegion: 'us-west-2',
     s3MediaBucket: 'hinto-test-media',

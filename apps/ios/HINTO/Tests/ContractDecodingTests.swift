@@ -180,4 +180,48 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertTrue(json.contains("\"bestSituationshipId\""))
         XCTAssertTrue(json.contains("\"worstSituationshipId\""))
     }
+
+    func testFriendsFeedAggregateDecodes() throws {
+        let payload = """
+        {
+          "data": {
+            "viewerProfileId": "11111111-1111-1111-1111-111111111111",
+            "items": [
+              {
+                "feedItemId": "22222222-2222-2222-2222-222222222222:33333333-3333-3333-3333-333333333333",
+                "ownerProfile": {
+                  "profileId": "22222222-2222-2222-2222-222222222222",
+                  "username": "mira",
+                  "displayName": "Mira",
+                  "avatarUrl": null
+                },
+                "viewerContext": {
+                  "mode": "authorized_viewer",
+                  "viewerProfileId": "11111111-1111-1111-1111-111111111111"
+                },
+                "situationship": {
+                  "situationshipId": "33333333-3333-3333-3333-333333333333",
+                  "ownerProfileId": "22222222-2222-2222-2222-222222222222",
+                  "name": "Coffee date",
+                  "emoji": "☕️",
+                  "category": "Crush",
+                  "description": "Met through friends",
+                  "rank": 1,
+                  "status": "active",
+                  "createdAt": "2026-01-03T00:00:00Z",
+                  "updatedAt": "2026-01-04T00:00:00Z"
+                }
+              }
+            ]
+          }
+        }
+        """.data(using: .utf8)!
+
+        let response = try decoder.decode(APIResponse<FriendsFeedAggregate>.self, from: payload)
+
+        XCTAssertEqual(response.data.viewerProfileId, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(response.data.items.first?.ownerProfile.username, "mira")
+        XCTAssertEqual(response.data.items.first?.viewerContext.mode, .authorizedViewer)
+        XCTAssertEqual(response.data.items.first?.situationship.name, "Coffee date")
+    }
 }

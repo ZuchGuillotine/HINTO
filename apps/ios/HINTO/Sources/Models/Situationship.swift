@@ -57,7 +57,7 @@ enum ViewerMode: String, Codable {
     case publicSessionViewer = "public_session_viewer"
 }
 
-struct ViewerContext: Codable {
+struct ViewerContext: Codable, Equatable, Hashable {
     let mode: ViewerMode
     let viewerProfileId: String?
 }
@@ -74,6 +74,27 @@ struct SituationshipListAggregate: Codable {
     let items: [Situationship]
     let ordering: Ordering
     let capabilities: SituationshipCapabilities
+}
+
+struct FriendsFeedAggregate: Codable {
+    let viewerProfileId: String
+    let items: [FeedItem]
+}
+
+struct FeedItem: Codable, Identifiable, Equatable, Hashable {
+    let feedItemId: String
+    let ownerProfile: FeedOwnerProfile
+    let viewerContext: ViewerContext
+    let situationship: Situationship
+
+    var id: String { feedItemId }
+}
+
+struct FeedOwnerProfile: Codable, Equatable, Hashable {
+    let profileId: String
+    let username: String
+    let displayName: String
+    let avatarUrl: String?
 }
 
 struct OwnerProfileSummary: Codable {

@@ -7,6 +7,7 @@ struct OnboardingView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showEmailSignIn = false
+    @State private var authIntent: AuthIntent?
 
     private let slides: [(emoji: String, title: String, description: String)] = [
         ("💖", "Welcome to HINTO", "Navigate your dating life with clarity and get the truth about your situationships."),
@@ -43,46 +44,21 @@ struct OnboardingView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .frame(maxHeight: .infinity)
 
-            // Bottom: Auth buttons
+            // Bottom: intent gate or provider picker
             VStack(spacing: Spacing.sm) {
-                Text("Get started")
-                    .font(.hintoH3)
-
-                Text("Choose your preferred sign-in method")
-                    .font(.hintoBodySmall)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, Spacing.xs)
-
-                ForEach(AuthProvider.allCases) { provider in
-                    SocialAuthButton(provider: provider) {
-                        Task { await handleAuth(provider) }
-                    }
-                    .disabled(isLoading)
+                if let intent = authIntent {
+                    providerPicker(for: intent)
+                } else {
+                    intentGate
                 }
-
-                #if DEBUG
-                VStack(spacing: Spacing.xs) {
-                    Button("Use Local API") {
-                        Task { await handleLocalDevelopmentAuth() }
-                    }
-                    .font(.hintoCaption)
-                    .foregroundStyle(Color.hintoPink)
-
-                    Button("Preview Mode") {
-                        auth.devSignIn()
-                    }
-                    .font(.hintoCaption)
-                    .foregroundStyle(.tertiary)
-                }
-                .padding(.top, Spacing.xs)
-                #endif
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.xl)
+            .animation(.easeInOut(duration: 0.2), value: authIntent)
         }
         .sheet(isPresented: $showEmailSignIn) {
             NavigationStack {
-                EmailSignInView()
+                EmailSignInView(intent: authIntent ?? .signIn)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") { showEmailSignIn = false }
@@ -94,6 +70,76 @@ struct OnboardingView: View {
             Button("OK") {}
         } message: {
             Text(errorMessage ?? "Something went wrong")
+        }
+    }
+
+    // MARK: - Intent gate
+
+    private var intentGate: some View {
+        VStack(spacing: Spacing.sm) {
+            Text("Welcome to HINTO")
+                .font(.hintoH3)
+
+            Text("Sign in, or create a new account to get started")
+                .font(.hintoBodySmall)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, Spacing.xs)
+
+            HINTOButton(title: "Create account", style: .primary, icon: "sparkles") {
+                withAnimation { authIntent = .signUp }
+            }
+
+            HINTOButton(title: "Sign in", style: .secondary, icon: "person.fill") {
+                withAnimation { authIntent = .signIn }
+            }
+        }
+    }
+
+    // MARK: - Provider picker
+
+    private func providerPicker(for intent: AuthIntent) -> some View {
+        VStack(spacing: Spacing.sm) {
+            Text(intent.heading)
+                .font(.hintoH3)
+
+            Text(intent.subheading)
+                .font(.hintoBodySmall)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, Spacing.xs)
+
+            ForEach(AuthProvider.allCases) { provider in
+                SocialAuthButton(provider: provider) {
+                    Task { await handleAuth(provider) }
+                }
+                .disabled(isLoading)
+            }
+
+            Button("Use a different option") {
+                withAnimation { authIntent = nil }
+            }
+            .font(.hintoCaption)
+            .foregroundStyle(.secondary)
+            .padding(.top, Spacing.xs)
+            .disabled(isLoading)
+
+            #if DEBUG
+            VStack(spacing: Spacing.xs) {
+                Button("Use Local API") {
+                    Task { await handleLocalDevelopmentAuth() }
+                }
+                .font(.hintoCaption)
+                .foregroundStyle(Color.hintoPink)
+
+                Button("Preview Mode") {
+                    auth.devSignIn()
+                }
+                .font(.hintoCaption)
+                .foregroundStyle(.tertiary)
+            }
+            .padding(.top, Spacing.xs)
+            #endif
         }
     }
 

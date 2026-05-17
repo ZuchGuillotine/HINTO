@@ -6,14 +6,15 @@ This document covers the current restart-era local development path for the shar
 
 Working local slice in this repo:
 
-- `services/api`: profile and situationship routes, `.env` loading, local CORS, development session bootstrap
-- `apps/web`: dependency-light JS shell for onboarding, profile, and situationship management
-- `apps/ios`: SwiftUI shell with local API base URL support, local development sign-in, profile editing, and situationship wiring
+- `services/api`: profile, friends feed, situationship, voting, moderation, AI, email auth, and custom-provider routes
+- `apps/web`: dependency-light JS shell for onboarding, profile, friends feed, situationship management, and voting smoke flows
+- `apps/ios`: SwiftUI shell with local API base URL support, local development sign-in, sign-in/sign-up split, friends feed, profile editing, situationship wiring, voting, and staged provider auth
 
 Still staged:
 
-- real provider auth flows beyond the local development bootstrap
-- deeper voting navigation polish, browser/simulator verification, and AI flows
+- provider app approval and portal callback registration for Snapchat, TikTok, and Meta
+- Meta/Facebook backend provider routes
+- deeper AI coach UI wiring beyond the current API route tests
 
 ## Local Ports
 
@@ -49,14 +50,45 @@ Important environment variables for the current slice:
 - `API_HOST`
 - `API_PORT`
 - `API_CORS_ALLOW_ORIGIN`
+- `ENABLE_DEVELOPMENT_AUTH`
 - `DISABLE_EMAIL_OTP_DELIVERY`
+- `AUTH_STATE_SECRET`
 
 If `API_CORS_ALLOW_ORIGIN` is unset, the API defaults to `*` outside production.
 
-`DISABLE_EMAIL_OTP_DELIVERY` defaults to enabled outside production. Local email
-sign-in does not call Supabase SMTP; it creates or loads a confirmed development
-session for the entered email. Set `DISABLE_EMAIL_OTP_DELIVERY=false` when
-testing the real Supabase email OTP flow.
+Development auth is fail-closed by default. Set `ENABLE_DEVELOPMENT_AUTH=true`
+only for local testing when you need `/v1/dev/session`, `dev-session:*` bearer
+tokens, or the local email OTP bypass.
+
+`DISABLE_EMAIL_OTP_DELIVERY` defaults to `false`. To test local email auth
+without SMTP, set both:
+
+```text
+ENABLE_DEVELOPMENT_AUTH=true
+DISABLE_EMAIL_OTP_DELIVERY=true
+```
+
+In that mode `/v1/auth/email/otp` returns a development code and
+`/v1/auth/email/verify` creates or loads an intent-aware development session.
+Do not enable these values on a shared staging API.
+
+For local Snapchat/TikTok provider testing, set `AUTH_STATE_SECRET` and provider
+secrets. The API accepts these local aliases from the current `.env` shape:
+
+- `SNAPCHAT_CLIENT_CONFIDENTIAL` or `SNAPCHAT_CLIENT_ID_PUBLIC`
+- `SNAPCHAT_CLIENT_SECRET`
+- `TIKTOK_CLIENT_ID_PUBLIC`
+- `TIKTOK_CLIENT_SECRET`
+- `META_APP_ID`
+- `META_CLIENT_SECRET`
+
+Outside production, Snapchat and TikTok callbacks default to:
+
+- `http://localhost:3000/v1/auth/providers/snapchat/callback`
+- `http://localhost:3000/v1/auth/providers/tiktok/callback`
+
+Those callback URLs still need to be registered in the provider portals before
+the browser/OAuth leg can complete.
 
 Current remote Supabase status:
 
@@ -115,7 +147,7 @@ Then open:
 http://127.0.0.1:3001
 ```
 
-Use the `Use Local API` button to create or refresh the shared development profile through `POST /v1/dev/session`.
+Use the `Use Local API` button to create or refresh the shared development profile through `POST /v1/dev/session`. This requires `ENABLE_DEVELOPMENT_AUTH=true`.
 
 ## Generate The iOS Project With Tuist
 
@@ -131,9 +163,9 @@ Generate the Xcode project:
 npm run ios
 ```
 
-The generated app target reads its default backend base URL from the `HINTOAPIBaseURL` Info.plist key.
-
-Override the API base URL at runtime from Xcode by setting the `HINTO_API_BASE_URL` environment variable for the scheme if needed.
+The Swift client reads `HINTO_API_BASE_URL` from the Xcode scheme environment
+when present. If unset, debug builds fall back to `http://127.0.0.1:3000`; set
+the scheme variable to your Mac LAN IP for physical-device testing.
 
 ## Run The SwiftUI App
 

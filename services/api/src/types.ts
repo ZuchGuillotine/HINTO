@@ -11,6 +11,7 @@ export interface AppConfig {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
+  developmentAuthEnabled: boolean;
   openAiApiKey?: string;
   emailOtpDeliveryDisabled: boolean;
   awsRegion?: string;
@@ -27,6 +28,10 @@ export interface AppConfig {
   appleTeamId?: string;
   appleKeyId?: string;
   applePrivateKey?: string;
+  apnsTeamId?: string;
+  apnsKeyId?: string;
+  apnsBundleId?: string;
+  apnsPrivateKey?: string;
   metaClientId?: string;
   metaClientSecret?: string;
   tiktokClientKey?: string;

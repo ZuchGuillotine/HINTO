@@ -1,6 +1,7 @@
 import Foundation
 import AuthenticationServices
 import Observation
+import UIKit
 
 @Observable
 final class AuthManager: NSObject {
@@ -16,6 +17,7 @@ final class AuthManager: NSObject {
     private let profileKey = "hinto_profile_cache"
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    private var providerWebAuthSession: ASWebAuthenticationSession?
 
     override init() {
         super.init()
@@ -85,7 +87,7 @@ final class AuthManager: NSObject {
             throw AuthError.invalidCredential
         }
 
-        // In production, send identityToken to backend for Supabase auth exchange
+        // In production, send identityToken to the backend for HINTO platform session exchange
         // For now, store as session token placeholder
         let mockUser = MeAggregate(
             profile: Profile(
@@ -137,16 +139,36 @@ final class AuthManager: NSObject {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    func sendEmailOtp(email: String) async throws {
+    func sendEmailOtp(
+        email: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws -> EmailOtpResponse {
         let client = APIClient()
-        let _ = try await client.sendEmailOtp(email: normalizeEmail(email))
+        let response = try await client.sendEmailOtp(
+            email: normalizeEmail(email),
+            intent: intent,
+            username: username,
+            displayName: displayName
+        )
+        return response.data
     }
 
-    func verifyEmailOtp(email: String, code: String) async throws {
+    func verifyEmailOtp(
+        email: String,
+        code: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws {
         let client = APIClient()
         let response = try await client.verifyEmailOtp(
             email: normalizeEmail(email),
-            code: code.trimmingCharacters(in: .whitespacesAndNewlines)
+            code: code.trimmingCharacters(in: .whitespacesAndNewlines),
+            intent: intent,
+            username: username,
+            displayName: displayName
         )
         setSession(
             token: response.data.accessToken,
@@ -171,7 +193,7 @@ final class AuthManager: NSObject {
         )
     }
 
-    // MARK: - Social Auth Placeholder
+    // MARK: - Social Auth
 
     func signInWithProvider(_ provider: AuthProvider) async throws {
         switch provider {
@@ -180,8 +202,77 @@ final class AuthManager: NSObject {
         case .email:
             // Email handled via EmailSignInView directly
             break
-        case .facebook, .snapchat, .tiktok:
+        case .snapchat, .tiktok:
+            try await signInWithCustomProvider(provider)
+        case .facebook:
             throw AuthError.providerNotImplemented(provider.rawValue)
+        }
+    }
+
+    private func signInWithCustomProvider(_ provider: AuthProvider) async throws {
+        let clientRedirectUri = "hinto://auth/provider-callback"
+        let client = APIClient()
+        let startResponse = try await client.startProviderAuth(
+            provider: provider,
+            clientRedirectUri: clientRedirectUri
+        )
+
+        guard let authorizationUrl = URL(string: startResponse.data.authorizationUrl) else {
+            throw AuthError.invalidCredential
+        }
+
+        let callbackUrl = try await performProviderSignIn(
+            authorizationUrl: authorizationUrl,
+            callbackScheme: "hinto"
+        )
+        let params = callbackUrl.fragmentParameters.merging(callbackUrl.queryParameters) {
+            fragmentValue, _ in fragmentValue
+        }
+
+        if let error = params["error"] {
+            throw AuthError.providerFailed(params["errorDescription"] ?? error)
+        }
+
+        guard let accessToken = params["accessToken"] else {
+            throw AuthError.invalidCredential
+        }
+
+        let refreshToken = params["refreshToken"]
+        let meResponse = try await client.getMe(token: accessToken)
+        setSession(token: accessToken, refreshToken: refreshToken, user: meResponse.data)
+    }
+
+    @MainActor
+    private func performProviderSignIn(
+        authorizationUrl: URL,
+        callbackScheme: String
+    ) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: authorizationUrl,
+                callbackURLScheme: callbackScheme
+            ) { callbackUrl, error in
+                if let error {
+                    if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
+                        continuation.resume(throwing: AuthError.cancelled)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
+                    return
+                }
+
+                guard let callbackUrl else {
+                    continuation.resume(throwing: AuthError.invalidCredential)
+                    return
+                }
+
+                continuation.resume(returning: callbackUrl)
+            }
+
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = true
+            providerWebAuthSession = session
+            session.start()
         }
     }
 
@@ -219,6 +310,48 @@ final class AuthManager: NSObject {
 }
 
 // MARK: - Auth Types
+
+enum AuthIntent: String, Identifiable {
+    case signUp
+    case signIn
+
+    var id: String { rawValue }
+
+    var apiValue: String {
+        switch self {
+        case .signUp: "sign_up"
+        case .signIn: "sign_in"
+        }
+    }
+
+    var heading: String {
+        switch self {
+        case .signUp: "Create your account"
+        case .signIn: "Welcome back"
+        }
+    }
+
+    var subheading: String {
+        switch self {
+        case .signUp: "Choose how you'd like to set up your account"
+        case .signIn: "Choose how you'd like to sign in"
+        }
+    }
+
+    var emailHeading: String {
+        switch self {
+        case .signUp: "Sign up with Email"
+        case .signIn: "Sign in with Email"
+        }
+    }
+
+    var emailSubheading: String {
+        switch self {
+        case .signUp: "We'll send a verification code to set up your account"
+        case .signIn: "We'll send a verification code to your email"
+        }
+    }
+}
 
 enum AuthProvider: String, CaseIterable, Identifiable {
     case apple
@@ -272,6 +405,7 @@ import SwiftUI
 enum AuthError: LocalizedError {
     case invalidCredential
     case providerNotImplemented(String)
+    case providerFailed(String)
     case cancelled
     case sessionExpired
 
@@ -279,9 +413,38 @@ enum AuthError: LocalizedError {
         switch self {
         case .invalidCredential: "Invalid sign-in credential"
         case .providerNotImplemented(let p): "\(p) sign-in coming soon"
+        case .providerFailed(let message): message
         case .cancelled: "Sign-in was cancelled"
         case .sessionExpired: "Your session has expired. Please sign in again."
         }
+    }
+}
+
+private extension URL {
+    var queryParameters: [String: String] {
+        URLComponents(url: self, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .reduce(into: [String: String]()) { result, item in
+                result[item.name] = item.value
+            } ?? [:]
+    }
+
+    var fragmentParameters: [String: String] {
+        guard let fragment else { return [:] }
+        return URLComponents(string: "hinto://callback?\(fragment)")?
+            .queryItems?
+            .reduce(into: [String: String]()) { result, item in
+                result[item.name] = item.value
+            } ?? [:]
+    }
+}
+
+extension AuthManager: ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        return scene?.windows.first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 }
 

@@ -44,6 +44,9 @@ export const api = {
   getSituationships(token) {
     return request('/v1/me/situationships', { token });
   },
+  getFriendsFeed(token) {
+    return request('/v1/me/feed', { token });
+  },
   createSituationship(token, input) {
     return request('/v1/me/situationships', { method: 'POST', token, body: input });
   },

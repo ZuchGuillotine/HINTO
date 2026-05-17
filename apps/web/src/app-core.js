@@ -51,6 +51,7 @@ export function createInitialState({
     isLoading: false,
     me: null,
     notice: null,
+    friendsFeed: [],
     situationships: [],
     token: resolvedStorage.getItem(SESSION_KEY),
     voterIdentity: existingVoterIdentity,
@@ -121,6 +122,10 @@ export function createApp({
     state.publicVoteSubmitted = false;
   }
 
+  function resetSocialState() {
+    state.friendsFeed = [];
+  }
+
   function getEditingSituationship() {
     return state.situationships.find((item) => item.situationshipId === state.editingId) ?? null;
   }
@@ -136,6 +141,7 @@ export function createApp({
     if (!state.token) {
       state.me = null;
       state.situationships = [];
+      resetSocialState();
       resetVotingState();
       render();
       return;
@@ -151,6 +157,10 @@ export function createApp({
       ]);
       state.me = meResponse.data;
       state.situationships = situationshipResponse.data.items;
+      if (typeof apiClient.getFriendsFeed === 'function') {
+        const feedResponse = await apiClient.getFriendsFeed(state.token);
+        state.friendsFeed = feedResponse.data.items;
+      }
       state.notice = state.notice ?? {
         type: 'success',
         message: 'Connected to the shared restart API.',
@@ -160,6 +170,7 @@ export function createApp({
       setToken(null);
       state.me = null;
       state.situationships = [];
+      resetSocialState();
       state.notice = {
         type: 'error',
         message: error.message ?? 'Failed to restore the local session.',
@@ -392,6 +403,28 @@ export function createApp({
       state.notice = {
         type: 'error',
         message: error.message ?? 'Failed to load voting sessions.',
+      };
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  async function handleLoadFeedPanel() {
+    if (!state.token || typeof apiClient.getFriendsFeed !== 'function') {
+      return;
+    }
+
+    state.isLoading = true;
+    render();
+
+    try {
+      const response = await apiClient.getFriendsFeed(state.token);
+      state.friendsFeed = response.data.items;
+    } catch (error) {
+      state.notice = {
+        type: 'error',
+        message: error.message ?? 'Failed to load friends feed.',
       };
     } finally {
       state.isLoading = false;
@@ -710,6 +743,42 @@ export function createApp({
     `;
   }
 
+  function renderFeedPanel() {
+    return `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Friends</div>
+            <h2>Shared lists from accepted friends</h2>
+          </div>
+          <button class="secondary-button" data-action="refresh-feed" type="button">Refresh</button>
+        </div>
+
+        <div class="list-stack">
+          ${state.friendsFeed.length === 0
+            ? `
+              <article class="empty-card">
+                <h3>No friend activity yet</h3>
+                <p>Accepted friends' shared situationships will appear here once friendship rows exist in the backend.</p>
+              </article>
+            `
+            : state.friendsFeed.map((item) => `
+                <article class="list-card">
+                  <div class="list-card__rank">${escapeHtml(item.situationship?.emoji ?? '💖')}</div>
+                  <div class="list-card__body">
+                    <div class="list-card__title-row">
+                      <h3>${escapeHtml(item.situationship?.name ?? 'Untitled')}</h3>
+                      <span class="pill">${escapeHtml(item.situationship?.category ?? 'Other')}</span>
+                    </div>
+                    <p>${escapeHtml(item.ownerProfile?.displayName ?? 'Friend')} · @${escapeHtml(item.ownerProfile?.username ?? '')}</p>
+                  </div>
+                </article>
+              `).join('')}
+        </div>
+      </section>
+    `;
+  }
+
   function renderRoadmapPanel() {
     return `
       <section class="panel">
@@ -911,6 +980,7 @@ export function createApp({
           </div>
           <div class="topbar__actions">
             <button class="ghost-button" data-action="set-panel" data-panel="situationships" type="button">Situationships</button>
+            <button class="ghost-button" data-action="set-panel" data-panel="feed" type="button">Friends</button>
             <button class="ghost-button" data-action="set-panel" data-panel="profile" type="button">Profile</button>
             <button class="ghost-button" data-action="set-panel" data-panel="voting" type="button">Voting</button>
             <button class="ghost-button" data-action="set-panel" data-panel="roadmap" type="button">Roadmap</button>
@@ -944,9 +1014,11 @@ export function createApp({
               ? renderProfilePanel()
               : state.activePanel === 'voting'
                 ? renderVotingPanel()
-                : state.activePanel === 'roadmap'
-                  ? renderRoadmapPanel()
-                  : renderSituationshipPanel()}
+                : state.activePanel === 'feed'
+                  ? renderFeedPanel()
+                  : state.activePanel === 'roadmap'
+                    ? renderRoadmapPanel()
+                    : renderSituationshipPanel()}
           </div>
           <aside class="workspace__side">
             ${renderSituationshipEditor()}
@@ -988,6 +1060,10 @@ export function createApp({
         await handleLoadVotingPanel();
         return;
       }
+      if (state.activePanel === 'feed') {
+        await handleLoadFeedPanel();
+        return;
+      }
       render();
       return;
     }
@@ -996,6 +1072,7 @@ export function createApp({
       setToken(null);
       state.me = null;
       state.situationships = [];
+      resetSocialState();
       resetVotingState();
       resetEditor();
       state.notice = { type: 'success', message: 'Local session cleared.' };
@@ -1031,6 +1108,11 @@ export function createApp({
 
     if (action === 'create-voting-session') {
       await handleCreateVotingSession();
+      return;
+    }
+
+    if (action === 'refresh-feed') {
+      await handleLoadFeedPanel();
       return;
     }
 
@@ -1096,6 +1178,7 @@ export function createApp({
     handleReorder,
     handleCreateVotingSession,
     handleLoadVotingPanel,
+    handleLoadFeedPanel,
     handleSelectVotingSession,
     handleLoadPublicVotingSession,
     handleSubmitPublicVote,

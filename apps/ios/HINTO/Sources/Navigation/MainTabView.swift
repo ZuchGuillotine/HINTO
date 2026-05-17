@@ -5,6 +5,7 @@ struct MainTabView: View {
 
     enum Tab: String, CaseIterable {
         case home
+        case feed
         case chat
         case profile
         case settings
@@ -12,6 +13,7 @@ struct MainTabView: View {
         var title: String {
             switch self {
             case .home: "My List"
+            case .feed: "Friends"
             case .chat: "AI Coach"
             case .profile: "Profile"
             case .settings: "Settings"
@@ -21,6 +23,7 @@ struct MainTabView: View {
         var icon: String {
             switch self {
             case .home: "heart.text.clipboard"
+            case .feed: "person.2"
             case .chat: "bubble.left.and.text.bubble.right"
             case .profile: "person.crop.circle"
             case .settings: "gearshape"
@@ -30,6 +33,7 @@ struct MainTabView: View {
         var selectedIcon: String {
             switch self {
             case .home: "heart.text.clipboard.fill"
+            case .feed: "person.2.fill"
             case .chat: "bubble.left.and.text.bubble.right.fill"
             case .profile: "person.crop.circle.fill"
             case .settings: "gearshape.fill"
@@ -58,6 +62,8 @@ struct MainTabView: View {
         switch tab {
         case .home:
             SituationshipListView()
+        case .feed:
+            FriendsFeedView()
         case .chat:
             ChatView()
         case .profile:

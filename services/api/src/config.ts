@@ -6,6 +6,10 @@ import { AppConfig, LogLevel } from './types.js';
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_LOG_LEVEL: LogLevel = 'info';
+const DEFAULT_IOS_BUNDLE_ID = 'app.hnnt';
+const DEFAULT_APPLE_TEAM_ID = '432862NB9P';
+const DEFAULT_APPLE_KEY_ID = 'U5L7DR4AND';
+const DEFAULT_APPLE_PRIVATE_KEY_FILE = 'AuthKey_U5L7DR4AND.p8';
 
 function loadDotEnv(env: NodeJS.ProcessEnv, cwd = process.cwd()): void {
   const dotEnvPath = resolve(cwd, '.env');
@@ -97,8 +101,32 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+function readOptionalFile(path: string | undefined): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+
+  const resolvedPath = resolve(process.cwd(), path);
+  if (!existsSync(resolvedPath)) {
+    return undefined;
+  }
+
+  return readFileSync(resolvedPath, 'utf8');
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   loadDotEnv(env);
+  const nodeEnv = env.NODE_ENV ?? 'development';
+  const applePrivateKey =
+    env.APPLE_PRIVATE_KEY ??
+    readOptionalFile(env.APPLE_PRIVATE_KEY_FILE ?? DEFAULT_APPLE_PRIVATE_KEY_FILE);
+  const apnsPrivateKey =
+    env.APNS_PRIVATE_KEY ??
+    readOptionalFile(
+      env.APNS_PRIVATE_KEY_FILE ??
+        env.APPLE_PRIVATE_KEY_FILE ??
+        DEFAULT_APPLE_PRIVATE_KEY_FILE,
+    );
 
   return {
     apiName: env.API_NAME ?? 'hinto-api',
@@ -106,9 +134,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: parsePort(env.API_PORT),
     corsAllowOrigin:
       env.API_CORS_ALLOW_ORIGIN ??
-      (env.NODE_ENV === 'production' ? 'https://hinto.app' : '*'),
+      (nodeEnv === 'production' ? 'https://hinto.app' : '*'),
     logLevel: parseLogLevel(env.API_LOG_LEVEL),
-    nodeEnv: env.NODE_ENV ?? 'development',
+    nodeEnv,
     databaseUrl: env.DATABASE_URL,
     supabaseUrl:
       env.SUPABASE_URL ?? env.PUBLIC_SUPABASE_URL ?? env.EXPO_PUBLIC_SUPABASE_URL,
@@ -117,10 +145,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       env.PUBLIC_SUPABASE_ANON_KEY ??
       env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    developmentAuthEnabled: parseBoolean(env.ENABLE_DEVELOPMENT_AUTH, false),
     openAiApiKey: env.OPENAI_API_KEY,
     emailOtpDeliveryDisabled: parseBoolean(
       env.DISABLE_EMAIL_OTP_DELIVERY,
-      (env.NODE_ENV ?? 'development') !== 'production',
+      false,
     ),
     awsRegion: env.AWS_REGION,
     s3MediaBucket: env.S3_MEDIA_BUCKET,
@@ -132,19 +161,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     jwtAccessTokenSecret: env.JWT_ACCESS_TOKEN_SECRET,
     refreshTokenPepper: env.REFRESH_TOKEN_PEPPER,
     authStateSecret: env.AUTH_STATE_SECRET,
-    appleClientId: env.APPLE_CLIENT_ID,
-    appleTeamId: env.APPLE_TEAM_ID,
-    appleKeyId: env.APPLE_KEY_ID,
-    applePrivateKey: env.APPLE_PRIVATE_KEY,
-    metaClientId: env.META_CLIENT_ID,
+    appleClientId: env.APPLE_CLIENT_ID ?? DEFAULT_IOS_BUNDLE_ID,
+    appleTeamId: env.APPLE_TEAM_ID ?? DEFAULT_APPLE_TEAM_ID,
+    appleKeyId: env.APPLE_KEY_ID ?? DEFAULT_APPLE_KEY_ID,
+    applePrivateKey,
+    apnsTeamId: env.APNS_TEAM_ID ?? env.APPLE_TEAM_ID ?? DEFAULT_APPLE_TEAM_ID,
+    apnsKeyId: env.APNS_KEY_ID ?? env.APPLE_KEY_ID ?? DEFAULT_APPLE_KEY_ID,
+    apnsBundleId: env.APNS_BUNDLE_ID ?? DEFAULT_IOS_BUNDLE_ID,
+    apnsPrivateKey,
+    metaClientId: env.META_CLIENT_ID ?? env.META_APP_ID,
     metaClientSecret: env.META_CLIENT_SECRET,
-    tiktokClientKey: env.TIKTOK_CLIENT_KEY,
+    tiktokClientKey: env.TIKTOK_CLIENT_KEY ?? env.TIKTOK_CLIENT_ID_PUBLIC,
     tiktokClientSecret: env.TIKTOK_CLIENT_SECRET,
-    tiktokRedirectUri: env.TIKTOK_REDIRECT_URI,
+    tiktokRedirectUri:
+      env.TIKTOK_REDIRECT_URI ??
+      (nodeEnv === 'production'
+        ? undefined
+        : 'http://localhost:3000/v1/auth/providers/tiktok/callback'),
     tiktokScopes: parseScopes(env.TIKTOK_SCOPES, ['user.info.basic']),
-    snapchatClientId: env.SNAPCHAT_CLIENT_ID,
+    snapchatClientId:
+      env.SNAPCHAT_CLIENT_ID ??
+      env.SNAPCHAT_CLIENT_CONFIDENTIAL ??
+      env.SNAPCHAT_CLIENT_ID_PUBLIC,
     snapchatClientSecret: env.SNAPCHAT_CLIENT_SECRET,
-    snapchatRedirectUri: env.SNAPCHAT_REDIRECT_URI,
+    snapchatRedirectUri:
+      env.SNAPCHAT_REDIRECT_URI ??
+      (nodeEnv === 'production'
+        ? undefined
+        : 'http://localhost:3000/v1/auth/providers/snapchat/callback'),
     snapchatScopes: parseScopes(env.SNAPCHAT_SCOPES, [
       'https://auth.snapchat.com/oauth2/api/user.display_name',
       'https://auth.snapchat.com/oauth2/api/user.external_id',

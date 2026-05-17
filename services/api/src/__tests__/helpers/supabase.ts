@@ -14,6 +14,7 @@ interface MockQueryBuilder {
   update: jest.Mock;
   delete: jest.Mock;
   eq: jest.Mock;
+  in: jest.Mock;
   order: jest.Mock;
   limit: jest.Mock;
   single: jest.Mock;
@@ -35,6 +36,7 @@ function createQueryBuilder(result?: SupabaseResult, results: SupabaseResult[] =
     update: jest.fn(),
     delete: jest.fn(),
     eq: jest.fn(),
+    in: jest.fn(),
     order: jest.fn(),
     limit: jest.fn(),
     single: jest.fn(),
@@ -44,12 +46,15 @@ function createQueryBuilder(result?: SupabaseResult, results: SupabaseResult[] =
   // Each method returns the builder for chaining, except when used as a
   // thenable (the last call in a chain). We make every method return the
   // builder, and also make the builder thenable so `await` works.
-  for (const method of ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'order', 'limit', 'single', 'maybeSingle'] as const) {
+  for (const method of ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'in', 'order', 'limit', 'single', 'maybeSingle'] as const) {
     builder[method].mockReturnValue(builder);
   }
 
   // Make the builder await-able (thenable)
-  (builder as unknown as { then: Function }).then = function (
+  (builder as unknown as { then: (
+    resolve: (v: SupabaseResult) => void,
+    reject?: (e: unknown) => void,
+  ) => Promise<void> }).then = function (
     resolve: (v: SupabaseResult) => void,
     reject?: (e: unknown) => void,
   ) {
@@ -63,6 +68,9 @@ function createQueryBuilder(result?: SupabaseResult, results: SupabaseResult[] =
 export interface MockSupabaseClient {
   from: jest.Mock;
   auth: {
+    admin: {
+      createUser: jest.Mock;
+    };
     getUser: jest.Mock;
     refreshSession: jest.Mock;
     signInWithOtp: jest.Mock;
@@ -96,6 +104,17 @@ export function createMockSupabaseClient(): MockSupabaseClient {
     }),
 
     auth: {
+      admin: {
+        createUser: jest.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'test-created-user-id',
+              email: 'created@example.com',
+            },
+          },
+          error: null,
+        }),
+      },
       getUser: jest.fn().mockResolvedValue({
         data: { user: null },
         error: { message: 'No token' },
