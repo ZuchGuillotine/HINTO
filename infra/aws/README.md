@@ -66,7 +66,7 @@ The first ECS Express service should be configured with:
 - container port: `3000`
 - health check path: `/health`
 - CPU/memory: smallest production-safe Fargate size, then adjust from metrics
-- public HTTPS service for `api.hinto.app`
+- public HTTPS service for `api.hnnt.app`
 - environment variables from `docs/AWS_Infrastructure_Plan.md`
 - secrets from SSM/Secrets Manager
 - task role permissions only for needed resources: S3 media bucket, SES send, CloudWatch logs, and parameter/secret reads

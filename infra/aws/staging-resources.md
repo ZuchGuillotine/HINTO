@@ -78,7 +78,40 @@ Both buckets currently have:
 - AES256 default encryption
 - HINTO staging cost tags
 
-CloudFront distributions have not been created yet.
+## CDN And TLS (Web Landing)
+
+- CloudFront distribution: `E2B8ASG16MNZ4F`
+  - Distribution domain: `d2t823dyxow063.cloudfront.net`
+  - Aliases: `hnnt.app`, `www.hnnt.app`
+  - Default root object: `index.html`
+  - Origin: `hinto-staging-web-881490119784-us-west-2` via Origin Access Control
+  - Price class: `PriceClass_100` (NA + EU edges)
+  - HTTP/2 + HTTP/3, IPv6 enabled, viewer protocol `redirect-to-https`
+  - 403/404 → `/index.html` 200 (SPA-friendly fallback; harmless for the landing page)
+- Origin Access Control: `E2B5PXCVGNQ0N2` (`hnnt-app-web-oac`)
+- ACM certificate (us-east-1, CloudFront): `arn:aws:acm:us-east-1:881490119784:certificate/3afd6043-d45c-4a65-a045-8cbbc4d3ea23`
+  - SANs: `hnnt.app`, `www.hnnt.app`
+  - DNS-validated via Route 53; renews automatically
+
+The S3 bucket policy on `hinto-staging-web-881490119784-us-west-2` allows `s3:GetObject` only when the request `SourceArn` matches the distribution above. Direct S3 URL access remains blocked.
+
+## DNS
+
+- Public hosted zone: `Z051205036XUDYVK1UKX6` (`hnnt.app.`)
+- Registrar: iwantmyname.com (manual delegation; not registered with Route 53 Domains)
+- Delegated nameservers:
+  - `ns-927.awsdns-51.net`
+  - `ns-1487.awsdns-57.org`
+  - `ns-1929.awsdns-49.co.uk`
+  - `ns-68.awsdns-08.com`
+
+Records:
+
+- `hnnt.app` A + AAAA ALIAS → CloudFront `d2t823dyxow063.cloudfront.net`
+- `www.hnnt.app` A + AAAA ALIAS → CloudFront `d2t823dyxow063.cloudfront.net`
+- ACM validation CNAMEs for the cert above (long random `_*.hnnt.app` names; required for cert renewal — do not delete)
+
+`hnnt.app` is the canonical apex; `www.hnnt.app` is treated as an alias of the apex. `api.hnnt.app` is reserved for the API ALB.
 
 ## SSM Parameters
 

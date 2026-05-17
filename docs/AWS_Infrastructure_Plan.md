@@ -55,7 +55,7 @@ Web:
 
 - Keep the current web app static for MVP.
 - Publish built web assets to S3.
-- Serve `hinto.app` and `www.hinto.app` through CloudFront.
+- Serve `hnnt.app` and `www.hnnt.app` through CloudFront.
 - Add a separate ECS/Next SSR service only if the product needs server-rendered dynamic pages.
 
 Media:
@@ -66,8 +66,8 @@ Media:
 
 iOS:
 
-- The SwiftUI app should talk to `https://api.hinto.app`.
-- OAuth callbacks and universal links should route through stable `hinto.app` / `api.hinto.app` URLs.
+- The SwiftUI app should talk to `https://api.hnnt.app`.
+- OAuth callbacks and universal links should route through stable `hnnt.app` / `api.hnnt.app` URLs.
 
 ## Data And Auth Direction
 
@@ -116,7 +116,7 @@ Core runtime:
 - `NODE_ENV=production`
 - `API_HOST=0.0.0.0`
 - `API_PORT=3000`
-- `API_CORS_ALLOW_ORIGIN=https://hinto.app`
+- `API_CORS_ALLOW_ORIGIN=https://hnnt.app`
 - `DATABASE_URL`
 - `AUTH_STATE_SECRET`
 - `JWT_ISSUER`
@@ -131,16 +131,17 @@ AWS integrations:
 - `S3_WEB_BUCKET`
 - `CLOUDFRONT_MEDIA_DOMAIN`
 - `SES_FROM_EMAIL`
-- `APNS_TEAM_ID`
-- `APNS_KEY_ID`
-- `APNS_BUNDLE_ID`
+- `APNS_TEAM_ID` (`432862NB9P` for the current Apple developer team)
+- `APNS_KEY_ID` (`U5L7DR4AND` for the current `HNNT` Apple key)
+- `APNS_BUNDLE_ID` (`app.hnnt`)
+- `APNS_PRIVATE_KEY` or `APNS_PRIVATE_KEY_FILE`; do not commit `AuthKey_U5L7DR4AND.p8`
 
 Provider credentials:
 
-- `APPLE_CLIENT_ID`
-- `APPLE_TEAM_ID`
-- `APPLE_KEY_ID`
-- `APPLE_PRIVATE_KEY`
+- `APPLE_CLIENT_ID` (`app.hnnt` for native iOS Sign in with Apple)
+- `APPLE_TEAM_ID` (`432862NB9P` for the current Apple developer team)
+- `APPLE_KEY_ID` (`U5L7DR4AND` for the current `HNNT` Apple key)
+- `APPLE_PRIVATE_KEY` or `APPLE_PRIVATE_KEY_FILE`; do not commit `AuthKey_U5L7DR4AND.p8`
 - `META_CLIENT_ID`
 - `META_CLIENT_SECRET`
 - `TIKTOK_CLIENT_KEY`

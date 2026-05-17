@@ -59,7 +59,9 @@ Inline policy:
 
 - `HNNTInfraBootstrap`
 
-The inline policy fills bootstrap gaps for EC2/VPC, S3, CloudWatch logs, ELB, CloudWatch, and budgets. This is broader than the final desired posture and should be replaced by narrower role-based policies once the infrastructure shape stabilizes.
+The inline policy fills bootstrap gaps for EC2/VPC, S3, CloudWatch logs, ELB, CloudWatch, budgets, and ACM. This is broader than the final desired posture and should be replaced by narrower role-based policies once the infrastructure shape stabilizes.
+
+`acm:*` is intentionally in the inline policy rather than as a managed policy attachment because the HNNT group is already at the AWS quota of 10 managed policies per group. When the group is split or migrated to roles, prefer the AWS-managed `AWSCertificateManagerFullAccess` and remove `acm:*` from the inline policy.
 
 ## GitHub OIDC Deployment Access
 
