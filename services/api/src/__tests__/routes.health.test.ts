@@ -1,3 +1,4 @@
+import { resolveCorsAllowOrigin } from '../cors';
 import { routeRequest } from '../routes';
 import { createMockRequest, createMockResponse, createTestContext } from './helpers/http';
 import { createTestConfig } from './helpers/config';
@@ -23,6 +24,15 @@ function dispatchAndWait(
 }
 
 describe('Health and discovery routes', () => {
+  test('selects configured CORS origin when request origin is allowed', () => {
+    expect(
+      resolveCorsAllowOrigin(
+        'https://hnnt.app,https://app.hnnt.app',
+        'https://app.hnnt.app',
+      ),
+    ).toBe('https://app.hnnt.app');
+  });
+
   test('GET /health returns 200 with service info', async () => {
     const res = await dispatchAndWait('GET', '/health');
     expect(res._getStatusCode()).toBe(200);

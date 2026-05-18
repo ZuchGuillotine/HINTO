@@ -5,6 +5,8 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { readJsonBody } from '../body.js';
+import { shouldUsePostgres } from '../db.js';
+import { createOrUpdateDevelopmentProfile } from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { fetchMeAggregateForProfileId } from './profile.js';
 
@@ -62,6 +64,27 @@ export async function handleCreateDevelopmentSession(
   const privacy =
     body.privacy === 'public' || body.privacy === 'mutuals_only' ? body.privacy : 'private';
   const now = new Date().toISOString();
+
+  if (shouldUsePostgres(config)) {
+    const profile = await createOrUpdateDevelopmentProfile(config, {
+      profileId: typeof body.profileId === 'string' && isUUID(body.profileId) ? body.profileId : undefined,
+      username: rawUsername,
+      displayName,
+      email,
+      privacy,
+    });
+
+    const accessToken = `dev-session:${profile.id}`;
+    const me = await fetchMeAggregateForProfileId(profile.id, profile.id, config);
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      accessToken,
+      me,
+      development: true,
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   // If a UUID profileId was provided, look up by ID; otherwise look up by username

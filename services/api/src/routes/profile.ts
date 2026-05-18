@@ -4,11 +4,18 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  getProfileById,
+  listAuthIdentities,
+  updateProfile,
+} from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
 export interface ProfileRow {
   id: string;
+  platform_user_id?: string | null;
   username: string | null;
   name: string | null;
   display_name?: string | null;
@@ -104,6 +111,29 @@ export async function fetchMeAggregateForProfileId(
   authUserId: string,
   config: AppConfig,
 ): Promise<MeAggregate> {
+  if (shouldUsePostgres(config)) {
+    const row = await getProfileById(config, profileId);
+    if (!row) {
+      throw new AppError('profile_not_found', 'Profile not found', 404);
+    }
+
+    const aggregate = buildMeAggregate(row, { authUserId, profileId });
+    const identities = await listAuthIdentities(config, row.platform_user_id);
+
+    if (identities.length > 0) {
+      aggregate.auth.linkedProviders = identities.map((identity) => identity.provider);
+      const primary = identities.find((identity) => identity.is_primary);
+      if (primary) {
+        aggregate.auth.primaryProvider = primary.provider;
+      }
+    } else {
+      aggregate.auth.primaryProvider = 'development';
+      aggregate.auth.linkedProviders = ['development'];
+    }
+
+    return aggregate;
+  }
+
   const supabase = getServiceClient(config);
   const { data: row, error } = await supabase
     .from('profiles')
@@ -163,27 +193,38 @@ export async function handlePatchMe(
   const body = await readJsonBody(request);
 
   const updateFields: Record<string, unknown> = {};
+  const postgresUpdate: {
+    username?: string;
+    name?: string;
+    bio?: string | null;
+    avatarUrl?: string | null;
+    privacy?: 'public' | 'private' | 'mutuals_only';
+  } = {};
 
   if (body.username !== undefined) {
     if (typeof body.username !== 'string' || (body.username as string).trim().length === 0) {
       throw new AppError('validation_error', 'username must be a non-empty string', 400);
     }
     updateFields.username = (body.username as string).trim().toLowerCase();
+    postgresUpdate.username = updateFields.username as string;
   }
   if (body.displayName !== undefined) {
     if (typeof body.displayName !== 'string') {
       throw new AppError('validation_error', 'displayName must be a string', 400);
     }
     updateFields.name = body.displayName;
+    postgresUpdate.name = body.displayName;
   }
   if (body.bio !== undefined) {
     if (body.bio !== null && typeof body.bio !== 'string') {
       throw new AppError('validation_error', 'bio must be a string or null', 400);
     }
     updateFields.bio = body.bio;
+    postgresUpdate.bio = body.bio as string | null;
   }
   if (body.avatarUrl !== undefined) {
     updateFields.avatar_url = body.avatarUrl;
+    postgresUpdate.avatarUrl = body.avatarUrl as string | null;
   }
   if (body.privacy !== undefined) {
     const validPrivacy = ['public', 'private', 'mutuals_only'];
@@ -200,6 +241,7 @@ export async function handlePatchMe(
       updateFields.is_public = false;
       updateFields.mutuals_only = false;
     }
+    postgresUpdate.privacy = body.privacy as 'public' | 'private' | 'mutuals_only';
   }
 
   if (Object.keys(updateFields).length === 0) {
@@ -207,6 +249,17 @@ export async function handlePatchMe(
   }
 
   updateFields.updated_at = new Date().toISOString();
+
+  if (shouldUsePostgres(config)) {
+    await updateProfile(config, authCtx.user.profileId, postgresUpdate);
+    const aggregate = await fetchMeAggregateForProfileId(
+      authCtx.user.profileId,
+      authCtx.user.authUserId,
+      config,
+    );
+    sendJsonSuccess(response, 200, context.requestId, aggregate);
+    return;
+  }
 
   const supabase = getServiceClient(config);
 

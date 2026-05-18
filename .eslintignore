@@ -1,3 +1,6 @@
 amplify-codegen-temp/models/models
 services/api/dist
+apps/web/dist
 web-build
+legacy/
+metro.config.js

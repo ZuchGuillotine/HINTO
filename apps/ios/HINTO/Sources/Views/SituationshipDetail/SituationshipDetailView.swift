@@ -83,7 +83,7 @@ struct SituationshipDetailView: View {
         VStack(spacing: Spacing.sm) {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 AvatarView(
-                    url: nil,
+                    url: existingSituationship?.avatarUrl,
                     emoji: emoji,
                     size: 120,
                     showEditOverlay: true
@@ -192,7 +192,11 @@ struct SituationshipDetailView: View {
                 let response = try await api.updateSituationship(
                     token: token, id: existing.id, input: request
                 )
-                onSave?(response.data.situationship)
+                let saved = try await uploadSelectedPhotoIfNeeded(
+                    token: token,
+                    situationship: response.data.situationship
+                )
+                onSave?(saved)
             } else {
                 let request = CreateSituationshipRequest(
                     name: name.trimmingCharacters(in: .whitespaces),
@@ -203,7 +207,11 @@ struct SituationshipDetailView: View {
                 let response = try await api.createSituationship(
                     token: token, input: request
                 )
-                onSave?(response.data.situationship)
+                let saved = try await uploadSelectedPhotoIfNeeded(
+                    token: token,
+                    situationship: response.data.situationship
+                )
+                onSave?(saved)
             }
             dismiss()
         } catch {
@@ -232,6 +240,23 @@ struct SituationshipDetailView: View {
               let token = auth.accessToken else { return }
         _ = try? await api.deleteSituationship(token: token, id: existing.id)
         dismiss()
+    }
+
+    private func uploadSelectedPhotoIfNeeded(
+        token: String,
+        situationship: Situationship
+    ) async throws -> Situationship {
+        guard let imageData = try await loadJPEGUploadData(from: selectedPhoto) else {
+            return situationship
+        }
+
+        let response = try await api.uploadSituationshipImage(
+            token: token,
+            id: situationship.id,
+            imageData: imageData
+        )
+        selectedPhoto = nil
+        return response.data.situationship
     }
 }
 

@@ -39,7 +39,10 @@ let project = Project(
                 "UILaunchScreen": .dictionary([:])
             ]),
             sources: ["apps/ios/HINTO/Sources/**"],
-            resources: []
+            resources: [],
+            entitlements: .dictionary([
+                "com.apple.developer.applesignin": .array([.string("Default")])
+            ])
         )
     ]
 )

@@ -35,6 +35,7 @@ AuthKey_U5L7DR4AND.p8
 .env.development.local
 .env.test.local
 .env.production.local
+.hinto-media/
 supabase/.temp/
 
 # Local cloud credentials

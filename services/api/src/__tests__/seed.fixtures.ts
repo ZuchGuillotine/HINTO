@@ -164,5 +164,5 @@ export function generateSeedSQL(): string {
 
 // When run directly, print the SQL to stdout
 if (require.main === module) {
-  console.log(generateSeedSQL());
+  process.stdout.write(`${generateSeedSQL()}\n`);
 }

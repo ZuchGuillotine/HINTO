@@ -37,4 +37,12 @@ describe('loadConfig', () => {
     );
     expect(config.metaClientId).toBe('meta-app');
   });
+
+  test('defaults production CORS to public and app hnnt origins', () => {
+    const config = loadConfig({
+      NODE_ENV: 'production',
+    });
+
+    expect(config.corsAllowOrigin).toBe('https://hnnt.app,https://app.hnnt.app');
+  });
 });

@@ -2,28 +2,28 @@
 
 Created: 2026-03-27
 
-Status note: this audit is historical. It was written when the restart path still used a Supabase-backed HTTP API. The current production direction is AWS RDS PostgreSQL plus HINTO-owned platform auth. The AWS Amplify/Cognito/AppSync findings still stand as legacy-retirement guidance.
+Status note: this audit is historical. It was written when the restart path still used a Supabase-backed HTTP API. The current production direction is AWS RDS PostgreSQL plus HINTO-owned platform auth. As of the lint cleanup pass, tracked `amplify/` backend artifacts and `lambda/snap-auth` have been removed, and the old Expo client has been quarantined under `legacy/hnnt-app`.
 
 Scope: audit only. No product code was changed. Codegraph was used to identify active coupling points before classifying legacy surfaces.
 
 ## Executive Summary
 
-The repo still contains a live Amplify/Cognito/AppSync client path that blocks the first backend/client slice. The highest-risk surfaces are:
+The repo previously contained a live Amplify/Cognito/AppSync client path that blocked the first backend/client slice. Those surfaces now remain only as legacy salvage/reference material:
 
 - root app bootstrap in `App.tsx`
-- auth state in `apps/hnnt-app/src/hooks/useAuth.tsx`
-- profile state in `apps/hnnt-app/src/context/useUserProfile.tsx`
-- situationship state in `apps/hnnt-app/src/context/useSituationships.tsx`
+- auth state in `legacy/hnnt-app/src/hooks/useAuth.tsx`
+- profile state in `legacy/hnnt-app/src/context/useUserProfile.tsx`
+- situationship state in `legacy/hnnt-app/src/context/useSituationships.tsx`
 
-Those are not just references. They are wired into the current screens and navigation, so they must be replaced or isolated before the restart can move fully to the shared HTTP API.
+Those paths should not be revived as active product code. They are excluded from active lint and kept only so useful UI/domain ideas can still be mined during the restart.
 
-Legacy backend assets under `amplify/`, AWS helper scripts, and the Expo/Amplify iOS shell can wait until replacements exist. They are not the first-slice blocker unless the team keeps trying to run the old stack.
+Legacy backend assets under `amplify/` and the custom `lambda/snap-auth` experiment have been removed.
 
 ## Active Code Path Blockers
 
 ### 1. Root app bootstrap still hard-codes Amplify/Cognito
 
-`App.tsx:21-58` configures `Amplify` directly and imports `./apps/hnnt-app/amplifyconfiguration.json`, which does not exist in the repo. `index.ts` registers this `App` as the root component, so this is the actual bootstrap path.
+`App.tsx` is now a legacy Expo bootstrap reference. The active SwiftUI app lives under `apps/ios`, and the web shell lives under `apps/web`.
 
 Why this matters:
 
@@ -32,7 +32,7 @@ Why this matters:
 
 ### 2. `useAuth` is the central auth coupling point
 
-`apps/hnnt-app/src/hooks/useAuth.tsx` uses `@aws-amplify/core` and `@aws-amplify/auth` throughout the provider lifecycle. It maps Cognito users into local app state and drives sign-in, sign-up, confirmation, sign-out, and redirect auth flows.
+`legacy/hnnt-app/src/hooks/useAuth.tsx` uses `@aws-amplify/core` and `@aws-amplify/auth` throughout the provider lifecycle. It maps Cognito users into local app state and drives sign-in, sign-up, confirmation, sign-out, and redirect auth flows.
 
 Codegraph signals:
 
@@ -47,9 +47,9 @@ Why this matters:
 
 ### 3. Profile flow still uses AppSync plus Cognito sign-out
 
-`apps/hnnt-app/src/context/useUserProfile.tsx` calls `generateClient()` from Amplify, fetches `getUser`, `updateUser`, and `deleteUser` through GraphQL, and signs out through Amplify after deletion.
+`legacy/hnnt-app/src/context/useUserProfile.tsx` calls `generateClient()` from Amplify, fetches `getUser`, `updateUser`, and `deleteUser` through GraphQL, and signs out through Amplify after deletion.
 
-`apps/hnnt-app/src/screens/ProfileScreen.tsx` consumes that context directly and also uses `uploadAvatar`.
+`legacy/hnnt-app/src/screens/ProfileScreen.tsx` consumes that context directly and also uses `uploadAvatar`.
 
 Why this matters:
 
@@ -58,7 +58,7 @@ Why this matters:
 
 ### 4. Situationship flow still uses AppSync query/mutation paths
 
-`apps/hnnt-app/src/context/useSituationships.tsx` uses Amplify GraphQL and Cognito user lookup to:
+`legacy/hnnt-app/src/context/useSituationships.tsx` uses Amplify GraphQL and Cognito user lookup to:
 
 - list situationships
 - reorder situationships
@@ -77,9 +77,9 @@ Why this matters:
 
 ### 5. Helper utilities still assume Cognito and AWS storage
 
-`apps/hnnt-app/src/utils/auth.ts` contains Cognito redirect handling, hosted-UI assumptions, and provider branches for Google, Instagram, Snapchat, TikTok, and email.
+`legacy/hnnt-app/src/utils/auth.ts` contains Cognito redirect handling, hosted-UI assumptions, and provider branches for Google, Instagram, Snapchat, TikTok, and email.
 
-`apps/hnnt-app/src/utils/upload.ts` uses `@aws-amplify/storage` and `getCurrentUser()` to upload and delete avatars in S3-like storage.
+`legacy/hnnt-app/src/utils/upload.ts` uses `@aws-amplify/storage` and `getCurrentUser()` to upload and delete avatars in S3-like storage.
 
 Why this matters:
 
@@ -107,23 +107,23 @@ This is acceptable as a legacy residue, but it should not expand. It is a migrat
 
 ### Hardcoded Cognito config
 
-`apps/hnnt-app/src/config/auth.ts:1-8` hardcodes the Cognito domain and redirect URLs.
+`legacy/hnnt-app/src/config/auth.ts:1-8` hardcodes the Cognito domain and redirect URLs.
 
-`apps/hnnt-app/src/config/amplify.ts:9-34` hardcodes user pool, client ID, and identity pool IDs.
+`legacy/hnnt-app/src/config/amplify.ts:9-34` hardcodes user pool, client ID, and identity pool IDs.
 
 These files are legacy configuration, not restart architecture.
 
 ### Amplify backend artifacts
 
-`amplify/backend/backend-config.json:2-37` and `amplify/backend/backend-config.json:39-110` still declare:
+The removed `amplify/backend/backend-config.json` previously declared:
 
 - AppSync as the API service
 - Cognito as the auth service
 - Lambda triggers for Cognito events
 
-`amplify/backend/api/hinto/schema.graphql:1-103` shows the old owner/group-based GraphQL model for `User`, `Situationship`, `Vote`, `Report`, and `InviteToken`.
+The removed `amplify/backend/api/hinto/schema.graphql` showed the old owner/group-based GraphQL model for `User`, `Situationship`, `Vote`, `Report`, and `InviteToken`; the vocabulary was captured in mapping/domain docs before removal.
 
-`amplify/backend/auth/HITNOauth/cli-inputs.json:3-92` still contains hosted-UI, social provider, and callback URL configuration for Google and Facebook.
+The removed `amplify/backend/auth/HITNOauth/cli-inputs.json` contained hosted-UI, social provider, and callback URL configuration for Google and Facebook.
 
 These are valuable as salvage input, but they are legacy-only from the restart perspective.
 
@@ -154,11 +154,10 @@ This is reference material for the restart, not the end-state native architectur
 
 These are useful as history or salvage, but they should not drive the restart:
 
-- `apps/hnnt-app/src/App.tsx` is a duplicate app entry and is not the root entry used by `index.ts`
-- `apps/hnnt-app/src/context/useSituationships-backup.tsx` is backup legacy state
-- `lambda/snap-auth/` is an AWS-specific auth experiment
+- `legacy/hnnt-app/src/App.tsx` is a duplicate legacy app entry
+- `legacy/hnnt-app/src/context/useSituationships-backup.tsx` is backup legacy state
 - `ProjectArchitecture.md`, `CHANGELOG.md`, and `UPGRADE_SUMMARY.md` are historical AWS-era docs
-- `amplify/` remains legacy-heavy and should be treated as read-only salvage unless a specific migration task requires it
+- old `amplify/` and `lambda/snap-auth/` artifacts were removed rather than retained as active lint targets
 
 ## What Blocks The First Slice
 
@@ -178,8 +177,8 @@ These can be deferred until the replacement path exists:
 
 - `scripts/update-cognito-redirects.sh`
 - `scripts/create-test-user.sh`
-- `amplify/backend/**`
-- `lambda/snap-auth/**`
+- historical `amplify/backend/**` artifacts, now removed
+- historical `lambda/snap-auth/**` artifacts, now removed
 - `ios/` Expo shell files
 - backup legacy context files
 
@@ -188,4 +187,4 @@ These can be deferred until the replacement path exists:
 1. Replace the root app bootstrap with a backend-neutral auth/session boundary.
 2. Move profile and situationship reads/writes behind the new HTTP API contract.
 3. Quarantine AWS scripts and `amplify/` behind legacy documentation only.
-4. Preserve the schema vocabulary from `amplify/backend/api/hinto/schema.graphql`, but do not preserve its transport or auth assumptions.
+4. Preserve schema vocabulary through `docs/Schema_Entity_Mapping.md` and `docs/Canonical_Domain_Model.md`, not through the removed Amplify transport files.

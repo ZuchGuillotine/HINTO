@@ -14,7 +14,9 @@ Current scope:
 - custom provider auth start/callback helpers for TikTok and Snapchat
 - `GET /v1/me` and `PATCH /v1/me`
 - `GET /v1/me/feed`
+- friends feed submission create, image upload, and vote routes
 - situationship CRUD and reorder routes
+- profile, situationship, and feed submission image uploads through S3/CloudFront or local development storage
 - voting session create/expire/public-view routes
 - public vote submission and owner-facing results routes
 - report/block moderation routes
@@ -24,7 +26,7 @@ Current scope:
 Still out of scope:
 
 - fully automated migration verification and DB-backed integration tests
-- full replacement of Supabase data/session calls with the RDS-backed repository layer
+- full removal of the remaining Supabase transition fallback paths
 
 Current provider-auth status:
 
@@ -53,16 +55,24 @@ This intentionally avoids:
 - `GET /v1`
 - `GET /v1/me`
 - `PATCH /v1/me`
+- `POST /v1/me/avatar`
 - `POST /v1/dev/session`
 - `GET /v1/me/feed`
+- `POST /v1/me/feed/submissions`
+- `POST /v1/me/feed/submissions/:id/image`
+- `POST /v1/me/feed/submissions/:id/votes`
 - `POST /v1/auth/email/otp`
 - `POST /v1/auth/email/verify`
+- `POST /v1/auth/email/password/sign-up`
+- `POST /v1/auth/email/password/sign-in`
+- `POST /v1/auth/apple/native`
 - `POST /v1/auth/refresh`
 - `POST /v1/auth/providers/:provider/start`
 - `GET /v1/auth/providers/:provider/callback`
 - `GET /v1/me/situationships`
 - `POST /v1/me/situationships`
 - `PATCH /v1/me/situationships/:id`
+- `POST /v1/me/situationships/:id/image`
 - `DELETE /v1/me/situationships/:id`
 - `PUT /v1/me/situationships/order`
 - `POST /v1/me/voting-sessions`
@@ -125,10 +135,10 @@ Supported environment variables:
 - `SNAPCHAT_REDIRECT_URI`
 - `SNAPCHAT_SCOPES`
 
-The current routes still use the Supabase values for transition-era auth, profile,
-situationship, voting, moderation, and AI conversation persistence. Production
-deployment should use `DATABASE_URL` and the RDS-backed repository/session layer
-once that replacement work lands.
+The active AWS path uses `DATABASE_URL` for platform sessions, profile,
+situationship, media, feed submission, feed vote, and core voting persistence.
+Supabase settings remain only for transition fallback paths that have not yet
+been removed.
 
 For local development, `ENABLE_DEVELOPMENT_AUTH` defaults to `false` and
 `DISABLE_EMAIL_OTP_DELIVERY` defaults to `false`. Set both to `true` only for a
@@ -144,6 +154,25 @@ developer portals before OAuth can complete.
 The AWS production target uses RDS PostgreSQL through `DATABASE_URL`. Supabase
 connection settings are retained for local/prototype compatibility until the
 RDS-backed data layer fully replaces them.
+
+## Feed Submissions And Media
+
+The friends feed is backed by explicit RDS rows:
+
+- `feed_submissions` stores the author profile, selected situationship, optional text body, optional image URL, expiry, and active/concluded state.
+- `feed_submission_votes` stores one authenticated vote per viewer/submission and supports `best_fit` and `not_the_one`.
+- `media_assets` stores the upload metadata for profile avatars, situationship images, and feed submission images.
+
+Feed submission flow:
+
+1. `POST /v1/me/feed/submissions` with `situationshipId`, optional `body`, and `expiresInHours`.
+2. Optional `POST /v1/me/feed/submissions/:id/image` with JSON `{ contentType, dataBase64 }`.
+3. `GET /v1/me/feed` returns the viewer's own submissions plus accepted friends' submissions, including vote counts and the viewer's current vote.
+4. `POST /v1/me/feed/submissions/:id/votes` upserts the viewer's vote until the submission expires.
+
+When `S3_MEDIA_BUCKET` is configured, uploads are written to S3 and public URLs
+prefer `CLOUDFRONT_MEDIA_DOMAIN`. Without S3 configuration, local development
+uploads are written to `.hinto-media/` and served through `GET /media-local/...`.
 
 ## Container Use
 

@@ -301,8 +301,6 @@ describe('PUT /v1/me/situationships/order', () => {
   test('reorders successfully', async () => {
     mockClient._mockTable('profiles', { data: PROFILE_ROW, error: null });
 
-    // The handler reads situationships twice: once for validation, once for the updated list
-    const reversedRows = [...SITUATIONSHIP_ROWS].reverse().map((r, i) => ({ ...r, rank: i }));
     mockClient._mockTable('situationships', {
       data: SITUATIONSHIP_ROWS.map((r) => ({ id: r.id, user_id: r.user_id, rank: r.rank, status: r.status })),
       error: null,

@@ -9,8 +9,7 @@ struct EmailSignInView: View {
     @State private var email = ""
     @State private var username = ""
     @State private var displayName = ""
-    @State private var code = ""
-    @State private var step: Step = .email
+    @State private var password = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -21,24 +20,14 @@ struct EmailSignInView: View {
         self.intent = intent
     }
 
-    private enum Step {
-        case email, code
-    }
-
     private enum Field {
-        case email, code
+        case email, password, username, displayName
     }
 
     var body: some View {
         VStack(spacing: Spacing.lg) {
             header
-
-            switch step {
-            case .email:
-                emailStep
-            case .code:
-                codeStep
-            }
+            emailPasswordForm
 
             Spacer()
         }
@@ -56,16 +45,14 @@ struct EmailSignInView: View {
 
     private var header: some View {
         VStack(spacing: Spacing.xs) {
-            Image(systemName: step == .email ? "envelope.fill" : "lock.fill")
+            Image(systemName: "envelope.fill")
                 .font(.system(size: 40))
                 .foregroundStyle(Color.hintoPink)
 
-            Text(step == .email ? intent.emailHeading : "Enter your code")
+            Text(intent.emailHeading)
                 .font(.hintoH2)
 
-            Text(step == .email
-                 ? intent.emailSubheading
-                 : "Check \(email) for a 6-digit code")
+            Text(intent.emailSubheading)
                 .font(.hintoBodySmall)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -73,9 +60,9 @@ struct EmailSignInView: View {
         .padding(.bottom, Spacing.sm)
     }
 
-    // MARK: - Email Step
+    // MARK: - Password Form
 
-    private var emailStep: some View {
+    private var emailPasswordForm: some View {
         VStack(spacing: Spacing.md) {
             TextField("Email address", text: $email)
                 .textContentType(.emailAddress)
@@ -83,6 +70,13 @@ struct EmailSignInView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused($focusedField, equals: .email)
+                .padding(Spacing.md)
+                .background(Color.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
+            SecureField("Password", text: $password)
+                .textContentType(intent == .signUp ? .newPassword : .password)
+                .focused($focusedField, equals: .password)
                 .padding(Spacing.md)
                 .background(Color.secondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -104,111 +98,47 @@ struct EmailSignInView: View {
             }
 
             HINTOButton(
-                title: "Send Code",
+                title: intent == .signUp ? "Create account" : "Sign in",
                 style: .primary,
-                icon: "paperplane.fill",
+                icon: intent == .signUp ? "sparkles" : "person.fill",
                 isLoading: isLoading
             ) {
-                Task { await sendOtp() }
+                Task { await submitPasswordAuth() }
             }
-            .disabled(!canSubmitEmailStep)
+            .disabled(!canSubmitPasswordForm)
         }
         .onAppear { focusedField = .email }
     }
 
-    private var canSubmitEmailStep: Bool {
+    private var canSubmitPasswordForm: Bool {
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            password.count >= 8 &&
             (intent == .signIn ||
              (!username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
               !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
     }
 
-    // MARK: - Code Step
-
-    private var codeStep: some View {
-        VStack(spacing: Spacing.md) {
-            TextField("6-digit code", text: $code)
-                .textContentType(.oneTimeCode)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 28, weight: .semibold, design: .monospaced))
-                .focused($focusedField, equals: .code)
-                .padding(Spacing.md)
-                .background(Color.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-
-            HINTOButton(
-                title: "Verify",
-                style: .primary,
-                icon: "checkmark.circle.fill",
-                isLoading: isLoading
-            ) {
-                Task { await verify() }
-            }
-            .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            Button("Resend code") {
-                Task { await sendOtp() }
-            }
-            .font(.hintoCaption)
-            .foregroundStyle(Color.hintoPink)
-            .disabled(isLoading)
-
-            Button("Use a different email") {
-                withAnimation {
-                    step = .email
-                    code = ""
-                }
-            }
-            .font(.hintoCaption)
-            .foregroundStyle(.secondary)
-            .disabled(isLoading)
-        }
-        .onAppear { focusedField = .code }
-    }
-
     // MARK: - Actions
 
-    private func sendOtp() async {
+    private func submitPasswordAuth() async {
         let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, password.count >= 8 else { return }
 
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let otpResponse = try await auth.sendEmailOtp(
-                email: trimmed,
-                intent: intent,
-                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            email = trimmed
-            code = otpResponse.deliveryDisabled == true ? (otpResponse.developmentCode ?? "") : ""
-            withAnimation {
-                step = .code
+            switch intent {
+            case .signUp:
+                try await auth.signUpWithEmailPassword(
+                    email: trimmed,
+                    password: password,
+                    username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                    displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            case .signIn:
+                try await auth.signInWithEmailPassword(email: trimmed, password: password)
             }
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-    }
-
-    private func verify() async {
-        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedCode.isEmpty else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            try await auth.verifyEmailOtp(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                code: trimmedCode,
-                intent: intent,
-                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

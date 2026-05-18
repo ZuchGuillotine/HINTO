@@ -4,6 +4,15 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  createSituationship,
+  deleteSituationship,
+  getProfileById,
+  listSituationships,
+  reorderSituationships,
+  updateSituationship,
+} from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
@@ -19,6 +28,7 @@ export interface SituationshipRow {
   created_at: string;
   updated_at: string;
   primary_image_id: string | null;
+  primary_image_url?: string | null;
   image_count: number;
   has_images: boolean;
 }
@@ -33,6 +43,7 @@ export function toSituationshipDto(row: SituationshipRow) {
     description: row.description,
     rank: row.rank ?? 0,
     status: row.is_active ? ('active' as const) : ('archived' as const),
+    avatarUrl: row.primary_image_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -48,6 +59,40 @@ export async function handleListSituationships(
   config: AppConfig,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
+
+  if (shouldUsePostgres(config)) {
+    const [rows, profile] = await Promise.all([
+      listSituationships(config, authCtx.user.profileId),
+      getProfileById(config, authCtx.user.profileId),
+    ]);
+    const items = rows.map(toSituationshipDto);
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      ownerProfile: {
+        profileId: authCtx.user.profileId,
+        username: profile?.username ?? '',
+        displayName: profile?.name ?? '',
+      },
+      viewerContext: {
+        mode: 'owner' as const,
+        viewerProfileId: authCtx.user.profileId,
+      },
+      items,
+      ordering: {
+        orderedSituationshipIds: items.map((i) => i.situationshipId),
+      },
+      capabilities: {
+        canEdit: true,
+        canReorder: true,
+        canVote: false,
+      },
+      audience: {
+        mode: 'owner_only' as const,
+      },
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { data: rows, error } = await supabase
@@ -123,6 +168,20 @@ export async function handleCreateSituationship(
     throw new AppError('validation_error', 'category is required', 400);
   }
 
+  if (shouldUsePostgres(config)) {
+    const row = await createSituationship(config, authCtx.user.profileId, {
+      name: (body.name as string).trim(),
+      emoji: (body.emoji as string).trim(),
+      category: (body.category as string).trim(),
+      description: typeof body.description === 'string' ? body.description : null,
+    });
+
+    sendJsonSuccess(response, 201, context.requestId, {
+      situationship: toSituationshipDto(row),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   // Determine next rank
@@ -195,6 +254,30 @@ export async function handleUpdateSituationship(
 
   updateFields.updated_at = new Date().toISOString();
 
+  if (shouldUsePostgres(config)) {
+    const row = await updateSituationship(
+      config,
+      authCtx.user.profileId,
+      situationshipId,
+      {
+        name: updateFields.name as string | undefined,
+        emoji: updateFields.emoji as string | undefined,
+        category: updateFields.category as string | undefined,
+        description: updateFields.description as string | null | undefined,
+        isActive: updateFields.is_active as boolean | undefined,
+      },
+    );
+
+    if (!row) {
+      throw new AppError('not_found', 'Situationship not found or not owned by user', 404);
+    }
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      situationship: toSituationshipDto(row),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { data: row, error } = await supabase
@@ -225,6 +308,15 @@ export async function handleDeleteSituationship(
   situationshipId: string,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
+  if (shouldUsePostgres(config)) {
+    await deleteSituationship(config, authCtx.user.profileId, situationshipId);
+    sendJsonSuccess(response, 200, context.requestId, {
+      situationshipId,
+      deleted: true,
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { error } = await supabase
@@ -267,6 +359,19 @@ export async function handleReorderSituationships(
   }
 
   const orderedIds = body.orderedSituationshipIds as string[];
+  if (shouldUsePostgres(config)) {
+    const updated = await reorderSituationships(config, authCtx.user.profileId, orderedIds);
+    const items = updated.map(toSituationshipDto);
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      ordering: {
+        orderedSituationshipIds: items.map((i) => i.situationshipId),
+      },
+      items,
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   // Fetch current situationships for validation

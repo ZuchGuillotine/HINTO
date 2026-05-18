@@ -134,7 +134,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: parsePort(env.API_PORT),
     corsAllowOrigin:
       env.API_CORS_ALLOW_ORIGIN ??
-      (nodeEnv === 'production' ? 'https://hinto.app' : '*'),
+      (nodeEnv === 'production' ? 'https://hnnt.app,https://app.hnnt.app' : '*'),
     logLevel: parseLogLevel(env.API_LOG_LEVEL),
     nodeEnv,
     databaseUrl: env.DATABASE_URL,

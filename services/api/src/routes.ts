@@ -8,7 +8,14 @@ import {
   handleCustomProviderStart,
   matchCustomAuthProvider,
 } from './routes/auth-providers.js';
-import { handleEmailOtp, handleEmailVerify, handleRefreshToken } from './routes/auth.js';
+import {
+  handleEmailOtp,
+  handleEmailPasswordSignIn,
+  handleEmailPasswordSignUp,
+  handleEmailVerify,
+  handleNativeAppleSignIn,
+  handleRefreshToken,
+} from './routes/auth.js';
 import { handleCreateDevelopmentSession } from './routes/dev.js';
 import { handleGetMe, handlePatchMe } from './routes/profile.js';
 import {
@@ -18,7 +25,12 @@ import {
   handleDeleteSituationship,
   handleReorderSituationships,
 } from './routes/situationships.js';
-import { handleGetFriendsFeed } from './routes/feed.js';
+import {
+  handleCreateFeedSubmission,
+  handleGetFriendsFeed,
+  handleUploadFeedSubmissionImage,
+  handleVoteOnFeedSubmission,
+} from './routes/feed.js';
 import {
   handleListOwnerVotingSessions,
   handleCreateVotingSession,
@@ -34,6 +46,11 @@ import {
   handleListBlocks,
 } from './routes/moderation.js';
 import {
+  handleLocalMedia,
+  handleUploadProfileAvatar,
+  handleUploadSituationshipImage,
+} from './routes/media.js';
+import {
   handleCreateConversation,
   handleDeleteConversation,
   handleGetConversation,
@@ -47,6 +64,21 @@ import {
  */
 function matchSituationshipId(path: string): string | null {
   const match = path.match(/^\/v1\/me\/situationships\/([a-f0-9-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchSituationshipImage(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/situationships\/([a-f0-9-]+)\/image$/);
+  return match ? match[1] : null;
+}
+
+function matchFeedSubmissionImage(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/image$/);
+  return match ? match[1] : null;
+}
+
+function matchFeedSubmissionVotes(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/votes$/);
   return match ? match[1] : null;
 }
 
@@ -128,6 +160,11 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'GET' && path.startsWith('/media-local/')) {
+    await handleLocalMedia(request, response);
+    return true;
+  }
+
   if (method === 'GET' && path === '/v1') {
     sendJsonSuccess(response, 200, context.requestId, {
       api: 'v1',
@@ -135,16 +172,24 @@ async function routeAsync(
       routes: [
         'POST /v1/auth/email/otp',
         'POST /v1/auth/email/verify',
+        'POST /v1/auth/email/password/sign-up',
+        'POST /v1/auth/email/password/sign-in',
+        'POST /v1/auth/apple/native',
         'POST /v1/auth/refresh',
         'POST /v1/auth/providers/:provider/start',
         'GET  /v1/auth/providers/:provider/callback',
         'GET  /v1/me',
         'PATCH /v1/me',
+        'POST /v1/me/avatar',
         'POST /v1/dev/session',
         'GET  /v1/me/feed',
+        'POST /v1/me/feed/submissions',
+        'POST /v1/me/feed/submissions/:id/image',
+        'POST /v1/me/feed/submissions/:id/votes',
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
+        'POST /v1/me/situationships/:id/image',
         'DELETE /v1/me/situationships/:id',
         'PUT  /v1/me/situationships/order',
         'GET  /v1/me/voting-sessions',
@@ -181,6 +226,21 @@ async function routeAsync(
 
   if (method === 'POST' && path === '/v1/auth/email/verify') {
     await handleEmailVerify(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/email/password/sign-up') {
+    await handleEmailPasswordSignUp(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/email/password/sign-in') {
+    await handleEmailPasswordSignIn(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/apple/native') {
+    await handleNativeAppleSignIn(request, response, context, config);
     return true;
   }
 
@@ -226,8 +286,42 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'POST' && path === '/v1/me/avatar') {
+    await handleUploadProfileAvatar(request, response, context, config);
+    return true;
+  }
+
   if (method === 'GET' && path === '/v1/me/feed') {
     await handleGetFriendsFeed(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/feed/submissions') {
+    await handleCreateFeedSubmission(request, response, context, config);
+    return true;
+  }
+
+  const feedSubmissionImageId = matchFeedSubmissionImage(path);
+  if (method === 'POST' && feedSubmissionImageId) {
+    await handleUploadFeedSubmissionImage(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionImageId,
+    );
+    return true;
+  }
+
+  const feedSubmissionVotesId = matchFeedSubmissionVotes(path);
+  if (method === 'POST' && feedSubmissionVotesId) {
+    await handleVoteOnFeedSubmission(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionVotesId,
+    );
     return true;
   }
 
@@ -245,6 +339,18 @@ async function routeAsync(
 
   if (method === 'PUT' && path === '/v1/me/situationships/order') {
     await handleReorderSituationships(request, response, context, config);
+    return true;
+  }
+
+  const situationshipImageId = matchSituationshipImage(path);
+  if (method === 'POST' && situationshipImageId) {
+    await handleUploadSituationshipImage(
+      request,
+      response,
+      context,
+      config,
+      situationshipImageId,
+    );
     return true;
   }
 

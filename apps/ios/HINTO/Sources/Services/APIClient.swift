@@ -98,6 +98,22 @@ final class APIClient {
         try await request(.patch, path: "/v1/me", body: update, token: token)
     }
 
+    func uploadProfileAvatar(
+        token: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<ProfileAvatarUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/avatar",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
+    }
+
     func createDevelopmentSession(input: DevelopmentSessionRequest) async throws -> APIResponse<DevelopmentSessionData> {
         try await request(.post, path: "/v1/dev/session", body: input)
     }
@@ -142,6 +158,51 @@ final class APIClient {
         )
     }
 
+    func signUpWithEmailPassword(
+        email: String,
+        password: String,
+        username: String,
+        displayName: String
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/password/sign-up",
+            body: EmailPasswordSignUpRequest(
+                email: email,
+                password: password,
+                username: username,
+                displayName: displayName
+            )
+        )
+    }
+
+    func signInWithEmailPassword(
+        email: String,
+        password: String
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/password/sign-in",
+            body: EmailPasswordSignInRequest(email: email, password: password)
+        )
+    }
+
+    func signInWithNativeApple(
+        identityToken: String,
+        email: String?,
+        displayName: String?
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/apple/native",
+            body: NativeAppleSignInRequest(
+                identityToken: identityToken,
+                email: email,
+                displayName: displayName
+            )
+        )
+    }
+
     func refreshSession(refreshToken: String) async throws -> APIResponse<AuthSessionData> {
         try await request(.post, path: "/v1/auth/refresh", body: RefreshTokenRequest(refreshToken: refreshToken))
     }
@@ -170,12 +231,59 @@ final class APIClient {
         try await request(.get, path: "/v1/me/feed", token: token)
     }
 
+    func createFeedSubmission(token: String, input: CreateFeedSubmissionRequest) async throws -> APIResponse<FeedSubmissionMutationData> {
+        try await request(.post, path: "/v1/me/feed/submissions", body: input, token: token)
+    }
+
+    func uploadFeedSubmissionImage(
+        token: String,
+        submissionId: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<FeedSubmissionImageUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/image",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
+    }
+
+    func voteOnFeedSubmission(token: String, submissionId: String, input: VoteOnFeedSubmissionRequest) async throws -> APIResponse<FeedSubmissionVoteData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/votes",
+            body: input,
+            token: token
+        )
+    }
+
     func createSituationship(token: String, input: CreateSituationshipRequest) async throws -> APIResponse<SituationshipMutationData> {
         try await request(.post, path: "/v1/me/situationships", body: input, token: token)
     }
 
     func updateSituationship(token: String, id: String, input: UpdateSituationshipRequest) async throws -> APIResponse<SituationshipMutationData> {
         try await request(.patch, path: "/v1/me/situationships/\(id)", body: input, token: token)
+    }
+
+    func uploadSituationshipImage(
+        token: String,
+        id: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<SituationshipImageUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/situationships/\(id)/image",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
     }
 
     func deleteSituationship(token: String, id: String) async throws -> APIResponse<DeletedData> {
@@ -231,6 +339,62 @@ struct SituationshipMutationData: Decodable {
     let situationship: Situationship
 }
 
+struct FeedSubmissionMutationData: Decodable {
+    let submission: FeedSubmissionMutation
+}
+
+struct FeedSubmissionMutation: Decodable {
+    let submissionId: String
+    let situationshipId: String
+    let body: String?
+    let imageUrl: String?
+    let expiresAt: String
+    let status: FeedSubmissionStatus
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct MediaAsset: Decodable {
+    let mediaId: String
+    let url: String
+    let contentType: String
+    let byteSize: Int
+    let createdAt: String
+}
+
+struct ImageUploadRequest: Encodable {
+    let contentType: String
+    let dataBase64: String
+}
+
+struct ProfileAvatarUploadData: Decodable {
+    let media: MediaAsset
+    let me: MeAggregate
+}
+
+struct SituationshipImageUploadData: Decodable {
+    let media: MediaAsset
+    let situationship: Situationship
+}
+
+struct FeedSubmissionImageUploadData: Decodable {
+    let media: MediaAsset
+    let submission: FeedSubmissionMutation
+}
+
+struct FeedSubmissionVoteData: Decodable {
+    let vote: FeedSubmissionVote
+}
+
+struct FeedSubmissionVote: Decodable {
+    let voteId: String
+    let submissionId: String
+    let voterProfileId: String
+    let voteType: FeedVoteType
+    let comment: String?
+    let createdAt: String
+}
+
 struct DeletedData: Decodable {
     let situationshipId: String
     let deleted: Bool
@@ -276,6 +440,24 @@ struct EmailVerifyRequest: Encodable {
     let token: String
     let intent: String
     let username: String?
+    let displayName: String?
+}
+
+struct EmailPasswordSignUpRequest: Encodable {
+    let email: String
+    let password: String
+    let username: String
+    let displayName: String
+}
+
+struct EmailPasswordSignInRequest: Encodable {
+    let email: String
+    let password: String
+}
+
+struct NativeAppleSignInRequest: Encodable {
+    let identityToken: String
+    let email: String?
     let displayName: String?
 }
 
@@ -355,9 +537,13 @@ enum Configuration {
         }
 
         #if DEBUG
+        #if targetEnvironment(simulator)
         return "http://127.0.0.1:3000"
         #else
-        return "https://api.hinto.app"
+        return "http://Benjamins-MacBook-Pro-2.local:3000"
+        #endif
+        #else
+        return "https://api.hnnt.app"
         #endif
     }
 }

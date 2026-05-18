@@ -4,6 +4,16 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { readJsonBody } from '../body.js';
+import { verifyAppleIdentityToken } from '../apple.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  assertPasswordAllowed,
+  authenticateEmailPassword,
+  createOrLoadAppleAccount,
+  createEmailPasswordAccount,
+  createPostgresAuthSession,
+  refreshPostgresAuthSession,
+} from '../repositories/postgres-auth.js';
 import { getServiceClient } from '../supabase.js';
 import { fetchMeAggregateForProfileId } from './profile.js';
 
@@ -37,6 +47,14 @@ function usernameFromEmail(email: string): string {
       .replace(/_{2,}/gu, '_')
       .replace(/^_|_$/gu, '') || 'user'
   );
+}
+
+function assertRequiredString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new AppError('validation_error', `${fieldName} is required`, 400);
+  }
+
+  return value.trim();
 }
 
 async function ensureEmailIdentity(
@@ -386,6 +404,137 @@ export async function handleEmailVerify(
   });
 }
 
+export async function handleEmailPasswordSignUp(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  if (!shouldUsePostgres(config)) {
+    throw new AppError(
+      'password_auth_unavailable',
+      'Email/password auth requires the AWS Postgres API backend',
+      501,
+    );
+  }
+
+  const body = await readJsonBody(request);
+  const email =
+    typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const password = assertPasswordAllowed(body.password);
+  const username = assertRequiredString(body.username, 'username');
+  const displayName = assertRequiredString(body.displayName, 'displayName');
+
+  if (!email || !EMAIL_RE.test(email)) {
+    throw new AppError('validation_error', 'A valid email address is required', 400);
+  }
+
+  const authProfile = await createEmailPasswordAccount(config, {
+    email,
+    password,
+    username,
+    displayName,
+  });
+  const session = await createPostgresAuthSession(config, request, authProfile);
+  const me = await fetchMeAggregateForProfileId(
+    session.profileId,
+    session.platformUserId,
+    config,
+  );
+
+  sendJsonSuccess(response, 201, context.requestId, {
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+    expiresAt: session.expiresAt,
+    me,
+  });
+}
+
+export async function handleEmailPasswordSignIn(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  if (!shouldUsePostgres(config)) {
+    throw new AppError(
+      'password_auth_unavailable',
+      'Email/password auth requires the AWS Postgres API backend',
+      501,
+    );
+  }
+
+  const body = await readJsonBody(request);
+  const email =
+    typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const password = assertPasswordAllowed(body.password);
+
+  if (!email || !EMAIL_RE.test(email)) {
+    throw new AppError('validation_error', 'A valid email address is required', 400);
+  }
+
+  const authProfile = await authenticateEmailPassword(config, { email, password });
+  const session = await createPostgresAuthSession(config, request, authProfile);
+  const me = await fetchMeAggregateForProfileId(
+    session.profileId,
+    session.platformUserId,
+    config,
+  );
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+    expiresAt: session.expiresAt,
+    me,
+  });
+}
+
+export async function handleNativeAppleSignIn(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  if (!shouldUsePostgres(config)) {
+    throw new AppError(
+      'apple_auth_unavailable',
+      'Apple auth requires the AWS Postgres API backend',
+      501,
+    );
+  }
+
+  const body = await readJsonBody(request);
+  const identityToken = assertRequiredString(body.identityToken, 'identityToken');
+  const displayName = normalizeOptionalString(body.displayName);
+  const claims = await verifyAppleIdentityToken(
+    identityToken,
+    config.appleClientId ?? 'app.hnnt',
+  );
+  const email =
+    typeof body.email === 'string' && EMAIL_RE.test(body.email)
+      ? body.email.trim().toLowerCase()
+      : claims.email ?? null;
+
+  const authProfile = await createOrLoadAppleAccount(config, {
+    appleUserId: claims.sub,
+    email,
+    displayName,
+  });
+  const session = await createPostgresAuthSession(config, request, authProfile);
+  const me = await fetchMeAggregateForProfileId(
+    session.profileId,
+    session.platformUserId,
+    config,
+  );
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+    expiresAt: session.expiresAt,
+    me,
+  });
+}
+
 /**
  * POST /v1/auth/refresh
  * Exchanges a refresh token for a new access + refresh token pair.
@@ -402,6 +551,27 @@ export async function handleRefreshToken(
 
   if (!refreshToken) {
     throw new AppError('validation_error', 'refreshToken is required', 400);
+  }
+
+  if (shouldUsePostgres(config)) {
+    const session = await refreshPostgresAuthSession(config, request, refreshToken);
+    if (!session) {
+      throw new AppError('refresh_failed', 'Invalid or expired refresh token', 401);
+    }
+
+    const me = await fetchMeAggregateForProfileId(
+      session.profileId,
+      session.platformUserId,
+      config,
+    );
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAt: session.expiresAt,
+      me,
+    });
+    return;
   }
 
   const supabase = getServiceClient(config);

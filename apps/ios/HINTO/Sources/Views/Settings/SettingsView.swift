@@ -64,11 +64,11 @@ struct SettingsView: View {
 
                 // Support
                 Section("Support") {
-                    Link(destination: URL(string: "https://hinto.app/privacy")!) {
+                    Link(destination: URL(string: "https://hnnt.app/privacy")!) {
                         Label("Privacy Policy", systemImage: "hand.raised.fill")
                     }
 
-                    Link(destination: URL(string: "https://hinto.app/terms")!) {
+                    Link(destination: URL(string: "https://hnnt.app/terms")!) {
                         Label("Terms of Service", systemImage: "doc.text.fill")
                     }
 

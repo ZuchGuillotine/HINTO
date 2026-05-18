@@ -240,6 +240,7 @@ struct ProfileView: View {
         }
 
         guard let token = auth.accessToken else { return }
+        let imageData = try? await loadJPEGUploadData(from: selectedPhoto)
 
         let update = UpdateProfileRequest(
             username: username.isEmpty ? nil : username,
@@ -250,6 +251,14 @@ struct ProfileView: View {
 
         if let response = try? await api.updateMe(token: token, update: update) {
             auth.currentUser = response.data
+        }
+        if let imageData,
+           let uploadResponse = try? await api.uploadProfileAvatar(
+            token: token,
+            imageData: imageData
+           ) {
+            auth.currentUser = uploadResponse.data.me
+            selectedPhoto = nil
         }
     }
 }

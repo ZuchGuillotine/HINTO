@@ -61,8 +61,11 @@ The repo now contains restart-era work that moves toward that target:
 - `/services/api` with auth, profile, and situationship routes
 - `/packages/contracts` and `/packages/domain` for the first shared slice
 - `/apps/ios` with a native SwiftUI app shell and feature views
+- `/legacy/hnnt-app` as quarantined Expo/Amplify salvage material
 
-What remains true is that the active legacy runtime under `apps/hnnt-app/src/` is still Amplify-shaped and has not yet been retired.
+The old Amplify backend artifacts and custom Snap lambda have been removed from
+the active tree. The remaining Expo/Amplify client code is kept only under
+`/legacy` for reference.
 
 ### 2.3 Reuse is possible, but selective
 
@@ -78,8 +81,8 @@ The codebase should not be "resumed" as-is. It should be treated as a salvage op
 From `HINTO`:
 
 - PRD and sprint docs as product-history input only
-- domain vocabulary in [schema.graphql](/Users/benjamincox/Downloads/HINTO/amplify/backend/api/hinto/schema.graphql)
-- some screen/component concepts in `apps/hnnt-app/src/`
+- domain vocabulary already captured in `docs/Schema_Entity_Mapping.md` and `docs/Canonical_Domain_Model.md`
+- some screen/component concepts in `legacy/hnnt-app/src/`
 - existing iOS project shell in `ios/` for reference only
 
 From `rork-hnnt--hinto--relationship-ranking-app`:
@@ -99,7 +102,7 @@ From `rork-hnnt--hinto--relationship-ranking-app`:
 
 ### 3.3 Low-value or discard candidates
 
-- Amplify-generated infrastructure under `amplify/`
+- historical Amplify-generated infrastructure, now removed from the active tree
 - Cognito redirect scripts and AWS environment metadata
 - Expo-specific build flow, EAS assumptions, and Expo Router structure
 - RORK-specific package naming and project artifacts

@@ -2,7 +2,7 @@ import { IncomingMessage } from 'node:http';
 
 import { AppError } from './errors.js';
 
-const MAX_BODY_SIZE = 1_048_576; // 1 MB
+const MAX_BODY_SIZE = 8 * 1024 * 1024; // Allows JSON-wrapped image uploads up to roughly 5 MB raw.
 
 /**
  * Reads and parses a JSON request body.

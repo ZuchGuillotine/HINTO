@@ -6,9 +6,9 @@ This document covers the current restart-era local development path for the shar
 
 Working local slice in this repo:
 
-- `services/api`: profile, friends feed, situationship, voting, moderation, AI, email auth, and custom-provider routes
+- `services/api`: profile, friends feed submissions/votes, situationship, media upload/storage, voting, moderation, AI, email/password auth, Apple native auth, and custom-provider routes
 - `apps/web`: dependency-light JS shell for onboarding, profile, friends feed, situationship management, and voting smoke flows
-- `apps/ios`: SwiftUI shell with local API base URL support, local development sign-in, sign-in/sign-up split, friends feed, profile editing, situationship wiring, voting, and staged provider auth
+- `apps/ios`: SwiftUI shell with local API base URL support, local development sign-in, email/password sign-in/sign-up, friends feed submission composer, profile editing, situationship wiring, image uploads, voting, and staged provider auth
 
 Still staged:
 
@@ -44,15 +44,19 @@ The API now loads the repo-root `.env` automatically when present.
 
 Important environment variables for the current slice:
 
-- `SUPABASE_URL` or `PUBLIC_SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_ANON_KEY` or `PUBLIC_SUPABASE_ANON_KEY`
+- `DATABASE_URL`
 - `API_HOST`
 - `API_PORT`
 - `API_CORS_ALLOW_ORIGIN`
 - `ENABLE_DEVELOPMENT_AUTH`
 - `DISABLE_EMAIL_OTP_DELIVERY`
 - `AUTH_STATE_SECRET`
+- `S3_MEDIA_BUCKET`
+- `CLOUDFRONT_MEDIA_DOMAIN`
+- `AWS_REGION`
+- `SUPABASE_URL` or `PUBLIC_SUPABASE_URL` for transition fallback routes
+- `SUPABASE_SERVICE_ROLE_KEY` for transition fallback routes
+- `SUPABASE_ANON_KEY` or `PUBLIC_SUPABASE_ANON_KEY` for transition fallback routes
 
 If `API_CORS_ALLOW_ORIGIN` is unset, the API defaults to `*` outside production.
 
@@ -90,20 +94,52 @@ Outside production, Snapchat and TikTok callbacks default to:
 Those callback URLs still need to be registered in the provider portals before
 the browser/OAuth leg can complete.
 
-Current remote Supabase status:
+Current AWS/RDS status:
 
-- migrations `001` through `011` are recorded in the remote migration table
-- service-role PostgREST reads work against the expected product tables
-- direct DB host resolution is unreliable from this machine; DB admin scripts should use the transaction pooler URL, not `SUPABASE_CONNECTION_STRING`
-- the currently working pooler env var is named `SUPABQSE_TRANSACTION_POOLER`; keep that typo in mind until it is intentionally normalized
-- API runtime code currently uses Supabase URL/key values, not the direct DB connection string
+- production-oriented migrations live in [`db/migrations`](/Users/benjamincox/Downloads/HINTO/db/migrations)
+- migrations `001` through `005` cover platform identity, product core, email/password auth, media assets, and friends feed submissions/votes
+- local device testing can point `DATABASE_URL` at the RDS endpoint through the SSM tunnel on `127.0.0.1:15432`
+- product routes should prefer the RDS repository path whenever `DATABASE_URL` is configured
 
 Production infrastructure direction:
 
 - Supabase remains a transition/local verification surface, not the production platform target.
 - Production should use AWS RDS PostgreSQL through `DATABASE_URL`.
 - Production deployment guidance lives in [`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md).
-- The first RDS/platform identity migration lives in [`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql).
+- RDS migrations currently include:
+  - [`001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql)
+  - [`002_hinto_product_core.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/002_hinto_product_core.sql)
+  - [`003_email_password_auth.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/003_email_password_auth.sql)
+  - [`004_media_assets.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/004_media_assets.sql)
+  - [`005_feed_submissions.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/005_feed_submissions.sql)
+
+## Media And Feed Submission Path
+
+Local image uploads use JSON-wrapped base64 bodies with a 5 MB raw image limit.
+The API stores media in S3 when `S3_MEDIA_BUCKET` is set, using
+`CLOUDFRONT_MEDIA_DOMAIN` for public URLs when present. Without an S3 bucket,
+development uploads are written under `.hinto-media/` and served through
+`GET /media-local/...`.
+
+Current upload routes:
+
+- `POST /v1/me/avatar`
+- `POST /v1/me/situationships/:id/image`
+- `POST /v1/me/feed/submissions/:id/image`
+
+The friends feed is now explicit RDS-backed submission data, not a read-only
+projection of friends' active situationships. The iOS Friends tab creates a feed
+submission by selecting one of the user's existing situationships, adding text,
+an image, or both, and choosing a voting window. The create route returns the
+submission row, and the optional image upload updates the same submission with a
+media asset URL.
+
+Current feed routes:
+
+- `GET /v1/me/feed`
+- `POST /v1/me/feed/submissions`
+- `POST /v1/me/feed/submissions/:id/image`
+- `POST /v1/me/feed/submissions/:id/votes`
 
 ## Start The API
 
@@ -183,16 +219,19 @@ The current verification goal is:
 1. API starts with local `.env`
 2. web shell loads at `127.0.0.1:3001`
 3. `Use Local API` works in web and SwiftUI
-4. profile edit persists
-5. situationship create/edit/delete/reorder persists
+4. profile edit and avatar upload persist
+5. situationship create/edit/delete/reorder and image upload persist
+6. Friends `+` creates a feed submission from an existing situationship
+7. optional feed submission image upload persists and appears in `GET /v1/me/feed`
+8. feed voting persists and updates vote counts
 
-Voting backend routes now exist in `services/api`, and the current web/SwiftUI shells now hit them for session creation, vote submission, session listing, and results. Browser and simulator verification are still follow-up work.
+Voting backend routes now exist in `services/api`, and the current web/SwiftUI shells now hit them for session creation, vote submission, session listing, and results. Friends feed submission voting is a separate authenticated feed route under `/v1/me/feed/submissions/:id/votes`.
 
 ## Legacy Expo Commands
 
-The legacy Expo/React Native app is still in the repo for reference, but it is
-not the default startup path. Use explicit legacy commands only when inspecting
-that app:
+The legacy Expo/React Native app is quarantined under `legacy/hnnt-app` for
+salvage reference only. It is not part of the active lint target or default
+startup path. Use explicit legacy commands only when inspecting that app:
 
 ```bash
 npm run legacy:expo:start

@@ -34,6 +34,7 @@ struct Situationship: Codable, Identifiable, Equatable, Hashable {
     var emoji: String?
     var category: String?
     var description: String?
+    var avatarUrl: String? = nil
     var rank: Int
     var status: SituationshipStatus
     let createdAt: String
@@ -83,11 +84,42 @@ struct FriendsFeedAggregate: Codable {
 
 struct FeedItem: Codable, Identifiable, Equatable, Hashable {
     let feedItemId: String
+    let submissionId: String?
     let ownerProfile: FeedOwnerProfile
     let viewerContext: ViewerContext
     let situationship: Situationship
+    let submission: FeedSubmission?
+    let voteSummary: FeedVoteSummary?
+    let viewerVote: FeedVoteType?
 
     var id: String { feedItemId }
+}
+
+struct FeedSubmission: Codable, Equatable, Hashable {
+    let body: String?
+    let imageUrl: String?
+    let expiresAt: String
+    let status: FeedSubmissionStatus
+    let createdAt: String
+    let updatedAt: String
+}
+
+enum FeedSubmissionStatus: String, Codable {
+    case active
+    case concluded
+}
+
+struct FeedVoteSummary: Codable, Equatable, Hashable {
+    let bestFitCount: Int
+    let notTheOneCount: Int
+    let totalCount: Int
+}
+
+enum FeedVoteType: String, Codable, CaseIterable, Identifiable {
+    case bestFit = "best_fit"
+    case notTheOne = "not_the_one"
+
+    var id: String { rawValue }
 }
 
 struct FeedOwnerProfile: Codable, Equatable, Hashable {
@@ -124,4 +156,15 @@ struct UpdateSituationshipRequest: Codable {
 
 struct ReorderRequest: Codable {
     let orderedSituationshipIds: [String]
+}
+
+struct CreateFeedSubmissionRequest: Codable {
+    let situationshipId: String
+    let body: String?
+    let expiresInHours: Int
+}
+
+struct VoteOnFeedSubmissionRequest: Codable {
+    let voteType: FeedVoteType
+    let comment: String?
 }

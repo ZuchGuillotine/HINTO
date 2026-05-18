@@ -2,6 +2,9 @@ import { IncomingMessage } from 'node:http';
 
 import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
+import { shouldUsePostgres } from '../db.js';
+import { resolvePostgresAccessToken } from '../repositories/postgres-auth.js';
+import { getProfileById } from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 
 export interface AuthenticatedUser {
@@ -40,6 +43,23 @@ async function resolveDevelopmentUser(
   const profileId = usesLegacyToken ? 'dev-user-001' : token.slice('dev-session:'.length).trim();
   if (!profileId) {
     throw new AppError('unauthorized', 'Invalid development session token', 401);
+  }
+
+  if (shouldUsePostgres(config)) {
+    const profile = await getProfileById(config, profileId);
+    if (!profile) {
+      throw new AppError(
+        'profile_not_found',
+        'Development profile not found. Create a development session first.',
+        404,
+      );
+    }
+
+    return {
+      authUserId: profileId,
+      profileId: profile.id,
+      email: profile.email ?? null,
+    };
   }
 
   const supabase = getServiceClient(config);
@@ -87,6 +107,19 @@ export async function resolveAuthenticatedUser(
     return {
       ...context,
       user: developmentUser,
+      accessToken: token,
+    };
+  }
+
+  if (shouldUsePostgres(config)) {
+    const postgresUser = await resolvePostgresAccessToken(config, token);
+    if (!postgresUser) {
+      throw new AppError('unauthorized', 'Invalid or expired token', 401);
+    }
+
+    return {
+      ...context,
+      user: postgresUser,
       accessToken: token,
     };
   }

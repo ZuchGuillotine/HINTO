@@ -28,6 +28,8 @@ This section is the live tracker for the current product-surface push: sign-in/s
 | SX-11 | Wire Snapchat provider into iOS auth flow | Done (local-ready) | iOS uses `ASWebAuthenticationSession` against `POST /v1/auth/providers/snapchat/start` and consumes the backend callback into a HINTO session. Live completion remains blocked on Snap app approval, registered redirect URI, and `AUTH_STATE_SECRET`. |
 | SX-12 | Reconcile Snapchat env vars and add redirect URI | Done (code) / Blocked (portal) | Config now accepts `SNAPCHAT_CLIENT_CONFIDENTIAL` / `SNAPCHAT_CLIENT_ID_PUBLIC` aliases and defaults the local redirect URI to `http://localhost:3000/v1/auth/providers/snapchat/callback` outside production. User still must register the redirect URI in Snap and provide `AUTH_STATE_SECRET`. |
 | SX-13 | Username/display-name capture step on sign-up | Done | Sign-up no longer silently derives all profile data from the email local-part; the backend writes supplied username/display name after OTP verification and the local bypass path uses the same intent-aware payload. |
+| SX-14 | Replace read-only friends feed with feed submissions | Done | RDS migration `005_feed_submissions.sql` adds `feed_submissions` and `feed_submission_votes`; `GET /v1/me/feed` now returns explicit submissions on the Postgres path, and new create/image/vote routes support the iOS Friends `+` flow. |
+| SX-15 | Add local/S3 media pathway for profile, situationship, and feed images | Done | `media_assets` plus the API media route support S3/CloudFront in configured environments and `.hinto-media`/`/media-local/...` for local testing. SwiftUI now compresses selected images before upload. |
 
 ### 2026-05-17 Execution Notes
 
@@ -36,7 +38,9 @@ This section is the live tracker for the current product-surface push: sign-in/s
 - Wired TikTok through the same iOS custom-provider flow as Snapchat. Backend config accepts `TIKTOK_CLIENT_ID_PUBLIC` as the local client-key alias and defaults the local callback URI outside production.
 - Meta/Facebook remains blocked at the backend-provider layer. Credentials are present under `META_APP_ID` / `META_CLIENT_SECRET`, but no `/v1/auth/providers/meta|facebook/*` route exists yet and provider app approval remains external.
 - Current temporary landing page/domain state is documented under `infra/aws/staging-resources.md` and `apps/web/landing/README.md`: `hnnt.app` / `www.hnnt.app` route through Route 53 to CloudFront/S3. No AWS deployment was performed in this session.
-- Verification: `npm run api:build`; `npm run api:test -- --runInBand` at 96/96 across 12 suites; `npm run web:test -- --runInBand` at 6/6; `xcodebuild test -scheme HINTO -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4'` at 7/7; local API smoke on port 3010 confirmed `/health` and `/v1` route discovery include `GET /v1/me/feed`.
+- The friends feed submission flow is now: select an existing situationship, add text and/or image, choose an expiry window, submit to `/v1/me/feed/submissions`, optionally upload media to `/v1/me/feed/submissions/:id/image`, and vote through `/v1/me/feed/submissions/:id/votes`.
+- RDS smoke verification through the local SSM tunnel passed for: development session, situationship create, feed submission create, feed image upload, feed vote, and `GET /v1/me/feed`.
+- Verification: `npm run api:build`; `npm run api:test -- --runInBand` at 98/98 across 12 suites; `npm run lint`; `npm run ios`; `xcodebuild -workspace HINTO.xcworkspace -scheme HINTO -destination 'generic/platform=iOS Simulator' build`; local API smoke confirmed `/health` and `/v1` route discovery include the feed submission routes.
 
 ## Session Focus: 2026-04-14
 
@@ -113,8 +117,8 @@ Recommended high-signal entry points for this repo:
 
 Known current hotspots from codegraph:
 
-- `apps/hnnt-app/src/hooks/useAuth.tsx` is high-risk and central to current auth coupling.
-- `apps/hnnt-app/src/context/useSituationships.tsx` is high-risk and central to the first product slice.
+- `legacy/hnnt-app/src/hooks/useAuth.tsx` is high-risk historical auth-coupling salvage.
+- `legacy/hnnt-app/src/context/useSituationships.tsx` is high-risk historical product-state salvage.
 
 ## Task Packet Shape
 
@@ -145,7 +149,7 @@ The first agent wave should stay close to Phase A and unblock the first backend 
 | Q2 | EX-22, EX-23 | Define canonical domain model and identify schema gaps for web + Swift | Worker | Yes | Should use EX-21 output as input |
 | Q3 | EX-30, EX-31, EX-32, EX-33, EX-34 | Scaffold `/services/api` with config, error model, logging, and health surface | Worker | Yes | Keep auth implementation out of first scaffold unless needed for structure |
 | Q4 | EX-50, EX-51 | Scaffold `/packages/contracts` and `/packages/domain` for first vertical slice | Worker | Yes | Should align with Q2 and Q3 outputs |
-| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Prioritize active paths under `apps/hnnt-app/src/` and scripts/config |
+| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Legacy client paths now live under `legacy/hnnt-app/src/`; do not treat them as active product targets |
 
 ## Evaluator Responsibilities
 
@@ -259,12 +263,12 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; active blockers are root bootstrap, `useAuth`, `useUserProfile`, `useSituationships`, and AWS storage/upload paths |
+| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; legacy Expo client is now quarantined under `legacy/hnnt-app`, and Amplify/lambda backend artifacts have been removed from the active tree |
 | EX-81 | Replace client auth assumptions with backend-neutral interfaces | Agent | Todo | Begin with adapters rather than full deletion |
 | EX-82 | Replace GraphQL/AWS API calls with new service clients | Agent | Todo | Incrementally by feature slice |
 | EX-83 | Remove AWS-specific env/config usage from active app paths | Agent | Todo | Only after replacements exist |
-| EX-84 | Move legacy Expo/Amplify implementation under `/legacy` | Agent | Todo | Only once new structure is ready |
-| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Todo | After archive/move step |
+| EX-84 | Move legacy Expo/Amplify implementation under `/legacy` | Agent | Done | `apps/hnnt-app` moved to `legacy/hnnt-app` as salvage/reference material and excluded from active lint |
+| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Done | Removed tracked `amplify/` backend artifacts and `lambda/snap-auth`; active lint now passes cleanly |
 
 ### 9. Quality, Testing, And Delivery
 
@@ -352,7 +356,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main).
 6. ~~Add provider-start and provider-callback flows after the canonical session path is wired.~~ - Done for transition implementation (EX-37/38). Production verification still needs provider credentials, callback URLs, and platform-session replacement work.
 7. ~~Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes.~~ - Done for profile/situationship/voting; AI coach + moderation UI still pending in both clients.
-8. Replace active legacy AWS client calls with backend-neutral service clients (EX-82, EX-83). Blocked on go/no-go for moving `apps/hnnt-app` under `/legacy` (EX-84).
+8. Replace any future revived legacy AWS client calls with backend-neutral service clients (EX-82, EX-83). The old Expo client has moved under `/legacy` (EX-84).
 9. ~~Align the existing SwiftUI app shell with the live backend contracts.~~ - Done via SX-05 + EX-93 contract-decode tests. AI chat view still uses mocked responses at the view layer.
 
 ## 2026-04-17 Session Delta
@@ -388,7 +392,6 @@ Historical note: this closed the transition-era Supabase connectivity blocker. S
 
 - Configure Apple, Meta/Facebook, TikTok, and Snapchat OAuth callback URLs for the HINTO platform auth flow.
 - Provision provider secrets in AWS Secrets Manager for staging/production.
-- Decide go/no-go on moving `apps/hnnt-app` under `/legacy` (EX-84) so EX-81/82/83 can proceed destructively.
 - Continue AWS staging deployment from `infra/aws/staging-resources.md` and `.github/workflows/deploy-api-staging.yml`.
 
 ## Current Orchestrator Guidance
@@ -398,7 +401,7 @@ Use the following sequencing constraints while agents are active:
 - ~~Do not start EX-24 until EX-21 through EX-23 are reviewed.~~ - EX-24 is complete.
 - ~~Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.~~ - EX-35 is complete; EX-37/EX-38 remain scoped.
 - ~~Prefer profile and situationship contracts as the first shared slice before voting or AI routes.~~ - First slice is complete.
-- Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
+- Treat `legacy/hnnt-app/src/hooks/useAuth.tsx` and `legacy/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
 - Treat `apps/ios` as the current native baseline, but do not mistake its placeholder auth, vote submission, or AI responses for end-to-end integration.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
 - ~~Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.~~ - EX-90 is complete; voting/AI routes are now unblocked.

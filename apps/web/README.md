@@ -22,3 +22,12 @@ Run the web Jest suite with:
 ```bash
 npm run web:test
 ```
+
+Build static deployable assets with:
+
+```bash
+npm run web:build:staging
+```
+
+The build writes `apps/web/dist` and injects `WEB_API_BASE_URL`, defaulting to
+`https://api.hnnt.app` for staging-style static hosting.

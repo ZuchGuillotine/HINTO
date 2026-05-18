@@ -178,7 +178,7 @@ struct ShareSessionView: View {
                 )
             )
             createdSession = response.data.session
-            shareURL = URL(string: "https://hinto.app/vote/\(response.data.session.inviteCode)")
+            shareURL = URL(string: "https://hnnt.app/vote/\(response.data.session.inviteCode)")
         } catch {
             errorMessage = error.localizedDescription
         }

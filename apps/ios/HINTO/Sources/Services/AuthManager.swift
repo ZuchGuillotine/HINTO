@@ -87,37 +87,19 @@ final class AuthManager: NSObject {
             throw AuthError.invalidCredential
         }
 
-        // In production, send identityToken to the backend for HINTO platform session exchange
-        // For now, store as session token placeholder
-        let mockUser = MeAggregate(
-            profile: Profile(
-                profileId: credential.user,
-                username: credential.fullName?.givenName?.lowercased() ?? "user",
-                displayName: [credential.fullName?.givenName, credential.fullName?.familyName]
-                    .compactMap { $0 }.joined(separator: " "),
-                email: credential.email,
-                bio: nil,
-                avatarUrl: nil,
-                privacy: .private,
-                subscriptionTier: .free,
-                createdAt: ISO8601DateFormatter().string(from: Date()),
-                updatedAt: ISO8601DateFormatter().string(from: Date())
-            ),
-            auth: AuthIdentity(
-                authUserId: credential.user,
-                profileId: credential.user,
-                primaryProvider: "apple",
-                linkedProviders: ["apple"],
-                status: "active"
-            ),
-            capabilities: MeCapabilities(
-                canEditProfile: true,
-                canCreateSituationship: true,
-                canUseAiCoach: true
-            )
+        let displayName = [credential.fullName?.givenName, credential.fullName?.familyName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        let response = try await APIClient().signInWithNativeApple(
+            identityToken: tokenString,
+            email: credential.email,
+            displayName: displayName.isEmpty ? nil : displayName
         )
-
-        setSession(token: tokenString, user: mockUser)
+        setSession(
+            token: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            user: response.data.me
+        )
     }
 
     @MainActor
@@ -169,6 +151,39 @@ final class AuthManager: NSObject {
             intent: intent,
             username: username,
             displayName: displayName
+        )
+        setSession(
+            token: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            user: response.data.me
+        )
+    }
+
+    func signUpWithEmailPassword(
+        email: String,
+        password: String,
+        username: String,
+        displayName: String
+    ) async throws {
+        let client = APIClient()
+        let response = try await client.signUpWithEmailPassword(
+            email: normalizeEmail(email),
+            password: password,
+            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        setSession(
+            token: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            user: response.data.me
+        )
+    }
+
+    func signInWithEmailPassword(email: String, password: String) async throws {
+        let client = APIClient()
+        let response = try await client.signInWithEmailPassword(
+            email: normalizeEmail(email),
+            password: password
         )
         setSession(
             token: response.data.accessToken,
@@ -347,8 +362,8 @@ enum AuthIntent: String, Identifiable {
 
     var emailSubheading: String {
         switch self {
-        case .signUp: "We'll send a verification code to set up your account"
-        case .signIn: "We'll send a verification code to your email"
+        case .signUp: "Choose an email and password to set up your account"
+        case .signIn: "Use your email and password to continue"
         }
     }
 }

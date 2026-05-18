@@ -4,6 +4,19 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  createVotingSession,
+  expireVotingSession,
+  getProfileById,
+  getVotingSessionByIdForOwner as getPostgresVotingSessionByIdForOwner,
+  getVotingSessionByInviteCode as getPostgresVotingSessionByInviteCode,
+  hasVoterSubmitted,
+  listActiveSituationshipsForOwners,
+  listOwnerVotingSessions,
+  listVotesForSession,
+  submitVotingSelection,
+} from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 import {
@@ -121,6 +134,10 @@ async function getOwnerActiveSituationships(
   config: AppConfig,
   ownerProfileId: string,
 ): Promise<SituationshipRow[]> {
+  if (shouldUsePostgres(config)) {
+    return listActiveSituationshipsForOwners(config, [ownerProfileId]) as Promise<SituationshipRow[]>;
+  }
+
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
     .from('situationships')
@@ -140,6 +157,17 @@ async function getVotingSessionByInviteCode(
   config: AppConfig,
   inviteCode: string,
 ): Promise<VotingSessionRow> {
+  if (shouldUsePostgres(config)) {
+    const session = await getPostgresVotingSessionByInviteCode(
+      config,
+      normalizeInviteCode(inviteCode),
+    );
+    if (!session) {
+      throw new AppError('not_found', 'Voting session not found', 404);
+    }
+    return session;
+  }
+
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
     .from('voting_sessions')
@@ -159,6 +187,18 @@ async function getVotingSessionByIdForOwner(
   votingSessionId: string,
   ownerProfileId: string,
 ): Promise<VotingSessionRow> {
+  if (shouldUsePostgres(config)) {
+    const session = await getPostgresVotingSessionByIdForOwner(
+      config,
+      votingSessionId,
+      ownerProfileId,
+    );
+    if (!session) {
+      throw new AppError('not_found', 'Voting session not found', 404);
+    }
+    return session;
+  }
+
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
     .from('voting_sessions')
@@ -184,6 +224,15 @@ export async function handleListOwnerVotingSessions(
   config: AppConfig,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
+
+  if (shouldUsePostgres(config)) {
+    const sessions = await listOwnerVotingSessions(config, authCtx.user.profileId);
+    sendJsonSuccess(response, 200, context.requestId, {
+      sessions: sessions.map(toVotingSessionDto),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { data, error } = await supabase
@@ -212,7 +261,6 @@ export async function handleCreateVotingSession(
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
-  const supabase = getServiceClient(config);
 
   const activeSituationships = await getOwnerActiveSituationships(config, authCtx.user.profileId);
   if (activeSituationships.length < 2) {
@@ -241,6 +289,25 @@ export async function handleCreateVotingSession(
       : 48;
 
   const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
+
+  if (shouldUsePostgres(config)) {
+    const session = await createVotingSession(config, {
+      ownerProfileId: authCtx.user.profileId,
+      title,
+      description,
+      isAnonymous: anonymityMode === 'anonymous',
+      expiresAt,
+    });
+
+    sendJsonSuccess(response, 201, context.requestId, {
+      session: toVotingSessionDto(session),
+      itemsCount: activeSituationships.length,
+      publicPath: `/v1/voting-sessions/${session.invite_code}`,
+    });
+    return;
+  }
+
+  const supabase = getServiceClient(config);
   const inviteCode = await generateUniqueInviteCode(config);
 
   const { data, error } = await supabase
@@ -279,9 +346,21 @@ export async function handleExpireVotingSession(
   votingSessionId: string,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
-  const supabase = getServiceClient(config);
 
   await getVotingSessionByIdForOwner(config, votingSessionId, authCtx.user.profileId);
+
+  if (shouldUsePostgres(config)) {
+    const session = await expireVotingSession(config, votingSessionId, authCtx.user.profileId);
+    if (!session) {
+      throw new AppError('update_failed', 'Failed to expire voting session', 500);
+    }
+    sendJsonSuccess(response, 200, context.requestId, {
+      session: toVotingSessionDto(session),
+    });
+    return;
+  }
+
+  const supabase = getServiceClient(config);
 
   const { data, error } = await supabase
     .from('voting_sessions')
@@ -311,6 +390,40 @@ export async function handleGetPublicVotingSession(
   inviteCode: string,
 ): Promise<void> {
   const session = await getVotingSessionByInviteCode(config, inviteCode);
+
+  if (shouldUsePostgres(config)) {
+    const [owner, situationshipRows] = await Promise.all([
+      getProfileById(config, session.owner_id),
+      getOwnerActiveSituationships(config, session.owner_id),
+    ]);
+
+    if (!owner) {
+      throw new AppError('fetch_failed', 'Failed to fetch voting session owner', 500);
+    }
+
+    const sessionDto = toVotingSessionDto(session);
+    sendJsonSuccess(response, 200, context.requestId, {
+      session: sessionDto,
+      ownerProfile: {
+        profileId: owner.id,
+        username: owner.username ?? '',
+        displayName: owner.name ?? '',
+      },
+      viewerContext: {
+        mode: 'public_session_viewer' as const,
+      },
+      items: situationshipRows.map(toSituationshipDto),
+      capabilities: {
+        canVote: sessionDto.status === 'active',
+        canComment: sessionDto.status === 'active',
+      },
+      audience: {
+        mode: 'session_link' as const,
+      },
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const [ownerResult, situationshipRows] = await Promise.all([
@@ -378,6 +491,47 @@ export async function handleSubmitVote(
     body.bestSituationshipId,
     body.worstSituationshipId,
   );
+
+  if (shouldUsePostgres(config)) {
+    if (await hasVoterSubmitted(config, session.id, voterIdentity)) {
+      throw new AppError(
+        'duplicate_vote',
+        'This voter identity has already submitted a vote for the session',
+        409,
+      );
+    }
+
+    try {
+      const votes = await submitVotingSelection(config, {
+        votingSessionId: session.id,
+        bestSituationshipId: selection.bestSituationshipId,
+        worstSituationshipId: selection.worstSituationshipId,
+        voterIdentity,
+        voterName,
+        comment,
+      });
+
+      sendJsonSuccess(response, 201, context.requestId, {
+        votingSessionId: session.id,
+        accepted: true,
+        votesRecorded: votes.length,
+        selections: {
+          bestSituationshipId: selection.bestSituationshipId,
+          worstSituationshipId: selection.worstSituationshipId,
+        },
+      });
+      return;
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === '23505') {
+        throw new AppError(
+          'duplicate_vote',
+          'This voter identity has already submitted a vote for the session',
+          409,
+        );
+      }
+      throw error;
+    }
+  }
 
   const supabase = getServiceClient(config);
   const { data: existingVotes, error: existingVotesError } = await supabase
@@ -461,8 +615,40 @@ export async function handleGetVotingResults(
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const session = await getVotingSessionByIdForOwner(config, votingSessionId, authCtx.user.profileId);
-  const supabase = getServiceClient(config);
   const situationships = await getOwnerActiveSituationships(config, session.owner_id);
+
+  if (shouldUsePostgres(config)) {
+    const votes = await listVotesForSession(config, session.id);
+    const aggregate = buildVotingResultsAggregate(
+      situationships.map((item) => ({
+        situationshipId: item.id,
+        name: item.name,
+        emoji: item.emoji,
+        rank: item.rank,
+      })),
+      votes.map((row) => ({
+        situationshipId: row.situationship_id,
+        voteType: row.vote_type,
+        voterIdentity: row.voter_identity,
+        voterId: row.voter_id,
+        voterName: row.voter_name,
+        comment: row.comment,
+        createdAt: row.created_at,
+      })),
+      { isAnonymous: session.is_anonymous },
+    );
+
+    sendJsonSuccess(response, 200, context.requestId, {
+      session: toVotingSessionDto(session),
+      totalVotes: aggregate.totalVotes,
+      totalVoters: aggregate.totalVoters,
+      results: aggregate.results,
+      comments: aggregate.comments,
+    });
+    return;
+  }
+
+  const supabase = getServiceClient(config);
 
   const { data: votes, error } = await supabase
     .from('votes')

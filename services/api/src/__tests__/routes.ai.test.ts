@@ -34,7 +34,10 @@ function queueTableResults(
 ): void {
   const builder = client._getBuilder(table);
   const queue = [...results];
-  (builder as unknown as { then: Function }).then = function (
+  (builder as unknown as { then: (
+    resolve: (v: unknown) => void,
+    reject?: (e: unknown) => void,
+  ) => Promise<void> }).then = function (
     resolve: (v: unknown) => void,
     reject?: (e: unknown) => void,
   ) {
