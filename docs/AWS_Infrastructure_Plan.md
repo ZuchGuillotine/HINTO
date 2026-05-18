@@ -19,6 +19,10 @@ The production baseline is:
 
 App Runner is not a target service. AWS moved App Runner to maintenance for new customers on April 30, 2026 and recommends ECS Express Mode for the same low-ops container use case.
 
+For the live collaborator checklist covering local test setup, pre-distribution
+hardening, and variable/secret/API asset status, see
+[`docs/Operational_Readiness_Checklist.md`](/Users/benjamincox/Downloads/HINTO/docs/Operational_Readiness_Checklist.md).
+
 ## Account Strategy
 
 Use the existing AWS organization and consolidated billing. Do not create a totally unrelated AWS account unless ownership, tax, or legal separation requires it.

@@ -2,6 +2,10 @@
 
 This document covers the current restart-era local development path for the shared backend, web shell, and SwiftUI app.
 
+For the collaborator checklist that separates local testing requirements,
+pre-distribution hardening, and environment/secret status, see
+[`docs/Operational_Readiness_Checklist.md`](/Users/benjamincox/Downloads/HINTO/docs/Operational_Readiness_Checklist.md).
+
 ## Current Local Slice
 
 Working local slice in this repo:
