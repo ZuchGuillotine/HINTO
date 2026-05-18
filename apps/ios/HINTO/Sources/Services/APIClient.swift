@@ -391,6 +391,8 @@ struct FeedSubmissionVote: Decodable {
     let submissionId: String
     let voterProfileId: String
     let voteType: FeedVoteType
+    let voterVoteCount: Int
+    let votesCast: Int
     let comment: String?
     let createdAt: String
 }

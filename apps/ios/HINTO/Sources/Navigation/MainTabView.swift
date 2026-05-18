@@ -13,8 +13,8 @@ struct MainTabView: View {
         var title: String {
             switch self {
             case .home: "My List"
-            case .feed: "Friends"
-            case .chat: "AI Coach"
+            case .feed: "Rank"
+            case .chat: "HNNT"
             case .profile: "Profile"
             case .settings: "Settings"
             }

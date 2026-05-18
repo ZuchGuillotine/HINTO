@@ -93,6 +93,8 @@ export interface FeedSubmissionAggregateRow extends FeedSubmissionRow {
   best_fit_count: number;
   not_the_one_count: number;
   viewer_vote_type: 'best_fit' | 'not_the_one' | null;
+  viewer_vote_count: number;
+  feed_comments: FeedSubmissionCommentAggregateRow[] | null;
 }
 
 export interface FeedSubmissionVoteRow {
@@ -102,6 +104,25 @@ export interface FeedSubmissionVoteRow {
   vote_type: 'best_fit' | 'not_the_one';
   comment: string | null;
   created_at: string;
+}
+
+export interface FeedSubmissionVoteMutationRow extends FeedSubmissionVoteRow {
+  voter_vote_count: number;
+  votes_cast: number;
+}
+
+export interface FeedSubmissionCommentAggregateRow {
+  commentId: string;
+  voterProfile: {
+    profileId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  voteType: 'best_fit' | 'not_the_one';
+  voterVoteCount: number;
+  comment: string;
+  createdAt: string;
 }
 
 function privacyBooleans(privacy: string): { isPublic: boolean; mutualsOnly: boolean } {
@@ -775,25 +796,64 @@ export async function listFeedSubmissions(
             s.primary_image_url AS situationship_primary_image_url,
             s.image_count AS situationship_image_count,
             s.has_images AS situationship_has_images,
-            COUNT(v.id) FILTER (WHERE v.vote_type = 'best_fit')::integer AS best_fit_count,
-            COUNT(v.id) FILTER (WHERE v.vote_type = 'not_the_one')::integer AS not_the_one_count,
-            viewer_vote.vote_type AS viewer_vote_type
+            COALESCE(vote_counts.best_fit_count, 0)::integer AS best_fit_count,
+            COALESCE(vote_counts.not_the_one_count, 0)::integer AS not_the_one_count,
+            viewer_vote.vote_type AS viewer_vote_type,
+            COALESCE(viewer_vote.vote_count, 0)::integer AS viewer_vote_count,
+            COALESCE(feed_comments.comments, '[]'::jsonb) AS feed_comments
        FROM feed_submissions fs
        JOIN profiles p ON p.id = fs.author_profile_id
        JOIN situationships s ON s.id = fs.situationship_id
-       LEFT JOIN feed_submission_votes v ON v.feed_submission_id = fs.id
-       LEFT JOIN feed_submission_votes viewer_vote
-         ON viewer_vote.feed_submission_id = fs.id
-        AND viewer_vote.voter_profile_id = $1
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) FILTER (WHERE vote_type = 'best_fit')::integer AS best_fit_count,
+                COUNT(*) FILTER (WHERE vote_type = 'not_the_one')::integer AS not_the_one_count
+           FROM feed_submission_votes
+          WHERE feed_submission_id = fs.id
+       ) vote_counts ON true
+       LEFT JOIN LATERAL (
+         SELECT (
+                  SELECT latest_vote.vote_type
+                    FROM feed_submission_votes latest_vote
+                   WHERE latest_vote.feed_submission_id = fs.id
+                     AND latest_vote.voter_profile_id = $1
+                   ORDER BY latest_vote.created_at DESC
+                   LIMIT 1
+                ) AS vote_type,
+                COUNT(*)::integer AS vote_count
+           FROM feed_submission_votes viewer_votes
+          WHERE viewer_votes.feed_submission_id = fs.id
+            AND viewer_votes.voter_profile_id = $1
+       ) viewer_vote ON true
+       LEFT JOIN LATERAL (
+         SELECT jsonb_agg(
+                  jsonb_build_object(
+                    'commentId', commented.id,
+                    'voterProfile', jsonb_build_object(
+                      'profileId', commenter.id,
+                      'username', COALESCE(commenter.username, ''),
+                      'displayName', COALESCE(commenter.name, commenter.username, 'HINTO friend'),
+                      'avatarUrl', commenter.avatar_url
+                    ),
+                    'voteType', commented.vote_type,
+                    'voterVoteCount', commenter_votes.vote_count,
+                    'comment', commented.comment,
+                    'createdAt', commented.created_at
+                  )
+                  ORDER BY commented.created_at DESC
+                ) AS comments
+           FROM feed_submission_votes commented
+           JOIN profiles commenter ON commenter.id = commented.voter_profile_id
+           JOIN LATERAL (
+             SELECT COUNT(*)::integer AS vote_count
+               FROM feed_submission_votes voter_votes
+              WHERE voter_votes.feed_submission_id = fs.id
+                AND voter_votes.voter_profile_id = commented.voter_profile_id
+           ) commenter_votes ON true
+          WHERE commented.feed_submission_id = fs.id
+            AND commented.comment IS NOT NULL
+       ) feed_comments ON true
       WHERE fs.is_active = true
         AND fs.author_profile_id = ANY($2::uuid[])
-      GROUP BY fs.id,
-               p.id,
-               p.username,
-               p.name,
-               p.avatar_url,
-               s.id,
-               viewer_vote.vote_type
       ORDER BY fs.created_at DESC
       LIMIT 100`,
     [viewerProfileId, Array.from(eligibleAuthorIds)],
@@ -807,8 +867,9 @@ export async function voteOnFeedSubmission(
     voterProfileId: string;
     voteType: 'best_fit' | 'not_the_one';
     comment: string | null;
+    count: number;
   },
-): Promise<FeedSubmissionVoteRow> {
+): Promise<FeedSubmissionVoteMutationRow> {
   return withTransaction(config, async (client) => {
     const submission = await client.query<Pick<FeedSubmissionRow, 'id'>>(
       `SELECT id
@@ -824,27 +885,47 @@ export async function voteOnFeedSubmission(
       throw new AppError('not_found', 'Feed submission not found or voting has ended', 404);
     }
 
-    const vote = await client.query<FeedSubmissionVoteRow>(
+    const currentVotes = await client.query<{ vote_count: number }>(
+      `SELECT COUNT(*)::integer AS vote_count
+         FROM feed_submission_votes
+        WHERE feed_submission_id = $1
+          AND voter_profile_id = $2`,
+      [input.feedSubmissionId, input.voterProfileId],
+    );
+    const currentVoteCount = Number(currentVotes.rows[0]?.vote_count ?? 0);
+    if (currentVoteCount + input.count > 99) {
+      throw new AppError(
+        'validation_error',
+        'feed submission votes are limited to 99 per user',
+        400,
+      );
+    }
+
+    const votes = await client.query<FeedSubmissionVoteRow>(
       `INSERT INTO feed_submission_votes(
          feed_submission_id,
          voter_profile_id,
          vote_type,
          comment
        )
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (feed_submission_id, voter_profile_id)
-       DO UPDATE SET vote_type = EXCLUDED.vote_type,
-                     comment = EXCLUDED.comment
+       SELECT $1, $2, $3, CASE WHEN vote_number = 1 THEN $4 ELSE NULL END
+         FROM generate_series(1, $5) AS vote_number
        RETURNING *`,
       [
         input.feedSubmissionId,
         input.voterProfileId,
         input.voteType,
         input.comment,
+        input.count,
       ],
     );
 
-    return vote.rows[0];
+    const latestVote = votes.rows[votes.rows.length - 1];
+    return {
+      ...latestVote,
+      voter_vote_count: currentVoteCount + input.count,
+      votes_cast: input.count,
+    };
   });
 }
 

@@ -86,6 +86,7 @@ function parseCreateFeedSubmissionBody(body: Record<string, unknown>): {
 function parseVoteBody(body: Record<string, unknown>): {
   voteType: FeedVoteType;
   comment: string | null;
+  count: number;
 } {
   const voteType = typeof body.voteType === 'string' ? body.voteType : '';
   if (voteType !== 'best_fit' && voteType !== 'not_the_one') {
@@ -101,13 +102,25 @@ function parseVoteBody(body: Record<string, unknown>): {
     throw new AppError('validation_error', 'comment must be 140 characters or fewer', 400);
   }
 
+  const count = body.count === undefined ? 1 : Number(body.count);
+  if (!Number.isInteger(count) || count < 1 || count > 99) {
+    throw new AppError('validation_error', 'count must be an integer between 1 and 99', 400);
+  }
+
   return {
     voteType,
     comment: comment.length > 0 ? comment : null,
+    count,
   };
 }
 
-function toFeedSubmissionDto(
+function feedCommentsForDto(
+  comments: Awaited<ReturnType<typeof listFeedSubmissions>>[number]['feed_comments'],
+) {
+  return comments ?? [];
+}
+
+export function toFeedSubmissionDto(
   row: Awaited<ReturnType<typeof listFeedSubmissions>>[number],
   viewerProfileId: string,
 ) {
@@ -157,6 +170,8 @@ function toFeedSubmissionDto(
       totalCount: row.best_fit_count + row.not_the_one_count,
     },
     viewerVote: row.viewer_vote_type,
+    viewerVoteCount: row.viewer_vote_count,
+    comments: feedCommentsForDto(row.feed_comments),
   };
 }
 
@@ -385,6 +400,7 @@ export async function handleVoteOnFeedSubmission(
     voterProfileId: authCtx.user.profileId,
     voteType: input.voteType,
     comment: input.comment,
+    count: input.count,
   });
 
   sendJsonSuccess(response, 200, context.requestId, {
@@ -393,6 +409,8 @@ export async function handleVoteOnFeedSubmission(
       submissionId: vote.feed_submission_id,
       voterProfileId: vote.voter_profile_id,
       voteType: vote.vote_type,
+      voterVoteCount: vote.voter_vote_count,
+      votesCast: vote.votes_cast,
       comment: vote.comment,
       createdAt: vote.created_at,
     },

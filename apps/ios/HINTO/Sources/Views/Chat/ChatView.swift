@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ChatView: View {
     @State private var messages: [ChatMessage] = [
-        .aiMessage("Hi! I'm your AI relationship coach. I'm here to help you navigate your situationships with clarity and confidence. What's on your mind?")
+        .aiMessage("Hi! I'm HNNT. I'm here to help you navigate your situationships with clarity and confidence. What's on your mind?")
     ]
     @State private var inputText = ""
     @State private var isTyping = false
@@ -52,7 +52,7 @@ struct ChatView: View {
                 // Input bar
                 inputBar
             }
-            .navigationTitle("AI Coach")
+            .navigationTitle("HNNT")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

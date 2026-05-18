@@ -40,8 +40,7 @@ CREATE TABLE IF NOT EXISTS feed_submission_votes (
   voter_profile_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   vote_type text NOT NULL CHECK (vote_type IN ('best_fit', 'not_the_one')),
   comment text CHECK (comment IS NULL OR char_length(comment) <= 140),
-  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
-  UNIQUE (feed_submission_id, voter_profile_id)
+  created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 CREATE INDEX IF NOT EXISTS idx_feed_submission_votes_submission
@@ -49,3 +48,6 @@ CREATE INDEX IF NOT EXISTS idx_feed_submission_votes_submission
 
 CREATE INDEX IF NOT EXISTS idx_feed_submission_votes_voter
   ON feed_submission_votes(voter_profile_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_feed_submission_votes_submission_voter
+  ON feed_submission_votes(feed_submission_id, voter_profile_id, created_at DESC);

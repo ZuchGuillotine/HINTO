@@ -12,7 +12,7 @@ struct OnboardingView: View {
     private let slides: [(emoji: String, title: String, description: String)] = [
         ("💖", "Welcome to HINTO", "Navigate your dating life with clarity and get the truth about your situationships."),
         ("📊", "Rank Your People", "Add the people in your life and drag to reorder based on your priorities."),
-        ("🤖", "AI Coach", "Get private, personalized relationship advice 24/7 from your AI assistant."),
+        ("🤖", "HNNT", "Get private, personalized relationship advice 24/7 from HNNT."),
     ]
 
     var body: some View {

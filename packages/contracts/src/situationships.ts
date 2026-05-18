@@ -53,11 +53,41 @@ export interface FeedOwnerProfileDto {
   avatarUrl: string | null;
 }
 
+export interface FeedSubmissionDto {
+  body: string | null;
+  imageUrl: string | null;
+  expiresAt: string;
+  status: 'active' | 'concluded';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeedVoteSummaryDto {
+  bestFitCount: number;
+  notTheOneCount: number;
+  totalCount: number;
+}
+
+export interface FeedSubmissionCommentDto {
+  commentId: string;
+  voterProfile: FeedOwnerProfileDto;
+  voteType: 'best_fit' | 'not_the_one';
+  voterVoteCount: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface FeedItemDto {
   feedItemId: string;
+  submissionId?: string | null;
   ownerProfile: FeedOwnerProfileDto;
   viewerContext: ViewerContextDto;
   situationship: SituationshipDto;
+  submission?: FeedSubmissionDto | null;
+  voteSummary?: FeedVoteSummaryDto | null;
+  viewerVote?: 'best_fit' | 'not_the_one' | null;
+  viewerVoteCount?: number;
+  comments?: FeedSubmissionCommentDto[];
 }
 
 export interface FriendsFeedAggregateDto {
@@ -67,6 +97,33 @@ export interface FriendsFeedAggregateDto {
 
 export interface GetFriendsFeedResponseDto {
   data: FriendsFeedAggregateDto;
+}
+
+export interface CreateFeedSubmissionRequestDto {
+  situationshipId: string;
+  body?: string | null;
+  expiresInHours: number;
+}
+
+export interface VoteOnFeedSubmissionRequestDto {
+  voteType: 'best_fit' | 'not_the_one';
+  comment?: string | null;
+  count?: number;
+}
+
+export interface VoteOnFeedSubmissionResponseDto {
+  data: {
+    vote: {
+      voteId: string;
+      submissionId: string;
+      voterProfileId: string;
+      voteType: 'best_fit' | 'not_the_one';
+      voterVoteCount: number;
+      votesCast: number;
+      comment: string | null;
+      createdAt: string;
+    };
+  };
 }
 
 export interface GetSituationshipsResponseDto {

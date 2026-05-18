@@ -91,6 +91,8 @@ struct FeedItem: Codable, Identifiable, Equatable, Hashable {
     let submission: FeedSubmission?
     let voteSummary: FeedVoteSummary?
     let viewerVote: FeedVoteType?
+    let viewerVoteCount: Int?
+    let comments: [FeedSubmissionComment]?
 
     var id: String { feedItemId }
 }
@@ -120,6 +122,13 @@ enum FeedVoteType: String, Codable, CaseIterable, Identifiable {
     case notTheOne = "not_the_one"
 
     var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .bestFit: "Best fit"
+        case .notTheOne: "Not it"
+        }
+    }
 }
 
 struct FeedOwnerProfile: Codable, Equatable, Hashable {
@@ -127,6 +136,17 @@ struct FeedOwnerProfile: Codable, Equatable, Hashable {
     let username: String
     let displayName: String
     let avatarUrl: String?
+}
+
+struct FeedSubmissionComment: Codable, Identifiable, Equatable, Hashable {
+    let commentId: String
+    let voterProfile: FeedOwnerProfile
+    let voteType: FeedVoteType
+    let voterVoteCount: Int
+    let comment: String
+    let createdAt: String
+
+    var id: String { commentId }
 }
 
 struct OwnerProfileSummary: Codable {
@@ -167,4 +187,5 @@ struct CreateFeedSubmissionRequest: Codable {
 struct VoteOnFeedSubmissionRequest: Codable {
     let voteType: FeedVoteType
     let comment: String?
+    let count: Int
 }
