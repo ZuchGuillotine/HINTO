@@ -395,7 +395,7 @@ struct FriendsView: View {
             return false
         }
 
-        let granted = try await withCheckedThrowingContinuation { continuation in
+        let granted = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
             contactStore.requestAccess(for: .contacts) { granted, error in
                 if let error {
                     continuation.resume(throwing: error)
