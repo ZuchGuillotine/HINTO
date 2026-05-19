@@ -51,6 +51,8 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSContactsUsageDescription</key>
+    <string>HINTO uses your contacts to help you find and invite friends for voting and feedback.</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

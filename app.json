@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.hnnt"
+      "bundleIdentifier": "app.hnnt",
+      "infoPlist": {
+        "NSContactsUsageDescription": "HINTO uses your contacts to help you find and invite friends for voting and feedback."
+      }
     },
     "android": {
       "adaptiveIcon": {

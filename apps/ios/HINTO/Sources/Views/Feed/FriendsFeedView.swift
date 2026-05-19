@@ -115,20 +115,19 @@ struct FriendsFeedView: View {
     private func voteControls(for item: FeedItem, summary: FeedVoteSummary) -> some View {
         let isClosed = item.submission?.status == .concluded
         let copy = voteCopy(for: item)
-        let otherBestFitCount = otherVoteCount(.bestFit, for: item, summary: summary)
-        let otherNotTheOneCount = otherVoteCount(.notTheOne, for: item, summary: summary)
-        let otherTotalCount = otherBestFitCount + otherNotTheOneCount
+        let viewerBestFitCount = viewerVoteCount(.bestFit, for: item)
+        let viewerNotTheOneCount = viewerVoteCount(.notTheOne, for: item)
         VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack(spacing: Spacing.xs) {
-                Text("others \(otherTotalCount)")
+                Text("\(summary.bestFitCount) for")
                     .font(.hintoCaption)
                     .foregroundStyle(.secondary)
 
-                Text("\(otherBestFitCount) for")
+                Text("·")
                     .font(.hintoCaption)
                     .foregroundStyle(.secondary)
 
-                Text("\(otherNotTheOneCount) against")
+                Text("\(summary.notTheOneCount) against")
                     .font(.hintoCaption)
                     .foregroundStyle(.secondary)
             }
@@ -137,8 +136,8 @@ struct FriendsFeedView: View {
                 voteButton(
                     title: copy.bestFit,
                     systemImage: "heart.fill",
-                    count: otherBestFitCount,
-                    selected: item.viewerVote == .bestFit,
+                    count: viewerBestFitCount,
+                    selected: viewerBestFitCount > 0,
                     disabled: isClosed || item.submissionId == nil || isSubmittingVote(.bestFit, for: item)
                 ) {
                     Task {
@@ -149,20 +148,14 @@ struct FriendsFeedView: View {
                 voteButton(
                     title: copy.notTheOne,
                     systemImage: "xmark",
-                    count: otherNotTheOneCount,
-                    selected: item.viewerVote == .notTheOne,
+                    count: viewerNotTheOneCount,
+                    selected: viewerNotTheOneCount > 0,
                     disabled: isClosed || item.submissionId == nil || isSubmittingVote(.notTheOne, for: item)
                 ) {
                     Task {
                         await submitQuickVote(.notTheOne, for: item)
                     }
                 }
-            }
-
-            if let viewerVoteText = viewerVoteText(for: item) {
-                Text(viewerVoteText)
-                .font(.hintoCaption)
-                .foregroundStyle(.secondary)
             }
         }
     }
@@ -196,37 +189,18 @@ struct FriendsFeedView: View {
         .disabled(disabled)
     }
 
-    private func viewerVoteText(for item: FeedItem) -> String? {
-        if let summary = item.viewerVoteSummary, summary.totalCount > 0 {
-            return "you: \(summary.bestFitCount)x best fit / \(summary.notTheOneCount)x not it"
-        }
-
-        if let count = item.viewerVoteCount, count > 0 {
-            return "you: \(count)x"
-        }
-
-        return nil
-    }
-
-    private func otherVoteCount(
-        _ voteType: FeedVoteType,
-        for item: FeedItem,
-        summary: FeedVoteSummary
-    ) -> Int {
-        let totalCount = voteType == .bestFit ? summary.bestFitCount : summary.notTheOneCount
-        let viewerCount: Int
-
+    private func viewerVoteCount(_ voteType: FeedVoteType, for item: FeedItem) -> Int {
         if let viewerSummary = item.viewerVoteSummary {
-            viewerCount = voteType == .bestFit
+            return voteType == .bestFit
                 ? viewerSummary.bestFitCount
                 : viewerSummary.notTheOneCount
-        } else if item.viewerVote == voteType {
-            viewerCount = item.viewerVoteCount ?? 0
-        } else {
-            viewerCount = 0
         }
 
-        return max(0, totalCount - viewerCount)
+        if item.viewerVote == voteType {
+            return item.viewerVoteCount ?? 0
+        }
+
+        return 0
     }
 
     private func openDishComposer(for item: FeedItem) {
