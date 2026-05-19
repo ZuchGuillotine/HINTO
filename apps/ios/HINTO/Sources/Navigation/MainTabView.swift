@@ -7,7 +7,7 @@ struct MainTabView: View {
         case home
         case feed
         case chat
-        case profile
+        case friends
         case settings
 
         var title: String {
@@ -15,7 +15,7 @@ struct MainTabView: View {
             case .home: "My List"
             case .feed: "Rank"
             case .chat: "HNNT"
-            case .profile: "Profile"
+            case .friends: "Friends"
             case .settings: "Settings"
             }
         }
@@ -23,9 +23,9 @@ struct MainTabView: View {
         var icon: String {
             switch self {
             case .home: "heart.text.clipboard"
-            case .feed: "person.2"
+            case .feed: "chart.bar.doc.horizontal"
             case .chat: "bubble.left.and.text.bubble.right"
-            case .profile: "person.crop.circle"
+            case .friends: "person.2"
             case .settings: "gearshape"
             }
         }
@@ -33,9 +33,9 @@ struct MainTabView: View {
         var selectedIcon: String {
             switch self {
             case .home: "heart.text.clipboard.fill"
-            case .feed: "person.2.fill"
+            case .feed: "chart.bar.doc.horizontal.fill"
             case .chat: "bubble.left.and.text.bubble.right.fill"
-            case .profile: "person.crop.circle.fill"
+            case .friends: "person.2.fill"
             case .settings: "gearshape.fill"
             }
         }
@@ -66,8 +66,8 @@ struct MainTabView: View {
             FriendsFeedView()
         case .chat:
             ChatView()
-        case .profile:
-            ProfileView()
+        case .friends:
+            FriendsView()
         case .settings:
             SettingsView()
         }

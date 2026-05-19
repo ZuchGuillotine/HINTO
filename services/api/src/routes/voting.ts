@@ -30,6 +30,7 @@ import {
   resolveVotingSessionStatus,
   validateVoteSubmission,
 } from './voting-shared.js';
+import { buildSharePayload } from '../share.js';
 
 interface VotingSessionRow {
   id: string;
@@ -303,6 +304,10 @@ export async function handleCreateVotingSession(
       session: toVotingSessionDto(session),
       itemsCount: activeSituationships.length,
       publicPath: `/v1/voting-sessions/${session.invite_code}`,
+      share: buildSharePayload(config, {
+        targetType: 'voting_session',
+        publicPath: `/vote/${session.invite_code}`,
+      }),
     });
     return;
   }
@@ -332,6 +337,10 @@ export async function handleCreateVotingSession(
     session: toVotingSessionDto(data as VotingSessionRow),
     itemsCount: activeSituationships.length,
     publicPath: `/v1/voting-sessions/${inviteCode}`,
+    share: buildSharePayload(config, {
+      targetType: 'voting_session',
+      publicPath: `/vote/${inviteCode}`,
+    }),
   });
 }
 

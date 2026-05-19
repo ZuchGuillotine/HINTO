@@ -9,7 +9,9 @@ struct FriendsFeedView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isShowingComposer = false
-    @State private var pendingVote: PendingFeedVote?
+    @State private var pendingDish: PendingFeedDish?
+    @State private var voteCopyByItemId: [String: FeedVoteCopy] = [:]
+    @State private var submittingVoteIds: Set<String> = []
 
     var body: some View {
         NavigationStack {
@@ -39,13 +41,12 @@ struct FriendsFeedView: View {
                     await loadFeed()
                 }
             }
-            .sheet(item: $pendingVote) { pendingVote in
-                FeedVoteComposer(pendingVote: pendingVote) { count, comment in
-                    await submitVote(
-                        pendingVote.voteType,
-                        for: pendingVote.item,
-                        count: count,
-                        comment: comment
+            .sheet(item: $pendingDish) { pendingDish in
+                FeedDishComposer(pendingDish: pendingDish) { comment in
+                    await submitComment(
+                        for: pendingDish.item,
+                        comment: comment,
+                        parentComment: pendingDish.parentComment
                     )
                 }
             }
@@ -65,7 +66,8 @@ struct FriendsFeedView: View {
                     FeedItemCard(
                         item: item,
                         timeRemaining: timeRemaining,
-                        voteControls: voteControls
+                        voteControls: voteControls,
+                        dishAction: openDishComposer
                     )
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
@@ -112,25 +114,55 @@ struct FriendsFeedView: View {
     @ViewBuilder
     private func voteControls(for item: FeedItem, summary: FeedVoteSummary) -> some View {
         let isClosed = item.submission?.status == .concluded
-        HStack(spacing: Spacing.sm) {
-            voteButton(
-                title: FeedVoteType.bestFit.displayTitle,
-                systemImage: "heart.fill",
-                count: summary.bestFitCount,
-                selected: item.viewerVote == .bestFit,
-                disabled: isClosed || item.submissionId == nil
-            ) {
-                pendingVote = PendingFeedVote(item: item, voteType: .bestFit)
+        let copy = voteCopy(for: item)
+        let otherBestFitCount = otherVoteCount(.bestFit, for: item, summary: summary)
+        let otherNotTheOneCount = otherVoteCount(.notTheOne, for: item, summary: summary)
+        let otherTotalCount = otherBestFitCount + otherNotTheOneCount
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(spacing: Spacing.xs) {
+                Text("others \(otherTotalCount)")
+                    .font(.hintoCaption)
+                    .foregroundStyle(.secondary)
+
+                Text("\(otherBestFitCount) for")
+                    .font(.hintoCaption)
+                    .foregroundStyle(.secondary)
+
+                Text("\(otherNotTheOneCount) against")
+                    .font(.hintoCaption)
+                    .foregroundStyle(.secondary)
             }
 
-            voteButton(
-                title: FeedVoteType.notTheOne.displayTitle,
-                systemImage: "xmark",
-                count: summary.notTheOneCount,
-                selected: item.viewerVote == .notTheOne,
-                disabled: isClosed || item.submissionId == nil
-            ) {
-                pendingVote = PendingFeedVote(item: item, voteType: .notTheOne)
+            HStack(spacing: Spacing.sm) {
+                voteButton(
+                    title: copy.bestFit,
+                    systemImage: "heart.fill",
+                    count: otherBestFitCount,
+                    selected: item.viewerVote == .bestFit,
+                    disabled: isClosed || item.submissionId == nil || isSubmittingVote(.bestFit, for: item)
+                ) {
+                    Task {
+                        await submitQuickVote(.bestFit, for: item)
+                    }
+                }
+
+                voteButton(
+                    title: copy.notTheOne,
+                    systemImage: "xmark",
+                    count: otherNotTheOneCount,
+                    selected: item.viewerVote == .notTheOne,
+                    disabled: isClosed || item.submissionId == nil || isSubmittingVote(.notTheOne, for: item)
+                ) {
+                    Task {
+                        await submitQuickVote(.notTheOne, for: item)
+                    }
+                }
+            }
+
+            if let viewerVoteText = viewerVoteText(for: item) {
+                Text(viewerVoteText)
+                .font(.hintoCaption)
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -146,14 +178,63 @@ struct FriendsFeedView: View {
         Button {
             action()
         } label: {
-            Label("\(title) \(count)", systemImage: systemImage)
-                .font(.hintoCaption)
-                .frame(maxWidth: .infinity)
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: Spacing.xs)
+                Text("\(count)")
+                    .fontWeight(.semibold)
+            }
+            .font(.hintoCaption)
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .tint(selected ? .hintoPink : Color(.tertiarySystemFill))
         .foregroundStyle(selected ? Color.white : Color.primary)
         .disabled(disabled)
+    }
+
+    private func viewerVoteText(for item: FeedItem) -> String? {
+        if let summary = item.viewerVoteSummary, summary.totalCount > 0 {
+            return "you: \(summary.bestFitCount)x best fit / \(summary.notTheOneCount)x not it"
+        }
+
+        if let count = item.viewerVoteCount, count > 0 {
+            return "you: \(count)x"
+        }
+
+        return nil
+    }
+
+    private func otherVoteCount(
+        _ voteType: FeedVoteType,
+        for item: FeedItem,
+        summary: FeedVoteSummary
+    ) -> Int {
+        let totalCount = voteType == .bestFit ? summary.bestFitCount : summary.notTheOneCount
+        let viewerCount: Int
+
+        if let viewerSummary = item.viewerVoteSummary {
+            viewerCount = voteType == .bestFit
+                ? viewerSummary.bestFitCount
+                : viewerSummary.notTheOneCount
+        } else if item.viewerVote == voteType {
+            viewerCount = item.viewerVoteCount ?? 0
+        } else {
+            viewerCount = 0
+        }
+
+        return max(0, totalCount - viewerCount)
+    }
+
+    private func openDishComposer(for item: FeedItem) {
+        pendingDish = PendingFeedDish(item: item, parentComment: nil)
+    }
+
+    private func openDishComposer(for item: FeedItem, parentComment: FeedSubmissionComment?) {
+        pendingDish = PendingFeedDish(item: item, parentComment: parentComment)
     }
 
     private func loadFeed() async {
@@ -163,14 +244,23 @@ struct FriendsFeedView: View {
 
         do {
             let response = try await api.getFriendsFeed(token: token)
+            let nextItems = response.data.items
+            syncVoteCopy(for: nextItems)
             withAnimation {
-                items = response.data.items
+                items = nextItems
                 isLoading = false
             }
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
         }
+    }
+
+    private func submitQuickVote(_ voteType: FeedVoteType, for item: FeedItem) async {
+        let voteId = voteSubmissionId(voteType, for: item)
+        submittingVoteIds.insert(voteId)
+        await submitVote(voteType, for: item, count: 1, comment: nil)
+        submittingVoteIds.remove(voteId)
     }
 
     private func submitVote(
@@ -191,6 +281,50 @@ struct FriendsFeedView: View {
             await loadFeed()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func submitComment(
+        for item: FeedItem,
+        comment: String,
+        parentComment: FeedSubmissionComment?
+    ) async {
+        guard let token = auth.accessToken,
+              let submissionId = item.submissionId else { return }
+
+        do {
+            _ = try await api.commentOnFeedSubmission(
+                token: token,
+                submissionId: submissionId,
+                input: CreateFeedSubmissionCommentRequest(
+                    comment: comment,
+                    parentCommentId: parentComment?.commentId
+                )
+            )
+            await loadFeed()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func isSubmittingVote(_ voteType: FeedVoteType, for item: FeedItem) -> Bool {
+        submittingVoteIds.contains(voteSubmissionId(voteType, for: item))
+    }
+
+    private func voteSubmissionId(_ voteType: FeedVoteType, for item: FeedItem) -> String {
+        "\(item.id):\(voteType.rawValue)"
+    }
+
+    private func voteCopy(for item: FeedItem) -> FeedVoteCopy {
+        voteCopyByItemId[item.id] ?? FeedVoteCopy.random()
+    }
+
+    private func syncVoteCopy(for nextItems: [FeedItem]) {
+        let nextIds = Set(nextItems.map(\.id))
+        voteCopyByItemId = voteCopyByItemId.filter { nextIds.contains($0.key) }
+
+        for item in nextItems where voteCopyByItemId[item.id] == nil {
+            voteCopyByItemId[item.id] = FeedVoteCopy.random()
         }
     }
 
@@ -215,24 +349,57 @@ struct FriendsFeedView: View {
     }
 }
 
-private struct PendingFeedVote: Identifiable {
+private struct PendingFeedDish: Identifiable {
     let item: FeedItem
-    let voteType: FeedVoteType
+    let parentComment: FeedSubmissionComment?
 
     var id: String {
-        "\(item.id):\(voteType.rawValue)"
+        parentComment.map { "\(item.id):\($0.commentId)" } ?? item.id
     }
+}
+
+private struct FeedVoteCopy {
+    let bestFit: String
+    let notTheOne: String
+
+    static func random() -> FeedVoteCopy {
+        FeedVoteCopy(
+            bestFit: bestFitOptions.randomElement() ?? "Best fit",
+            notTheOne: notTheOneOptions.randomElement() ?? "Not it"
+        )
+    }
+
+    private static let bestFitOptions = [
+        "Best fit",
+        "Do it girl",
+        "Omg cute",
+        "Green flag",
+        "Ship it",
+        "Yes please",
+        "Main character"
+    ]
+
+    private static let notTheOneOptions = [
+        "Not it",
+        "Chud",
+        "Hard pass",
+        "Red flag",
+        "Nope",
+        "The ick",
+        "Run"
+    ]
 }
 
 private struct FeedItemCard<VoteControls: View>: View {
     let item: FeedItem
     let timeRemaining: (String) -> String
     let voteControls: (FeedItem, FeedVoteSummary) -> VoteControls
+    let dishAction: (FeedItem, FeedSubmissionComment?) -> Void
 
-    private let cardHeight: CGFloat = 416
+    @State private var showsAllComments = false
+
     private let mediaHeight: CGFloat = 104
     private let bodyHeight: CGFloat = 42
-    private let commentsHeight: CGFloat = 52
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -240,17 +407,17 @@ private struct FeedItemCard<VoteControls: View>: View {
             subjectRow
             captionBlock
             mediaBlock
+            dishButton
             commentPreviewBlock
 
             if let summary = item.voteSummary {
                 voteControls(item, summary)
-                    .frame(height: 34)
             } else {
-                Spacer(minLength: 34)
+                EmptyView()
             }
         }
         .padding(Spacing.md)
-        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
     }
@@ -364,83 +531,161 @@ private struct FeedItemCard<VoteControls: View>: View {
         }
     }
 
-    @ViewBuilder
-    private var commentPreviewBlock: some View {
-        if let comment = item.comments?.first {
-            HStack(alignment: .top, spacing: Spacing.xs) {
-                AvatarView(url: comment.voterProfile.avatarUrl, emoji: nil, size: 24)
+    private var dishButton: some View {
+        Button {
+            dishAction(item, nil)
+        } label: {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 15, weight: .semibold))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(comment.comment)
-                        .font(.hintoBodySmall)
-                        .lineLimit(1)
-
-                    Text("\(comment.voterProfile.displayName) · \(comment.voteType.displayTitle) · \(comment.voterVoteCount)x")
-                        .font(.hintoCaption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text("dish")
+                    .font(.hintoBodySmall)
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, Spacing.xs)
-            .padding(.vertical, Spacing.xs)
-            .frame(maxWidth: .infinity, minHeight: commentsHeight, maxHeight: commentsHeight, alignment: .leading)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, Spacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
             .background(Color(.tertiarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-        } else {
-            Color.clear
-                .frame(maxWidth: .infinity, minHeight: commentsHeight, maxHeight: commentsHeight)
+            .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .disabled(item.submission?.status == .concluded || item.submissionId == nil)
+    }
+
+    @ViewBuilder
+    private var commentPreviewBlock: some View {
+        let comments = item.comments ?? []
+        if comments.isEmpty {
+            EmptyView()
+        } else {
+            let displayedComments = visibleComments(from: comments)
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                ForEach(displayedComments) { displayedComment in
+                    commentRow(displayedComment)
+                }
+
+                if flattenedComments(from: comments).count > 3 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showsAllComments.toggle()
+                        }
+                    } label: {
+                        Text(showsAllComments ? "less tea" : "tea")
+                            .font(.hintoCaption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func visibleComments(from comments: [FeedSubmissionComment]) -> [FeedDisplayedComment] {
+        let flattened = flattenedComments(from: comments)
+        return showsAllComments ? flattened : Array(flattened.prefix(3))
+    }
+
+    private func flattenedComments(from comments: [FeedSubmissionComment]) -> [FeedDisplayedComment] {
+        let grouped = Dictionary(grouping: comments, by: { $0.parentCommentId })
+        let roots = grouped[nil] ?? []
+        var displayed: [FeedDisplayedComment] = []
+
+        func append(_ comment: FeedSubmissionComment, depth: Int) {
+            displayed.append(FeedDisplayedComment(comment: comment, depth: min(depth, 3)))
+            for reply in grouped[comment.commentId] ?? [] {
+                append(reply, depth: depth + 1)
+            }
+        }
+
+        for comment in roots {
+            append(comment, depth: 0)
+        }
+
+        return displayed
+    }
+
+    private func commentRow(_ displayedComment: FeedDisplayedComment) -> some View {
+        let comment = displayedComment.comment
+        return HStack(alignment: .top, spacing: Spacing.xs) {
+            AvatarView(url: comment.voterProfile.avatarUrl, emoji: nil, size: 22)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(comment.comment)
+                    .font(.hintoBodySmall)
+                    .lineLimit(1)
+
+                HStack(spacing: Spacing.xs) {
+                    Text(commentMetadata(for: comment))
+
+                    Button("reply") {
+                        dishAction(item, comment)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.hintoCaption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, CGFloat(displayedComment.depth) * 18)
+        .padding(.horizontal, Spacing.xs)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .background(Color(.tertiarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+    }
+
+    private func commentMetadata(for comment: FeedSubmissionComment) -> String {
+        if let voteType = comment.voteType, comment.voterVoteCount > 0 {
+            return "\(comment.voterProfile.displayName) · \(voteType.displayTitle) · \(comment.voterVoteCount)x"
+        }
+        if comment.voterVoteCount > 0 {
+            return "\(comment.voterProfile.displayName) · \(comment.voterVoteCount)x"
+        }
+
+        return comment.voterProfile.displayName
     }
 }
 
-private struct FeedVoteComposer: View {
+private struct FeedDisplayedComment: Identifiable {
+    let comment: FeedSubmissionComment
+    let depth: Int
+
+    var id: String { comment.id }
+}
+
+private struct FeedDishComposer: View {
     @Environment(\.dismiss) private var dismiss
 
-    let pendingVote: PendingFeedVote
-    let onSubmit: (Int, String?) async -> Void
+    let pendingDish: PendingFeedDish
+    let onSubmit: (String) async -> Void
 
-    @State private var count = 1
     @State private var comment = ""
     @State private var isSubmitting = false
-
-    private var remainingVotes: Int {
-        max(0, 99 - (pendingVote.item.viewerVoteCount ?? 0))
-    }
 
     private var trimmedComment: String {
         comment.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var sectionTitle: String {
+        pendingDish.parentComment == nil ? "Dish" : "Reply"
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Vote") {
-                    HStack {
-                        Label(
-                            pendingVote.voteType.displayTitle,
-                            systemImage: pendingVote.voteType == .bestFit ? "heart.fill" : "xmark"
-                        )
-                        .foregroundStyle(pendingVote.voteType == .bestFit ? Color.hintoPink : Color.primary)
-
-                        Spacer()
-
-                        Text("\(pendingVote.item.viewerVoteCount ?? 0)/99 used")
+                Section(sectionTitle) {
+                    if let parentComment = pendingDish.parentComment {
+                        Text("Replying to \(parentComment.voterProfile.displayName)")
                             .font(.hintoCaption)
                             .foregroundStyle(.secondary)
                     }
 
-                    if remainingVotes > 0 {
-                        Stepper("Cast \(count) vote\(count == 1 ? "" : "s")", value: $count, in: 1...remainingVotes)
-                    } else {
-                        Text("You have used all 99 votes on this post.")
-                            .font(.hintoCaption)
-                            .foregroundStyle(Color.hintoError)
-                    }
-                }
-
-                Section("Comment") {
                     TextEditor(text: $comment)
                         .frame(minHeight: 90)
 
@@ -449,7 +694,7 @@ private struct FeedVoteComposer: View {
                         .foregroundStyle(trimmedComment.count > 140 ? Color.hintoError : Color.secondary)
                 }
             }
-            .navigationTitle("Vote")
+            .navigationTitle("Dish")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -464,7 +709,7 @@ private struct FeedVoteComposer: View {
                             await submit()
                         }
                     }
-                    .disabled(isSubmitting || remainingVotes == 0 || trimmedComment.count > 140)
+                    .disabled(isSubmitting || trimmedComment.isEmpty || trimmedComment.count > 140)
                 }
             }
         }
@@ -474,7 +719,7 @@ private struct FeedVoteComposer: View {
         guard !isSubmitting else { return }
         isSubmitting = true
 
-        await onSubmit(count, trimmedComment.isEmpty ? nil : trimmedComment)
+        await onSubmit(trimmedComment)
         dismiss()
     }
 }

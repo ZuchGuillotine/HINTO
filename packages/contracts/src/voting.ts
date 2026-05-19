@@ -1,4 +1,5 @@
 import { SituationshipDto } from './situationships.js';
+import { SharePayloadDto } from './share.js';
 
 export type VotingSessionStatus = 'active' | 'expired' | 'closed';
 export type VotingVisibility = 'session_link';
@@ -30,6 +31,7 @@ export interface CreateVotingSessionResponseDto {
     session: VotingSessionDto;
     itemsCount: number;
     publicPath: string;
+    share: SharePayloadDto;
   };
 }
 

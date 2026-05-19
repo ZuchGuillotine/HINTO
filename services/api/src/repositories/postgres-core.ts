@@ -10,10 +10,52 @@ export interface IdentityRow {
 }
 
 export interface FriendshipRow {
+  id?: string;
   requester_id: string;
   addressee_id: string;
+  status?: 'pending' | 'accepted' | 'rejected' | 'declined' | 'blocked';
+  requested_at?: string;
+  created_at?: string;
   updated_at?: string | null;
   responded_at?: string | null;
+}
+
+export interface FriendshipAggregateRow extends FriendshipRow {
+  id: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'declined' | 'blocked';
+  requested_at: string;
+  created_at: string;
+  requester_username: string | null;
+  requester_name: string | null;
+  requester_display_name: string | null;
+  requester_avatar_url: string | null;
+  addressee_username: string | null;
+  addressee_name: string | null;
+  addressee_display_name: string | null;
+  addressee_avatar_url: string | null;
+}
+
+export interface FriendSuggestionAggregateRow {
+  id: string;
+  suggested_profile_id: string;
+  source: 'contacts' | 'mutual_friend' | 'shared_invite' | 'shared_voter' | 'provider_link';
+  reason_code: string;
+  score: number;
+  created_at: string;
+  expires_at: string;
+  username: string | null;
+  name: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  mutual_count: number;
+}
+
+export interface BlockRow {
+  id: string;
+  blocker_id: string;
+  blocked_id: string;
+  reason: string | null;
+  created_at: string;
 }
 
 export interface FeedProfileRow {
@@ -45,6 +87,20 @@ export interface VoteRow {
   vote_type: 'best_fit' | 'not_the_one';
   comment: string | null;
   created_at: string;
+}
+
+export interface ShareInviteRow {
+  id: string;
+  inviter_profile_id: string;
+  invite_token: string;
+  target_type: 'voting_session' | 'feed_submission' | 'friend_invite';
+  target_id: string | null;
+  channel: 'sms' | 'ios_share' | 'web_share' | 'copy_link' | 'unknown';
+  recipient_contact_hmac: string | null;
+  clicked_at: string | null;
+  converted_profile_id: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
 export interface MediaAssetRow {
@@ -94,6 +150,8 @@ export interface FeedSubmissionAggregateRow extends FeedSubmissionRow {
   not_the_one_count: number;
   viewer_vote_type: 'best_fit' | 'not_the_one' | null;
   viewer_vote_count: number;
+  viewer_best_fit_count: number;
+  viewer_not_the_one_count: number;
   feed_comments: FeedSubmissionCommentAggregateRow[] | null;
 }
 
@@ -111,15 +169,27 @@ export interface FeedSubmissionVoteMutationRow extends FeedSubmissionVoteRow {
   votes_cast: number;
 }
 
+export interface FeedSubmissionCommentRow {
+  id: string;
+  feed_submission_id: string;
+  commenter_profile_id: string;
+  parent_comment_id: string | null;
+  vote_type: 'best_fit' | 'not_the_one' | null;
+  voter_vote_count: number;
+  comment: string;
+  created_at: string;
+}
+
 export interface FeedSubmissionCommentAggregateRow {
   commentId: string;
+  parentCommentId: string | null;
   voterProfile: {
     profileId: string;
     username: string;
     displayName: string;
     avatarUrl: string | null;
   };
-  voteType: 'best_fit' | 'not_the_one';
+  voteType: 'best_fit' | 'not_the_one' | null;
   voterVoteCount: number;
   comment: string;
   createdAt: string;
@@ -609,8 +679,329 @@ export async function listAcceptedFriendships(
     `SELECT requester_id, addressee_id, responded_at, updated_at
        FROM friendships
       WHERE status = 'accepted'
-        AND (requester_id = $1 OR addressee_id = $1)`,
+        AND (requester_id = $1 OR addressee_id = $1)
+        AND NOT EXISTS (
+          SELECT 1
+            FROM blocks b
+           WHERE (b.blocker_id = $1 AND b.blocked_id = CASE
+                    WHEN friendships.requester_id = $1 THEN friendships.addressee_id
+                    ELSE friendships.requester_id
+                 END)
+              OR (b.blocked_id = $1 AND b.blocker_id = CASE
+                    WHEN friendships.requester_id = $1 THEN friendships.addressee_id
+                    ELSE friendships.requester_id
+                 END)
+        )`,
     [profileId],
+  );
+}
+
+export async function listFriendshipsForProfile(
+  config: AppConfig,
+  profileId: string,
+): Promise<FriendshipAggregateRow[]> {
+  return queryRows<FriendshipAggregateRow>(
+    config,
+    `SELECT f.*,
+            requester.username AS requester_username,
+            requester.name AS requester_name,
+            requester.display_name AS requester_display_name,
+            requester.avatar_url AS requester_avatar_url,
+            addressee.username AS addressee_username,
+            addressee.name AS addressee_name,
+            addressee.display_name AS addressee_display_name,
+            addressee.avatar_url AS addressee_avatar_url
+       FROM friendships f
+       JOIN profiles requester ON requester.id = f.requester_id
+       JOIN profiles addressee ON addressee.id = f.addressee_id
+      WHERE (f.requester_id = $1 OR f.addressee_id = $1)
+        AND f.status IN ('pending', 'accepted')
+        AND NOT EXISTS (
+          SELECT 1
+            FROM blocks b
+           WHERE (b.blocker_id = $1 AND b.blocked_id = CASE
+                    WHEN f.requester_id = $1 THEN f.addressee_id
+                    ELSE f.requester_id
+                 END)
+              OR (b.blocked_id = $1 AND b.blocker_id = CASE
+                    WHEN f.requester_id = $1 THEN f.addressee_id
+                    ELSE f.requester_id
+                 END)
+        )
+      ORDER BY f.updated_at DESC, f.created_at DESC`,
+    [profileId],
+  );
+}
+
+export async function findFriendshipBetweenProfiles(
+  config: AppConfig,
+  profileAId: string,
+  profileBId: string,
+): Promise<FriendshipRow | null> {
+  return queryOne<FriendshipRow>(
+    config,
+    `SELECT *
+       FROM friendships
+      WHERE (requester_id = $1 AND addressee_id = $2)
+         OR (requester_id = $2 AND addressee_id = $1)
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [profileAId, profileBId],
+  );
+}
+
+export async function hasBlockBetweenProfiles(
+  config: AppConfig,
+  profileAId: string,
+  profileBId: string,
+): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    config,
+    `SELECT id
+       FROM blocks
+      WHERE (blocker_id = $1 AND blocked_id = $2)
+         OR (blocker_id = $2 AND blocked_id = $1)
+      LIMIT 1`,
+    [profileAId, profileBId],
+  );
+  return Boolean(row);
+}
+
+export async function createBlock(
+  config: AppConfig,
+  input: {
+    blockerProfileId: string;
+    blockedProfileId: string;
+    reason: string | null;
+  },
+): Promise<BlockRow> {
+  return withTransaction(config, async (client) => {
+    const inserted = await client.query<BlockRow>(
+      `INSERT INTO blocks(blocker_id, blocked_id, reason)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [input.blockerProfileId, input.blockedProfileId, input.reason],
+    );
+
+    await client.query(
+      `DELETE FROM friendships
+        WHERE (requester_id = $1 AND addressee_id = $2)
+           OR (requester_id = $2 AND addressee_id = $1)`,
+      [input.blockerProfileId, input.blockedProfileId],
+    );
+
+    return inserted.rows[0];
+  });
+}
+
+export async function deleteBlock(
+  config: AppConfig,
+  blockerProfileId: string,
+  blockedProfileId: string,
+): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    config,
+    `DELETE FROM blocks
+      WHERE blocker_id = $1
+        AND blocked_id = $2
+      RETURNING id`,
+    [blockerProfileId, blockedProfileId],
+  );
+  return Boolean(row);
+}
+
+export async function listBlocksForProfile(
+  config: AppConfig,
+  blockerProfileId: string,
+): Promise<BlockRow[]> {
+  return queryRows<BlockRow>(
+    config,
+    'SELECT * FROM blocks WHERE blocker_id = $1 ORDER BY created_at DESC',
+    [blockerProfileId],
+  );
+}
+
+export async function createFriendRequest(
+  config: AppConfig,
+  requesterProfileId: string,
+  addresseeProfileId: string,
+): Promise<FriendshipRow> {
+  const row = await queryOne<FriendshipRow>(
+    config,
+    `INSERT INTO friendships(requester_id, addressee_id, status)
+     VALUES ($1, $2, 'pending')
+     RETURNING *`,
+    [requesterProfileId, addresseeProfileId],
+  );
+
+  if (!row) {
+    throw new AppError('create_failed', 'Failed to create friend request', 500);
+  }
+
+  return row;
+}
+
+export async function acceptFriendRequest(
+  config: AppConfig,
+  friendshipId: string,
+  addresseeProfileId: string,
+): Promise<FriendshipRow | null> {
+  return queryOne<FriendshipRow>(
+    config,
+    `UPDATE friendships
+        SET status = 'accepted',
+            responded_at = timezone('utc'::text, now()),
+            updated_at = timezone('utc'::text, now())
+      WHERE id = $1
+        AND addressee_id = $2
+        AND status = 'pending'
+      RETURNING *`,
+    [friendshipId, addresseeProfileId],
+  );
+}
+
+export async function declineFriendRequest(
+  config: AppConfig,
+  friendshipId: string,
+  addresseeProfileId: string,
+): Promise<FriendshipRow | null> {
+  return queryOne<FriendshipRow>(
+    config,
+    `UPDATE friendships
+        SET status = 'declined',
+            responded_at = timezone('utc'::text, now()),
+            updated_at = timezone('utc'::text, now())
+      WHERE id = $1
+        AND addressee_id = $2
+        AND status = 'pending'
+      RETURNING *`,
+    [friendshipId, addresseeProfileId],
+  );
+}
+
+export async function removeFriendship(
+  config: AppConfig,
+  viewerProfileId: string,
+  friendProfileId: string,
+): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    config,
+    `DELETE FROM friendships
+      WHERE status = 'accepted'
+        AND (
+          (requester_id = $1 AND addressee_id = $2)
+          OR (requester_id = $2 AND addressee_id = $1)
+        )
+      RETURNING id`,
+    [viewerProfileId, friendProfileId],
+  );
+  return Boolean(row);
+}
+
+export async function dismissFriendSuggestion(
+  config: AppConfig,
+  profileId: string,
+  suggestionId: string,
+): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    config,
+    `UPDATE friend_suggestions
+        SET status = 'dismissed'
+      WHERE id = $1
+        AND profile_id = $2
+        AND status = 'active'
+      RETURNING id`,
+    [suggestionId, profileId],
+  );
+  return Boolean(row);
+}
+
+export async function markFriendSuggestionRequested(
+  config: AppConfig,
+  profileId: string,
+  suggestedProfileId: string,
+): Promise<void> {
+  await queryOne<{ id: string }>(
+    config,
+    `UPDATE friend_suggestions
+        SET status = 'requested'
+      WHERE profile_id = $1
+        AND suggested_profile_id = $2
+        AND status = 'active'
+      RETURNING id`,
+    [profileId, suggestedProfileId],
+  );
+}
+
+export async function listFriendSuggestions(
+  config: AppConfig,
+  profileId: string,
+  limit = 5,
+): Promise<FriendSuggestionAggregateRow[]> {
+  return queryRows<FriendSuggestionAggregateRow>(
+    config,
+    `SELECT fs.id,
+            fs.suggested_profile_id,
+            fs.source,
+            fs.reason_code,
+            fs.score,
+            fs.created_at,
+            fs.expires_at,
+            p.username,
+            p.name,
+            p.display_name,
+            p.avatar_url,
+            COALESCE(mutuals.mutual_count, 0)::integer AS mutual_count
+       FROM friend_suggestions fs
+       JOIN profiles p ON p.id = fs.suggested_profile_id
+       LEFT JOIN LATERAL (
+         WITH viewer_friends AS (
+           SELECT CASE
+                    WHEN f.requester_id = $1 THEN f.addressee_id
+                    ELSE f.requester_id
+                  END AS friend_id
+             FROM friendships f
+            WHERE f.status = 'accepted'
+              AND (f.requester_id = $1 OR f.addressee_id = $1)
+         ),
+         suggested_friends AS (
+           SELECT CASE
+                    WHEN f.requester_id = fs.suggested_profile_id THEN f.addressee_id
+                    ELSE f.requester_id
+                  END AS friend_id
+             FROM friendships f
+            WHERE f.status = 'accepted'
+              AND (
+                f.requester_id = fs.suggested_profile_id
+                OR f.addressee_id = fs.suggested_profile_id
+              )
+         )
+         SELECT COUNT(*)::integer AS mutual_count
+           FROM viewer_friends vf
+           JOIN suggested_friends sf ON sf.friend_id = vf.friend_id
+       ) mutuals ON true
+      WHERE fs.profile_id = $1
+        AND fs.status = 'active'
+        AND fs.expires_at > timezone('utc'::text, now())
+        AND fs.suggested_profile_id <> $1
+        AND NOT EXISTS (
+          SELECT 1
+            FROM friendships f
+           WHERE f.status IN ('pending', 'accepted')
+             AND (
+               (f.requester_id = $1 AND f.addressee_id = fs.suggested_profile_id)
+               OR (f.requester_id = fs.suggested_profile_id AND f.addressee_id = $1)
+             )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+            FROM blocks b
+           WHERE (b.blocker_id = $1 AND b.blocked_id = fs.suggested_profile_id)
+              OR (b.blocker_id = fs.suggested_profile_id AND b.blocked_id = $1)
+        )
+      ORDER BY fs.score DESC, fs.created_at DESC
+      LIMIT $2`,
+    [profileId, limit],
   );
 }
 
@@ -763,6 +1154,22 @@ export async function createFeedSubmissionImageMedia(
   });
 }
 
+export async function getFeedSubmissionByIdForOwner(
+  config: AppConfig,
+  feedSubmissionId: string,
+  ownerProfileId: string,
+): Promise<Pick<FeedSubmissionRow, 'id'> | null> {
+  return queryOne<Pick<FeedSubmissionRow, 'id'>>(
+    config,
+    `SELECT id
+       FROM feed_submissions
+      WHERE id = $1
+        AND author_profile_id = $2
+      LIMIT 1`,
+    [feedSubmissionId, ownerProfileId],
+  );
+}
+
 export async function listFeedSubmissions(
   config: AppConfig,
   viewerProfileId: string,
@@ -800,6 +1207,8 @@ export async function listFeedSubmissions(
             COALESCE(vote_counts.not_the_one_count, 0)::integer AS not_the_one_count,
             viewer_vote.vote_type AS viewer_vote_type,
             COALESCE(viewer_vote.vote_count, 0)::integer AS viewer_vote_count,
+            COALESCE(viewer_vote.best_fit_count, 0)::integer AS viewer_best_fit_count,
+            COALESCE(viewer_vote.not_the_one_count, 0)::integer AS viewer_not_the_one_count,
             COALESCE(feed_comments.comments, '[]'::jsonb) AS feed_comments
        FROM feed_submissions fs
        JOIN profiles p ON p.id = fs.author_profile_id
@@ -819,7 +1228,9 @@ export async function listFeedSubmissions(
                    ORDER BY latest_vote.created_at DESC
                    LIMIT 1
                 ) AS vote_type,
-                COUNT(*)::integer AS vote_count
+                COUNT(*)::integer AS vote_count,
+                COUNT(*) FILTER (WHERE viewer_votes.vote_type = 'best_fit')::integer AS best_fit_count,
+                COUNT(*) FILTER (WHERE viewer_votes.vote_type = 'not_the_one')::integer AS not_the_one_count
            FROM feed_submission_votes viewer_votes
           WHERE viewer_votes.feed_submission_id = fs.id
             AND viewer_votes.voter_profile_id = $1
@@ -828,6 +1239,7 @@ export async function listFeedSubmissions(
          SELECT jsonb_agg(
                   jsonb_build_object(
                     'commentId', commented.id,
+                    'parentCommentId', commented.parent_comment_id,
                     'voterProfile', jsonb_build_object(
                       'profileId', commenter.id,
                       'username', COALESCE(commenter.username, ''),
@@ -835,22 +1247,57 @@ export async function listFeedSubmissions(
                       'avatarUrl', commenter.avatar_url
                     ),
                     'voteType', commented.vote_type,
-                    'voterVoteCount', commenter_votes.vote_count,
+                    'voterVoteCount', commenter_vote_counts.vote_count,
                     'comment', commented.comment,
                     'createdAt', commented.created_at
                   )
                   ORDER BY commented.created_at DESC
                 ) AS comments
-           FROM feed_submission_votes commented
-           JOIN profiles commenter ON commenter.id = commented.voter_profile_id
+           FROM (
+             SELECT new_comment.id,
+                    new_comment.parent_comment_id,
+                    new_comment.commenter_profile_id,
+                    new_comment.vote_type,
+                    new_comment.voter_vote_count,
+                    new_comment.comment,
+                    new_comment.created_at
+               FROM feed_submission_comments new_comment
+              WHERE new_comment.feed_submission_id = fs.id
+             UNION ALL
+             SELECT legacy_comment.id,
+                    NULL::uuid AS parent_comment_id,
+                    legacy_comment.voter_profile_id AS commenter_profile_id,
+                    legacy_comment.vote_type,
+                    legacy_comment_votes.vote_count,
+                    legacy_comment.comment,
+                    legacy_comment.created_at
+               FROM feed_submission_votes legacy_comment
+               JOIN LATERAL (
+                 SELECT COUNT(*)::integer AS vote_count
+                   FROM feed_submission_votes voter_votes
+                  WHERE voter_votes.feed_submission_id = fs.id
+                    AND voter_votes.voter_profile_id = legacy_comment.voter_profile_id
+                    AND voter_votes.vote_type = legacy_comment.vote_type
+               ) legacy_comment_votes ON true
+              WHERE legacy_comment.feed_submission_id = fs.id
+                AND legacy_comment.comment IS NOT NULL
+                AND NOT EXISTS (
+                  SELECT 1
+                    FROM feed_submission_comments migrated_comment
+                   WHERE migrated_comment.id = legacy_comment.id
+                )
+           ) commented
+           JOIN profiles commenter ON commenter.id = commented.commenter_profile_id
            JOIN LATERAL (
              SELECT COUNT(*)::integer AS vote_count
-               FROM feed_submission_votes voter_votes
-              WHERE voter_votes.feed_submission_id = fs.id
-                AND voter_votes.voter_profile_id = commented.voter_profile_id
-           ) commenter_votes ON true
-          WHERE commented.feed_submission_id = fs.id
-            AND commented.comment IS NOT NULL
+               FROM feed_submission_votes commenter_vote
+              WHERE commenter_vote.feed_submission_id = fs.id
+                AND commenter_vote.voter_profile_id = commented.commenter_profile_id
+                AND (
+                  commented.vote_type IS NULL
+                  OR commenter_vote.vote_type = commented.vote_type
+                )
+           ) commenter_vote_counts ON true
        ) feed_comments ON true
       WHERE fs.is_active = true
         AND fs.author_profile_id = ANY($2::uuid[])
@@ -908,14 +1355,13 @@ export async function voteOnFeedSubmission(
          vote_type,
          comment
        )
-       SELECT $1, $2, $3, CASE WHEN vote_number = 1 THEN $4 ELSE NULL END
-         FROM generate_series(1, $5) AS vote_number
+       SELECT $1, $2, $3, NULL
+         FROM generate_series(1, $4) AS vote_number
        RETURNING *`,
       [
         input.feedSubmissionId,
         input.voterProfileId,
         input.voteType,
-        input.comment,
         input.count,
       ],
     );
@@ -929,6 +1375,107 @@ export async function voteOnFeedSubmission(
   });
 }
 
+export async function createFeedSubmissionComment(
+  config: AppConfig,
+  input: {
+    feedSubmissionId: string;
+    commenterProfileId: string;
+    comment: string;
+    parentCommentId: string | null;
+  },
+): Promise<FeedSubmissionCommentRow> {
+  return withTransaction(config, async (client) => {
+    const submission = await client.query<Pick<FeedSubmissionRow, 'id'>>(
+      `SELECT id
+         FROM feed_submissions
+        WHERE id = $1
+          AND is_active = true
+          AND expires_at > now()
+        LIMIT 1`,
+      [input.feedSubmissionId],
+    );
+
+    if (!submission.rows[0]) {
+      throw new AppError('not_found', 'Feed submission not found or commenting has ended', 404);
+    }
+
+    if (input.parentCommentId) {
+      const parent = await client.query<Pick<FeedSubmissionCommentRow, 'id'>>(
+        `SELECT id
+           FROM feed_submission_comments
+          WHERE id = $1
+            AND feed_submission_id = $2
+          LIMIT 1`,
+        [input.parentCommentId, input.feedSubmissionId],
+      );
+
+      if (!parent.rows[0]) {
+        throw new AppError('not_found', 'Parent comment not found', 404);
+      }
+    }
+
+    const voteSnapshot = await client.query<{
+      vote_type: 'best_fit' | 'not_the_one' | null;
+      vote_count: number;
+    }>(
+      `WITH latest_vote AS (
+         SELECT vote_type
+           FROM feed_submission_votes
+          WHERE feed_submission_id = $1
+            AND voter_profile_id = $2
+          ORDER BY created_at DESC
+          LIMIT 1
+       )
+       SELECT latest_vote.vote_type,
+              CASE
+                WHEN latest_vote.vote_type IS NULL THEN 0
+                ELSE (
+                  SELECT COUNT(*)::integer
+                    FROM feed_submission_votes counted
+                   WHERE counted.feed_submission_id = $1
+                     AND counted.voter_profile_id = $2
+                     AND counted.vote_type = latest_vote.vote_type
+                )
+              END AS vote_count
+         FROM latest_vote
+       UNION ALL
+       SELECT NULL::text AS vote_type, 0::integer AS vote_count
+        WHERE NOT EXISTS (SELECT 1 FROM latest_vote)
+       LIMIT 1`,
+      [input.feedSubmissionId, input.commenterProfileId],
+    );
+    const snapshot = voteSnapshot.rows[0];
+
+    const comment = await client.query<FeedSubmissionCommentRow>(
+      `INSERT INTO feed_submission_comments(
+         feed_submission_id,
+         commenter_profile_id,
+         parent_comment_id,
+         vote_type,
+         voter_vote_count,
+         comment
+       )
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        input.feedSubmissionId,
+        input.commenterProfileId,
+        input.parentCommentId,
+        snapshot?.vote_type ?? null,
+        Number(snapshot?.vote_count ?? 0),
+        input.comment,
+      ],
+    );
+
+    const row = comment.rows[0];
+    if (!row) {
+      throw new AppError('create_failed', 'Failed to create feed submission comment', 500);
+    }
+
+    return row;
+  });
+}
+
 export async function listOwnerVotingSessions(
   config: AppConfig,
   ownerProfileId: string,
@@ -938,6 +1485,43 @@ export async function listOwnerVotingSessions(
     'SELECT * FROM voting_sessions WHERE owner_id = $1 ORDER BY created_at DESC',
     [ownerProfileId],
   );
+}
+
+export async function createShareInvite(
+  config: AppConfig,
+  input: {
+    inviterProfileId: string;
+    targetType: ShareInviteRow['target_type'];
+    targetId: string | null;
+    channel: ShareInviteRow['channel'];
+    recipientContactHmac?: string | null;
+  },
+): Promise<ShareInviteRow> {
+  const row = await queryOne<ShareInviteRow>(
+    config,
+    `INSERT INTO share_invites(
+       inviter_profile_id,
+       target_type,
+       target_id,
+       channel,
+       recipient_contact_hmac
+     )
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      input.inviterProfileId,
+      input.targetType,
+      input.targetId,
+      input.channel,
+      input.recipientContactHmac ?? null,
+    ],
+  );
+
+  if (!row) {
+    throw new AppError('create_failed', 'Failed to create share invite', 500);
+  }
+
+  return row;
 }
 
 export async function createVotingSession(

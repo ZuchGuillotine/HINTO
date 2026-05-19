@@ -26,11 +26,22 @@ import {
   handleReorderSituationships,
 } from './routes/situationships.js';
 import {
+  handleCreateFeedSubmissionComment,
   handleCreateFeedSubmission,
   handleGetFriendsFeed,
   handleUploadFeedSubmissionImage,
   handleVoteOnFeedSubmission,
 } from './routes/feed.js';
+import {
+  handleAcceptFriendRequest,
+  handleCreateFriendRequest,
+  handleDeclineFriendRequest,
+  handleDeleteFriend,
+  handleDismissFriendSuggestion,
+  handleListFriendRequests,
+  handleListFriends,
+  handleListFriendSuggestions,
+} from './routes/friends.js';
 import {
   handleListOwnerVotingSessions,
   handleCreateVotingSession,
@@ -45,6 +56,7 @@ import {
   handleDeleteBlock,
   handleListBlocks,
 } from './routes/moderation.js';
+import { handleCreateShareInvite } from './routes/share.js';
 import {
   handleLocalMedia,
   handleUploadProfileAvatar,
@@ -82,6 +94,11 @@ function matchFeedSubmissionVotes(path: string): string | null {
   return match ? match[1] : null;
 }
 
+function matchFeedSubmissionComments(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/comments$/);
+  return match ? match[1] : null;
+}
+
 function matchOwnerVotingAction(path: string): { votingSessionId: string; action: 'expire' | 'results' } | null {
   const match = path.match(/^\/v1\/me\/voting-sessions\/([a-f0-9-]+)\/(expire|results)$/);
   if (!match) {
@@ -97,6 +114,37 @@ function matchOwnerVotingAction(path: string): { votingSessionId: string; action
 function matchBlockProfileId(path: string): string | null {
   const match = path.match(/^\/v1\/me\/blocks\/([0-9a-f-]+)$/);
   return match ? match[1] : null;
+}
+
+function matchFriendProfileId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/friends\/([0-9a-f-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchFriendRequestAction(
+  path: string,
+): { friendshipId: string; action: 'accept' | 'decline' } | null {
+  const match = path.match(/^\/v1\/me\/friend-requests\/([0-9a-f-]+)\/(accept|decline)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    friendshipId: match[1],
+    action: match[2] as 'accept' | 'decline',
+  };
+}
+
+function matchFriendSuggestionAction(
+  path: string,
+): { suggestionId: string; action: 'dismiss' } | null {
+  const match = path.match(/^\/v1\/me\/friend-suggestions\/([0-9a-f-]+)\/(dismiss)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    suggestionId: match[1],
+    action: 'dismiss',
+  };
 }
 
 function matchConversationId(path: string): string | null {
@@ -186,6 +234,16 @@ async function routeAsync(
         'POST /v1/me/feed/submissions',
         'POST /v1/me/feed/submissions/:id/image',
         'POST /v1/me/feed/submissions/:id/votes',
+        'POST /v1/me/feed/submissions/:id/comments',
+        'POST /v1/me/share-invites',
+        'GET  /v1/me/friends',
+        'DELETE /v1/me/friends/:profileId',
+        'GET  /v1/me/friend-requests',
+        'POST /v1/me/friend-requests',
+        'POST /v1/me/friend-requests/:id/accept',
+        'POST /v1/me/friend-requests/:id/decline',
+        'GET  /v1/me/friend-suggestions',
+        'POST /v1/me/friend-suggestions/:id/dismiss',
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
@@ -296,6 +354,72 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'POST' && path === '/v1/me/share-invites') {
+    await handleCreateShareInvite(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friends') {
+    await handleListFriends(request, response, context, config);
+    return true;
+  }
+
+  const friendProfileId = matchFriendProfileId(path);
+  if (method === 'DELETE' && friendProfileId) {
+    await handleDeleteFriend(request, response, context, config, friendProfileId);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friend-requests') {
+    await handleListFriendRequests(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/friend-requests') {
+    await handleCreateFriendRequest(request, response, context, config);
+    return true;
+  }
+
+  const friendRequestAction = matchFriendRequestAction(path);
+  if (method === 'POST' && friendRequestAction?.action === 'accept') {
+    await handleAcceptFriendRequest(
+      request,
+      response,
+      context,
+      config,
+      friendRequestAction.friendshipId,
+    );
+    return true;
+  }
+
+  if (method === 'POST' && friendRequestAction?.action === 'decline') {
+    await handleDeclineFriendRequest(
+      request,
+      response,
+      context,
+      config,
+      friendRequestAction.friendshipId,
+    );
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friend-suggestions') {
+    await handleListFriendSuggestions(request, response, context, config);
+    return true;
+  }
+
+  const friendSuggestionAction = matchFriendSuggestionAction(path);
+  if (method === 'POST' && friendSuggestionAction?.action === 'dismiss') {
+    await handleDismissFriendSuggestion(
+      request,
+      response,
+      context,
+      config,
+      friendSuggestionAction.suggestionId,
+    );
+    return true;
+  }
+
   if (method === 'POST' && path === '/v1/me/feed/submissions') {
     await handleCreateFeedSubmission(request, response, context, config);
     return true;
@@ -321,6 +445,18 @@ async function routeAsync(
       context,
       config,
       feedSubmissionVotesId,
+    );
+    return true;
+  }
+
+  const feedSubmissionCommentsId = matchFeedSubmissionComments(path);
+  if (method === 'POST' && feedSubmissionCommentsId) {
+    await handleCreateFeedSubmissionComment(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionCommentsId,
     );
     return true;
   }

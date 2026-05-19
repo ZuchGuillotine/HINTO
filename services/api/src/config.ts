@@ -137,6 +137,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       (nodeEnv === 'production' ? 'https://hnnt.app,https://app.hnnt.app' : '*'),
     logLevel: parseLogLevel(env.API_LOG_LEVEL),
     nodeEnv,
+    webAppUrl:
+      env.WEB_APP_URL ??
+      env.PUBLIC_WEB_APP_URL ??
+      (nodeEnv === 'production' ? 'https://hnnt.app' : 'http://localhost:3000'),
+    iosAppStoreUrl: env.IOS_APP_STORE_URL,
     databaseUrl: env.DATABASE_URL,
     supabaseUrl:
       env.SUPABASE_URL ?? env.PUBLIC_SUPABASE_URL ?? env.EXPO_PUBLIC_SUPABASE_URL,

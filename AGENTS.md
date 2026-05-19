@@ -38,6 +38,7 @@ Treat the current repo as a salvage-and-transition codebase. Preserve reusable p
 
 ## Conventions
 - Read the restart docs before making architecture-level decisions.
+- Before user-facing UI or visual design changes, read root `DESIGN.md` and follow its brand, audience, token, copy, and component guidance.
 - Prefer small, reviewable changes over broad rewrites.
 - Preserve useful domain language from the current schema and screens even when replacing platform scaffolding.
 - When touching frontend code, follow existing local patterns inside `apps/hnnt-app/src/` unless the task is explicitly part of the restart migration.

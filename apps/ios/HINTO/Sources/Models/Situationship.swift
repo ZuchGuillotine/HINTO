@@ -92,6 +92,7 @@ struct FeedItem: Codable, Identifiable, Equatable, Hashable {
     let voteSummary: FeedVoteSummary?
     let viewerVote: FeedVoteType?
     let viewerVoteCount: Int?
+    let viewerVoteSummary: FeedVoteSummary?
     let comments: [FeedSubmissionComment]?
 
     var id: String { feedItemId }
@@ -140,8 +141,9 @@ struct FeedOwnerProfile: Codable, Equatable, Hashable {
 
 struct FeedSubmissionComment: Codable, Identifiable, Equatable, Hashable {
     let commentId: String
+    let parentCommentId: String?
     let voterProfile: FeedOwnerProfile
-    let voteType: FeedVoteType
+    let voteType: FeedVoteType?
     let voterVoteCount: Int
     let comment: String
     let createdAt: String
@@ -188,4 +190,9 @@ struct VoteOnFeedSubmissionRequest: Codable {
     let voteType: FeedVoteType
     let comment: String?
     let count: Int
+}
+
+struct CreateFeedSubmissionCommentRequest: Codable {
+    let comment: String
+    let parentCommentId: String?
 }

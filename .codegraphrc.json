@@ -1,0 +1,14 @@
+{
+  "ignoreDirs": [
+    "web-build",
+    "legacy"
+  ],
+  "query": {
+    "defaultDepth": 3,
+    "defaultLimit": 20,
+    "excludeTests": false
+  },
+  "embeddings": {
+    "model": "minilm"
+  }
+}

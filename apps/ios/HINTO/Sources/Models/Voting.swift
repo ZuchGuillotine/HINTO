@@ -98,6 +98,46 @@ struct CreateVotingSessionData: Decodable {
     let session: VotingSession
     let itemsCount: Int
     let publicPath: String
+    let share: SharePayload
+}
+
+struct SharePayload: Decodable {
+    let targetType: String
+    let shareUrl: String
+    let appStoreUrl: String?
+    let copyOptions: [ShareCopyOption]
+}
+
+struct ShareCopyOption: Decodable, Identifiable {
+    let copyId: String
+    let text: String
+    let fullText: String
+
+    var id: String { copyId }
+}
+
+struct CreateShareInviteRequest: Encodable {
+    let targetType: String
+    let targetId: String?
+    let channel: String
+    let recipientContactHmac: String?
+}
+
+struct CreateShareInviteData: Decodable {
+    let invite: ShareInvite
+    let share: SharePayload
+}
+
+struct ShareInvite: Decodable, Identifiable {
+    let inviteId: String
+    let inviteToken: String
+    let targetType: String
+    let targetId: String?
+    let channel: String
+    let expiresAt: String
+    let createdAt: String
+
+    var id: String { inviteId }
 }
 
 struct VotingSessionMutationData: Decodable {

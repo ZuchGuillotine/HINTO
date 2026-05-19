@@ -12,6 +12,7 @@ export function createTestConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     corsAllowOrigin: '*',
     logLevel: 'error',
     nodeEnv: 'test',
+    webAppUrl: 'https://hnnt.test',
     databaseUrl: 'postgres://test:test@localhost:5432/hinto_test',
     supabaseUrl: 'https://test.supabase.co',
     supabaseAnonKey: 'test-anon-key',

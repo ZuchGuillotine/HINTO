@@ -7,8 +7,10 @@ import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { shouldUsePostgres } from '../db.js';
 import { readJsonBody } from '../body.js';
 import {
+  createFeedSubmissionComment,
   createFeedSubmission,
   createFeedSubmissionImageMedia,
+  getProfileById,
   listFeedSubmissions,
   voteOnFeedSubmission,
 } from '../repositories/postgres-core.js';
@@ -114,6 +116,29 @@ function parseVoteBody(body: Record<string, unknown>): {
   };
 }
 
+function parseCreateFeedCommentBody(body: Record<string, unknown>): {
+  comment: string;
+  parentCommentId: string | null;
+} {
+  const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+  if (!comment) {
+    throw new AppError('validation_error', 'comment is required', 400);
+  }
+  if (comment.length > 140) {
+    throw new AppError('validation_error', 'comment must be 140 characters or fewer', 400);
+  }
+
+  const parentCommentId =
+    typeof body.parentCommentId === 'string' && body.parentCommentId.trim().length > 0
+      ? body.parentCommentId.trim()
+      : null;
+
+  return {
+    comment,
+    parentCommentId,
+  };
+}
+
 function feedCommentsForDto(
   comments: Awaited<ReturnType<typeof listFeedSubmissions>>[number]['feed_comments'],
 ) {
@@ -171,6 +196,11 @@ export function toFeedSubmissionDto(
     },
     viewerVote: row.viewer_vote_type,
     viewerVoteCount: row.viewer_vote_count,
+    viewerVoteSummary: {
+      bestFitCount: row.viewer_best_fit_count,
+      notTheOneCount: row.viewer_not_the_one_count,
+      totalCount: row.viewer_vote_count,
+    },
     comments: feedCommentsForDto(row.feed_comments),
   };
 }
@@ -413,6 +443,46 @@ export async function handleVoteOnFeedSubmission(
       votesCast: vote.votes_cast,
       comment: vote.comment,
       createdAt: vote.created_at,
+    },
+  });
+}
+
+export async function handleCreateFeedSubmissionComment(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+  feedSubmissionId: string,
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+  if (!shouldUsePostgres(config)) {
+    throw new AppError('not_configured', 'Feed submission comments require DATABASE_URL', 501);
+  }
+
+  const body = await readJsonBody(request);
+  const input = parseCreateFeedCommentBody(body);
+  const comment = await createFeedSubmissionComment(config, {
+    feedSubmissionId,
+    commenterProfileId: authCtx.user.profileId,
+    comment: input.comment,
+    parentCommentId: input.parentCommentId,
+  });
+  const profile = await getProfileById(config, authCtx.user.profileId);
+
+  sendJsonSuccess(response, 201, context.requestId, {
+    comment: {
+      commentId: comment.id,
+      parentCommentId: comment.parent_comment_id,
+      voterProfile: {
+        profileId: authCtx.user.profileId,
+        username: profile?.username ?? '',
+        displayName: profile?.name ?? profile?.username ?? 'HINTO friend',
+        avatarUrl: profile?.avatar_url ?? null,
+      },
+      voteType: comment.vote_type,
+      voterVoteCount: comment.voter_vote_count,
+      comment: comment.comment,
+      createdAt: comment.created_at,
     },
   });
 }

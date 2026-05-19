@@ -7,6 +7,8 @@ export interface AppConfig {
   corsAllowOrigin: string;
   logLevel: LogLevel;
   nodeEnv: string;
+  webAppUrl: string;
+  iosAppStoreUrl?: string;
   databaseUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;

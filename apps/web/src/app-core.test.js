@@ -124,7 +124,8 @@ function createPublicVotingSession() {
 
 function createApi(overrides = {}) {
   return {
-    createDevelopmentSession: jest.fn(),
+    signUpWithEmailPassword: jest.fn(),
+    signInWithEmailPassword: jest.fn(),
     getMe: jest.fn(),
     getFriendsFeed: jest.fn().mockResolvedValue({ data: { items: [] } }),
     updateMe: jest.fn(),
@@ -158,10 +159,10 @@ describe('web app core', () => {
     expect(storage.getItem(VOTER_IDENTITY_KEY)).toBe('voter-123');
   });
 
-  test('handleDevelopmentSignIn stores the token and loads the shared owner slice', async () => {
+  test('handlePasswordAuth signs up with email and loads the shared owner slice', async () => {
     const me = createMe();
     const apiClient = createApi({
-      createDevelopmentSession: jest.fn().mockResolvedValue({
+      signUpWithEmailPassword: jest.fn().mockResolvedValue({
         data: {
           accessToken: 'token-abc',
           me,
@@ -183,16 +184,74 @@ describe('web app core', () => {
       FormDataCtor: FakeFormData,
     });
 
-    await app.handleDevelopmentSignIn();
+    await app.handlePasswordAuth(
+      {
+        email: ' DEV@HINTO.APP ',
+        password: 'password123',
+        username: 'local_dev',
+        displayName: 'Local Dev',
+      },
+      'signup',
+    );
 
     expect(storage.getItem(SESSION_KEY)).toBe('token-abc');
+    expect(apiClient.signUpWithEmailPassword).toHaveBeenCalledWith({
+      email: 'dev@hinto.app',
+      password: 'password123',
+      username: 'local_dev',
+      displayName: 'Local Dev',
+    });
     expect(apiClient.getMe).toHaveBeenCalledWith('token-abc');
     expect(apiClient.getSituationships).toHaveBeenCalledWith('token-abc');
     expect(app.state.me).toEqual(me);
     expect(app.state.situationships).toHaveLength(2);
     expect(app.state.notice).toEqual({
       type: 'success',
-      message: 'Development session created against the shared backend.',
+      message: 'Account created.',
+    });
+  });
+
+  test('handlePasswordAuth signs in with email/password', async () => {
+    const me = createMe();
+    const apiClient = createApi({
+      signInWithEmailPassword: jest.fn().mockResolvedValue({
+        data: {
+          accessToken: 'token-signin',
+          me,
+        },
+      }),
+      getMe: jest.fn().mockResolvedValue({ data: me }),
+      getSituationships: jest.fn().mockResolvedValue({
+        data: {
+          items: [],
+        },
+      }),
+    });
+    const storage = createMemoryStorage();
+    const app = createApp({
+      apiClient,
+      root: createRoot(),
+      storage,
+      cryptoImpl: { randomUUID: () => 'voter-signin' },
+      FormDataCtor: FakeFormData,
+    });
+
+    await app.handlePasswordAuth(
+      {
+        email: 'LOCAL@HINTO.APP',
+        password: 'password123',
+      },
+      'signin',
+    );
+
+    expect(storage.getItem(SESSION_KEY)).toBe('token-signin');
+    expect(apiClient.signInWithEmailPassword).toHaveBeenCalledWith({
+      email: 'local@hinto.app',
+      password: 'password123',
+    });
+    expect(app.state.notice).toEqual({
+      type: 'success',
+      message: 'Signed in.',
     });
   });
 

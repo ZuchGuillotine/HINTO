@@ -32,8 +32,11 @@ async function request(path, { method = 'GET', token, body } = {}) {
 }
 
 export const api = {
-  createDevelopmentSession(input) {
-    return request('/v1/dev/session', { method: 'POST', body: input });
+  signUpWithEmailPassword(input) {
+    return request('/v1/auth/email/password/sign-up', { method: 'POST', body: input });
+  },
+  signInWithEmailPassword(input) {
+    return request('/v1/auth/email/password/sign-in', { method: 'POST', body: input });
   },
   getMe(token) {
     return request('/v1/me', { token });
@@ -46,6 +49,30 @@ export const api = {
   },
   getFriendsFeed(token) {
     return request('/v1/me/feed', { token });
+  },
+  getFriends(token) {
+    return request('/v1/me/friends', { token });
+  },
+  createFriendRequest(token, input) {
+    return request('/v1/me/friend-requests', { method: 'POST', token, body: input });
+  },
+  acceptFriendRequest(token, friendshipId) {
+    return request(`/v1/me/friend-requests/${friendshipId}/accept`, { method: 'POST', token });
+  },
+  declineFriendRequest(token, friendshipId) {
+    return request(`/v1/me/friend-requests/${friendshipId}/decline`, { method: 'POST', token });
+  },
+  removeFriend(token, profileId) {
+    return request(`/v1/me/friends/${profileId}`, { method: 'DELETE', token });
+  },
+  getFriendSuggestions(token) {
+    return request('/v1/me/friend-suggestions', { token });
+  },
+  dismissFriendSuggestion(token, suggestionId) {
+    return request(`/v1/me/friend-suggestions/${suggestionId}/dismiss`, {
+      method: 'POST',
+      token,
+    });
   },
   createSituationship(token, input) {
     return request('/v1/me/situationships', { method: 'POST', token, body: input });
@@ -68,6 +95,9 @@ export const api = {
   },
   createVotingSession(token, input) {
     return request('/v1/me/voting-sessions', { method: 'POST', token, body: input });
+  },
+  createShareInvite(token, input) {
+    return request('/v1/me/share-invites', { method: 'POST', token, body: input });
   },
   getVotingResults(token, votingSessionId) {
     return request(`/v1/me/voting-sessions/${votingSessionId}/results`, { token });

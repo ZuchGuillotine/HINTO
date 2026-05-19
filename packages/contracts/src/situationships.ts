@@ -70,8 +70,9 @@ export interface FeedVoteSummaryDto {
 
 export interface FeedSubmissionCommentDto {
   commentId: string;
+  parentCommentId?: string | null;
   voterProfile: FeedOwnerProfileDto;
-  voteType: 'best_fit' | 'not_the_one';
+  voteType?: 'best_fit' | 'not_the_one' | null;
   voterVoteCount: number;
   comment: string;
   createdAt: string;
@@ -87,6 +88,7 @@ export interface FeedItemDto {
   voteSummary?: FeedVoteSummaryDto | null;
   viewerVote?: 'best_fit' | 'not_the_one' | null;
   viewerVoteCount?: number;
+  viewerVoteSummary?: FeedVoteSummaryDto;
   comments?: FeedSubmissionCommentDto[];
 }
 
@@ -111,6 +113,11 @@ export interface VoteOnFeedSubmissionRequestDto {
   count?: number;
 }
 
+export interface CreateFeedSubmissionCommentRequestDto {
+  comment: string;
+  parentCommentId?: string | null;
+}
+
 export interface VoteOnFeedSubmissionResponseDto {
   data: {
     vote: {
@@ -123,6 +130,12 @@ export interface VoteOnFeedSubmissionResponseDto {
       comment: string | null;
       createdAt: string;
     };
+  };
+}
+
+export interface CreateFeedSubmissionCommentResponseDto {
+  data: {
+    comment: FeedSubmissionCommentDto;
   };
 }
 

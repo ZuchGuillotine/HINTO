@@ -149,4 +149,24 @@ describe('RDS production migration files', () => {
       expect(content).toContain(table);
     }
   });
+
+  test('007_friends_invites_discovery.sql creates friend discovery and share invite tables', () => {
+    const migration = migrationFiles.find((f) => f === '007_friends_invites_discovery.sql');
+    expect(migration).toBeDefined();
+
+    const content = fs.readFileSync(path.join(RDS_MIGRATIONS_DIR, migration!), 'utf-8');
+    const requiredTables = [
+      'profile_discovery_settings',
+      'profile_contact_points',
+      'contact_import_batches',
+      'friend_suggestions',
+      'share_invites',
+    ];
+
+    for (const table of requiredTables) {
+      expect(content).toContain(table);
+    }
+    expect(content).toContain('idx_friendships_unique_pair_active');
+    expect(content).toContain('generate_share_invite_token');
+  });
 });

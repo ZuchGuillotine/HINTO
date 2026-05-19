@@ -31,9 +31,12 @@ const baseFeedRow: FeedSubmissionAggregateRow = {
   not_the_one_count: 7,
   viewer_vote_type: 'not_the_one',
   viewer_vote_count: 7,
+  viewer_best_fit_count: 0,
+  viewer_not_the_one_count: 7,
   feed_comments: [
     {
       commentId: '44444444-4444-4444-8444-444444444444',
+      parentCommentId: null,
       voterProfile: {
         profileId: '55555555-5555-4555-8555-555555555555',
         username: 'nora',
@@ -61,9 +64,15 @@ test('toFeedSubmissionDto includes repeated vote counts and comment vote context
   });
   expect(dto.viewerVote).toBe('not_the_one');
   expect(dto.viewerVoteCount).toBe(7);
+  expect(dto.viewerVoteSummary).toEqual({
+    bestFitCount: 0,
+    notTheOneCount: 7,
+    totalCount: 7,
+  });
   expect(dto.comments).toEqual([
     {
       commentId: '44444444-4444-4444-8444-444444444444',
+      parentCommentId: null,
       voterProfile: {
         profileId: '55555555-5555-4555-8555-555555555555',
         username: 'nora',

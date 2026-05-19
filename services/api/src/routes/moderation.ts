@@ -4,6 +4,12 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  createBlock as createPostgresBlock,
+  deleteBlock as deletePostgresBlock,
+  listBlocksForProfile,
+} from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
@@ -123,6 +129,31 @@ export async function handleCreateBlock(
   }
 
   const reason = normalizeOptionalString(body.reason, 'reason', BLOCK_REASON_MAX_LENGTH);
+  if (shouldUsePostgres(config)) {
+    try {
+      const block = await createPostgresBlock(config, {
+        blockerProfileId: authCtx.user.profileId,
+        blockedProfileId,
+        reason,
+      });
+      sendJsonSuccess(response, 201, context.requestId, {
+        block: toBlockDto(block),
+      });
+      return;
+    } catch (error) {
+      if (error instanceof Error && 'code' in error) {
+        const code = String(error.code);
+        if (code === '23505') {
+          throw new AppError('duplicate_block', 'You have already blocked this profile', 409);
+        }
+        if (code === '23503') {
+          throw new AppError('not_found', 'Blocked profile not found', 404);
+        }
+      }
+      throw error;
+    }
+  }
+
   const supabase = getServiceClient(config);
 
   const { data, error } = await supabase
@@ -164,6 +195,22 @@ export async function handleDeleteBlock(
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   assertUuid(blockedProfileId, 'blockedProfileId');
 
+  if (shouldUsePostgres(config)) {
+    const removed = await deletePostgresBlock(
+      config,
+      authCtx.user.profileId,
+      blockedProfileId,
+    );
+    if (!removed) {
+      throw new AppError('not_found', 'Block not found', 404);
+    }
+    sendJsonSuccess(response, 200, context.requestId, {
+      blockedProfileId,
+      removed: true,
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
     .from('blocks')
@@ -196,6 +243,14 @@ export async function handleListBlocks(
   config: AppConfig,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
+  if (shouldUsePostgres(config)) {
+    const blocks = await listBlocksForProfile(config, authCtx.user.profileId);
+    sendJsonSuccess(response, 200, context.requestId, {
+      blocks: blocks.map(toBlockDto),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { data, error } = await supabase

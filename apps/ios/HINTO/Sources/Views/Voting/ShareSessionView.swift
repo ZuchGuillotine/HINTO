@@ -8,6 +8,8 @@ struct ShareSessionView: View {
 
     @State private var isCreating = false
     @State private var shareURL: URL?
+    @State private var sharePayload: SharePayload?
+    @State private var shareCopyIndex = 0
     @State private var createdSession: VotingSession?
     @State private var errorMessage: String?
     @State private var showVotePreview = false
@@ -77,7 +79,28 @@ struct ShareSessionView: View {
 
                 if let shareURL {
                     VStack(spacing: Spacing.sm) {
-                        ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
+                        if let selectedCopy {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Text(selectedCopy.text)
+                                    .font(.hintoBody)
+                                    .foregroundStyle(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Button {
+                                    cycleShareCopy()
+                                } label: {
+                                    Label("Try another line", systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.hintoCaption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.hintoPink)
+                            }
+                            .padding(Spacing.md)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        }
+
+                        ShareLink(item: selectedShareText ?? shareURL.absoluteString) {
                             Label("Share Link", systemImage: "square.and.arrow.up")
                                 .font(.hintoButton)
                                 .frame(maxWidth: .infinity)
@@ -178,10 +201,26 @@ struct ShareSessionView: View {
                 )
             )
             createdSession = response.data.session
-            shareURL = URL(string: "https://hnnt.app/vote/\(response.data.session.inviteCode)")
+            sharePayload = response.data.share
+            shareCopyIndex = 0
+            shareURL = URL(string: response.data.share.shareUrl)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var selectedCopy: ShareCopyOption? {
+        guard let options = sharePayload?.copyOptions, !options.isEmpty else { return nil }
+        return options[shareCopyIndex % options.count]
+    }
+
+    private var selectedShareText: String? {
+        selectedCopy?.fullText
+    }
+
+    private func cycleShareCopy() {
+        guard let options = sharePayload?.copyOptions, !options.isEmpty else { return }
+        shareCopyIndex = (shareCopyIndex + 1) % options.count
     }
 }
 

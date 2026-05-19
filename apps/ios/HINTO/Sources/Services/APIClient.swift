@@ -231,6 +231,34 @@ final class APIClient {
         try await request(.get, path: "/v1/me/feed", token: token)
     }
 
+    func getFriends(token: String) async throws -> APIResponse<FriendsAggregate> {
+        try await request(.get, path: "/v1/me/friends", token: token)
+    }
+
+    func createFriendRequest(token: String, input: CreateFriendRequestRequest) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests", body: input, token: token)
+    }
+
+    func acceptFriendRequest(token: String, friendshipId: String) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests/\(friendshipId)/accept", token: token)
+    }
+
+    func declineFriendRequest(token: String, friendshipId: String) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests/\(friendshipId)/decline", token: token)
+    }
+
+    func removeFriend(token: String, profileId: String) async throws -> APIResponse<DeleteFriendData> {
+        try await request(.delete, path: "/v1/me/friends/\(profileId)", token: token)
+    }
+
+    func getFriendSuggestions(token: String) async throws -> APIResponse<FriendSuggestionsData> {
+        try await request(.get, path: "/v1/me/friend-suggestions", token: token)
+    }
+
+    func dismissFriendSuggestion(token: String, suggestionId: String) async throws -> APIResponse<DismissFriendSuggestionData> {
+        try await request(.post, path: "/v1/me/friend-suggestions/\(suggestionId)/dismiss", token: token)
+    }
+
     func createFeedSubmission(token: String, input: CreateFeedSubmissionRequest) async throws -> APIResponse<FeedSubmissionMutationData> {
         try await request(.post, path: "/v1/me/feed/submissions", body: input, token: token)
     }
@@ -256,6 +284,15 @@ final class APIClient {
         try await request(
             .post,
             path: "/v1/me/feed/submissions/\(submissionId)/votes",
+            body: input,
+            token: token
+        )
+    }
+
+    func commentOnFeedSubmission(token: String, submissionId: String, input: CreateFeedSubmissionCommentRequest) async throws -> APIResponse<FeedSubmissionCommentData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/comments",
             body: input,
             token: token
         )
@@ -298,6 +335,10 @@ final class APIClient {
 
     func createVotingSession(token: String, input: CreateVotingSessionRequest = CreateVotingSessionRequest()) async throws -> APIResponse<CreateVotingSessionData> {
         try await request(.post, path: "/v1/me/voting-sessions", body: input, token: token)
+    }
+
+    func createShareInvite(token: String, input: CreateShareInviteRequest) async throws -> APIResponse<CreateShareInviteData> {
+        try await request(.post, path: "/v1/me/share-invites", body: input, token: token)
     }
 
     func getVotingSessions(token: String) async throws -> APIResponse<OwnerVotingSessionsData> {
@@ -384,6 +425,10 @@ struct FeedSubmissionImageUploadData: Decodable {
 
 struct FeedSubmissionVoteData: Decodable {
     let vote: FeedSubmissionVote
+}
+
+struct FeedSubmissionCommentData: Decodable {
+    let comment: FeedSubmissionComment
 }
 
 struct FeedSubmissionVote: Decodable {

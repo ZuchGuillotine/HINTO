@@ -167,6 +167,10 @@ describe('POST /v1/me/voting-sessions', () => {
         session: { votingSessionId: string; inviteCode: string; status: string };
         itemsCount: number;
         publicPath: string;
+        share: {
+          shareUrl: string;
+          copyOptions: Array<{ copyId: string; text: string; fullText: string }>;
+        };
       };
     };
 
@@ -178,6 +182,9 @@ describe('POST /v1/me/voting-sessions', () => {
     // publicPath is built from the freshly generated invite code (random), so
     // only assert the path shape, not the exact code.
     expect(body.data.publicPath).toMatch(/^\/v1\/voting-sessions\/[A-Z0-9]+$/);
+    expect(body.data.share.shareUrl).toMatch(/^https:\/\/hnnt\.test\/vote\/[A-Z0-9]+$/);
+    expect(body.data.share.copyOptions.length).toBeGreaterThan(1);
+    expect(body.data.share.copyOptions[0].fullText).toContain(body.data.share.shareUrl);
   });
 });
 
