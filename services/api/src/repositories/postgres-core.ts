@@ -1246,8 +1246,8 @@ export async function listFeedSubmissions(
                       'displayName', COALESCE(commenter.name, commenter.username, 'HINTO friend'),
                       'avatarUrl', commenter.avatar_url
                     ),
-                    'voteType', commented.vote_type,
-                    'voterVoteCount', commenter_vote_counts.vote_count,
+                    'voteType', commenter_vote_context.vote_type,
+                    'voterVoteCount', commenter_vote_context.vote_count,
                     'comment', commented.comment,
                     'createdAt', commented.created_at
                   )
@@ -1289,15 +1289,21 @@ export async function listFeedSubmissions(
            ) commented
            JOIN profiles commenter ON commenter.id = commented.commenter_profile_id
            JOIN LATERAL (
-             SELECT COUNT(*)::integer AS vote_count
-               FROM feed_submission_votes commenter_vote
-              WHERE commenter_vote.feed_submission_id = fs.id
-                AND commenter_vote.voter_profile_id = commented.commenter_profile_id
-                AND (
-                  commented.vote_type IS NULL
-                  OR commenter_vote.vote_type = commented.vote_type
-                )
-           ) commenter_vote_counts ON true
+             WITH commenter_vote_totals AS (
+               SELECT COUNT(*) FILTER (WHERE commenter_vote.vote_type = 'best_fit')::integer AS best_fit_count,
+                      COUNT(*) FILTER (WHERE commenter_vote.vote_type = 'not_the_one')::integer AS not_the_one_count
+                 FROM feed_submission_votes commenter_vote
+                WHERE commenter_vote.feed_submission_id = fs.id
+                  AND commenter_vote.voter_profile_id = commented.commenter_profile_id
+             )
+             SELECT CASE
+                      WHEN best_fit_count > not_the_one_count THEN 'best_fit'::text
+                      WHEN not_the_one_count > best_fit_count THEN 'not_the_one'::text
+                      ELSE NULL::text
+                    END AS vote_type,
+                    ABS(best_fit_count - not_the_one_count)::integer AS vote_count
+               FROM commenter_vote_totals
+           ) commenter_vote_context ON true
        ) feed_comments ON true
       WHERE fs.is_active = true
         AND fs.author_profile_id = ANY($2::uuid[])
@@ -1418,30 +1424,20 @@ export async function createFeedSubmissionComment(
       vote_type: 'best_fit' | 'not_the_one' | null;
       vote_count: number;
     }>(
-      `WITH latest_vote AS (
-         SELECT vote_type
+      `WITH commenter_vote_totals AS (
+         SELECT COUNT(*) FILTER (WHERE vote_type = 'best_fit')::integer AS best_fit_count,
+                COUNT(*) FILTER (WHERE vote_type = 'not_the_one')::integer AS not_the_one_count
            FROM feed_submission_votes
           WHERE feed_submission_id = $1
             AND voter_profile_id = $2
-          ORDER BY created_at DESC
-          LIMIT 1
        )
-       SELECT latest_vote.vote_type,
-              CASE
-                WHEN latest_vote.vote_type IS NULL THEN 0
-                ELSE (
-                  SELECT COUNT(*)::integer
-                    FROM feed_submission_votes counted
-                   WHERE counted.feed_submission_id = $1
-                     AND counted.voter_profile_id = $2
-                     AND counted.vote_type = latest_vote.vote_type
-                )
-              END AS vote_count
-         FROM latest_vote
-       UNION ALL
-       SELECT NULL::text AS vote_type, 0::integer AS vote_count
-        WHERE NOT EXISTS (SELECT 1 FROM latest_vote)
-       LIMIT 1`,
+       SELECT CASE
+                WHEN best_fit_count > not_the_one_count THEN 'best_fit'::text
+                WHEN not_the_one_count > best_fit_count THEN 'not_the_one'::text
+                ELSE NULL::text
+              END AS vote_type,
+              ABS(best_fit_count - not_the_one_count)::integer AS vote_count
+         FROM commenter_vote_totals`,
       [input.feedSubmissionId, input.commenterProfileId],
     );
     const snapshot = voteSnapshot.rows[0];

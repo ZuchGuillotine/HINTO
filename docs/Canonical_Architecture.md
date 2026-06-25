@@ -63,6 +63,8 @@ This reduces duplication and keeps behavior consistent across:
 - profile and privacy rules
 - situationship CRUD and reorder logic
 - voting session creation and vote handling
+- Rank feed submissions, repeated friend votes, aggregate scoring, and
+  per-comment author vote badges
 - AI chat quotas, moderation, and persistence
 - report/block flows
 
@@ -154,6 +156,16 @@ Optional/later baseline entities from the donor repo:
 - `image_attachments`
 
 These should be validated against MVP scope before full adoption.
+
+The current RDS-backed Rank feed voting path uses explicit feed submission
+tables in addition to the legacy/public voting-session tables:
+
+- `feed_submissions`
+- `feed_submission_votes`
+- `feed_submission_comments`
+
+That path is documented in
+[`docs/Friends_Feed_Voting.md`](/Users/benjamincox/Downloads/HINTO/docs/Friends_Feed_Voting.md).
 
 Shared platform identity tables are now tracked separately in
 [`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql):

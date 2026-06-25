@@ -30,6 +30,7 @@ This section is the live tracker for the current product-surface push: sign-in/s
 | SX-13 | Username/display-name capture step on sign-up | Done | Sign-up no longer silently derives all profile data from the email local-part; the backend writes supplied username/display name after OTP verification and the local bypass path uses the same intent-aware payload. |
 | SX-14 | Replace read-only friends feed with feed submissions | Done | RDS migration `005_feed_submissions.sql` adds `feed_submissions` and `feed_submission_votes`; `GET /v1/me/feed` now returns explicit submissions on the Postgres path, and new create/image/vote routes support the iOS Friends `+` flow. |
 | SX-15 | Add local/S3 media pathway for profile, situationship, and feed images | Done | `media_assets` plus the API media route support S3/CloudFront in configured environments and `.hinto-media`/`/media-local/...` for local testing. SwiftUI now compresses selected images before upload. |
+| SX-16 | Finish Rank feed repeated-vote mechanics and displays | Done | `006_feed_multi_votes.sql` removes the per-user unique vote constraint; feed votes are repeatable rows, post buttons show aggregate direction counts, post summary shows total volume plus net signal, and comment badges show the comment author's net vote score. See `docs/Friends_Feed_Voting.md`. |
 
 ### 2026-05-17 Execution Notes
 
@@ -39,6 +40,10 @@ This section is the live tracker for the current product-surface push: sign-in/s
 - Meta/Facebook remains blocked at the backend-provider layer. Credentials are present under `META_APP_ID` / `META_CLIENT_SECRET`, but no `/v1/auth/providers/meta|facebook/*` route exists yet and provider app approval remains external.
 - Current temporary landing page/domain state is documented under `infra/aws/staging-resources.md` and `apps/web/landing/README.md`: `hnnt.app` / `www.hnnt.app` route through Route 53 to CloudFront/S3. No AWS deployment was performed in this session.
 - The friends feed submission flow is now: select an existing situationship, add text and/or image, choose an expiry window, submit to `/v1/me/feed/submissions`, optionally upload media to `/v1/me/feed/submissions/:id/image`, and vote through `/v1/me/feed/submissions/:id/votes`.
+- Rank feed voting now treats every vote as one row. A user can cast multiple
+  votes on the same post; post aggregates count all rows, viewer state is kept
+  separate from aggregate display, and comment badges show the comment author's
+  net score on that post.
 - RDS smoke verification through the local SSM tunnel passed for: development session, situationship create, feed submission create, feed image upload, feed vote, and `GET /v1/me/feed`.
 - Verification: `npm run api:build`; `npm run api:test -- --runInBand` at 98/98 across 12 suites; `npm run lint`; `npm run ios`; `xcodebuild -workspace HINTO.xcworkspace -scheme HINTO -destination 'generic/platform=iOS Simulator' build`; local API smoke confirmed `/health` and `/v1` route discovery include the feed submission routes.
 

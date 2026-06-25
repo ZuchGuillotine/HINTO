@@ -117,9 +117,10 @@ struct FriendsFeedView: View {
         let copy = voteCopy(for: item)
         let viewerBestFitCount = viewerVoteCount(.bestFit, for: item)
         let viewerNotTheOneCount = viewerVoteCount(.notTheOne, for: item)
+        let voteSignal = voteSignal(for: summary)
         VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack(spacing: Spacing.xs) {
-                Text("\(summary.bestFitCount) for")
+                Text("votes \(voteSignal.totalCount)")
                     .font(.hintoCaption)
                     .foregroundStyle(.secondary)
 
@@ -127,16 +128,20 @@ struct FriendsFeedView: View {
                     .font(.hintoCaption)
                     .foregroundStyle(.secondary)
 
-                Text("\(summary.notTheOneCount) against")
-                    .font(.hintoCaption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 3) {
+                    Image(systemName: "flag.fill")
+                    Text(voteSignal.netLabel)
+                        .fontWeight(.semibold)
+                }
+                .font(.hintoCaption)
+                .foregroundStyle(voteSignal.color)
             }
 
             HStack(spacing: Spacing.sm) {
                 voteButton(
                     title: copy.bestFit,
                     systemImage: "heart.fill",
-                    count: viewerBestFitCount,
+                    count: summary.bestFitCount,
                     selected: viewerBestFitCount > 0,
                     disabled: isClosed || item.submissionId == nil || isSubmittingVote(.bestFit, for: item)
                 ) {
@@ -148,7 +153,7 @@ struct FriendsFeedView: View {
                 voteButton(
                     title: copy.notTheOne,
                     systemImage: "xmark",
-                    count: viewerNotTheOneCount,
+                    count: summary.notTheOneCount,
                     selected: viewerNotTheOneCount > 0,
                     disabled: isClosed || item.submissionId == nil || isSubmittingVote(.notTheOne, for: item)
                 ) {
@@ -201,6 +206,26 @@ struct FriendsFeedView: View {
         }
 
         return 0
+    }
+
+    private func voteSignal(for summary: FeedVoteSummary) -> FeedVoteSignal {
+        let totalCount = summary.bestFitCount + summary.notTheOneCount
+        let netScore = summary.bestFitCount - summary.notTheOneCount
+        let color: Color
+
+        if netScore > 0 {
+            color = .hintoSuccess
+        } else if Double(netScore) < -(Double(totalCount) * 0.2) {
+            color = .hintoError
+        } else {
+            color = .hintoWarning
+        }
+
+        return FeedVoteSignal(
+            totalCount: totalCount,
+            netLabel: netScore > 0 ? "+\(netScore)" : "\(netScore)",
+            color: color
+        )
     }
 
     private func openDishComposer(for item: FeedItem) {
@@ -330,6 +355,12 @@ private struct PendingFeedDish: Identifiable {
     var id: String {
         parentComment.map { "\(item.id):\($0.commentId)" } ?? item.id
     }
+}
+
+private struct FeedVoteSignal {
+    let totalCount: Int
+    let netLabel: String
+    let color: Color
 }
 
 private struct FeedVoteCopy {
@@ -592,15 +623,25 @@ private struct FeedItemCard<VoteControls: View>: View {
                     .lineLimit(1)
 
                 HStack(spacing: Spacing.xs) {
-                    Text(commentMetadata(for: comment))
+                    Text(comment.voterProfile.displayName)
+                        .foregroundStyle(.secondary)
+
+                    if let voteBadge = commentVoteBadge(for: comment) {
+                        HStack(spacing: 2) {
+                            Image(systemName: voteBadge.systemImage)
+                            Text(voteBadge.countLabel)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(voteBadge.color)
+                    }
 
                     Button("reply") {
                         dishAction(item, comment)
                     }
                     .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
                 .font(.hintoCaption)
-                .foregroundStyle(.secondary)
                 .lineLimit(1)
             }
 
@@ -614,15 +655,25 @@ private struct FeedItemCard<VoteControls: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
     }
 
-    private func commentMetadata(for comment: FeedSubmissionComment) -> String {
-        if let voteType = comment.voteType, comment.voterVoteCount > 0 {
-            return "\(comment.voterProfile.displayName) · \(voteType.displayTitle) · \(comment.voterVoteCount)x"
-        }
-        if comment.voterVoteCount > 0 {
-            return "\(comment.voterProfile.displayName) · \(comment.voterVoteCount)x"
+    private func commentVoteBadge(for comment: FeedSubmissionComment) -> CommentVoteBadge? {
+        guard let voteType = comment.voteType, comment.voterVoteCount > 0 else {
+            return nil
         }
 
-        return comment.voterProfile.displayName
+        switch voteType {
+        case .bestFit:
+            return CommentVoteBadge(
+                systemImage: "arrow.up",
+                countLabel: "+\(comment.voterVoteCount)",
+                color: .hintoSuccess
+            )
+        case .notTheOne:
+            return CommentVoteBadge(
+                systemImage: "arrow.down",
+                countLabel: "-\(comment.voterVoteCount)",
+                color: .hintoError
+            )
+        }
     }
 }
 
@@ -631,6 +682,12 @@ private struct FeedDisplayedComment: Identifiable {
     let depth: Int
 
     var id: String { comment.id }
+}
+
+private struct CommentVoteBadge {
+    let systemImage: String
+    let countLabel: String
+    let color: Color
 }
 
 private struct FeedDishComposer: View {
