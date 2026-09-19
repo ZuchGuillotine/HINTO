@@ -18,6 +18,12 @@ export interface VotingSessionDto {
   createdAt: string;
 }
 
+export interface ListVotingSessionsResponseDto {
+  data: {
+    sessions: VotingSessionDto[];
+  };
+}
+
 export interface CreateVotingSessionRequestDto {
   title?: string;
   description?: string | null;
@@ -95,6 +101,8 @@ export interface VoteResultDto {
 }
 
 export interface VoteCommentDto {
+  /** Vote row id; use as `contentId` with `contentType: 'vote'` when reporting. */
+  voteId: string | null;
   comment: string;
   createdAt: string;
   voteType: VoteKind;

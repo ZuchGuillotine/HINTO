@@ -3,12 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HINTO Web</title>
+    <title>HINTO</title>
+    <meta name="description" content="Rank your situationships privately, let your closest friends vote, and get a clear read on what to do next." />
+    <!--
+      Per-environment configuration. Leave `content` empty to use the defaults in
+      /config.js (localhost -> http://127.0.0.1:3000, otherwise https://api.hinto.app).
+      Set it at deploy time (see apps/web/README.md and apps/web/inject-config.mjs).
+    -->
+    <meta name="hinto-api-base-url" content="" />
+    <meta name="hinto-apple-web-enabled" content="false" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/api.js"></script>
+    <script src="/config.js"></script>
     <script type="module" src="/app.js"></script>
   </body>
-  </html>
+</html>

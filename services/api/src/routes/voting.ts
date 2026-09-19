@@ -119,7 +119,7 @@ async function generateUniqueInviteCode(config: AppConfig): Promise<string> {
 
 async function getOwnerActiveSituationships(
   config: AppConfig,
-  ownerProfileId: string,
+  ownerProfileId: string
 ): Promise<SituationshipRow[]> {
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
@@ -138,7 +138,7 @@ async function getOwnerActiveSituationships(
 
 async function getVotingSessionByInviteCode(
   config: AppConfig,
-  inviteCode: string,
+  inviteCode: string
 ): Promise<VotingSessionRow> {
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
@@ -157,7 +157,7 @@ async function getVotingSessionByInviteCode(
 async function getVotingSessionByIdForOwner(
   config: AppConfig,
   votingSessionId: string,
-  ownerProfileId: string,
+  ownerProfileId: string
 ): Promise<VotingSessionRow> {
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
@@ -175,13 +175,42 @@ async function getVotingSessionByIdForOwner(
 }
 
 /**
+ * GET /v1/me/voting-sessions - List the owner's voting sessions, newest first.
+ */
+export async function handleListVotingSessions(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+  const supabase = getServiceClient(config);
+
+  const { data, error } = await supabase
+    .from('voting_sessions')
+    .select('*')
+    .eq('owner_id', authCtx.user.profileId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new AppError('fetch_failed', 'Failed to load voting sessions', 500);
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as VotingSessionRow[];
+  sendJsonSuccess(response, 200, context.requestId, {
+    sessions: rows.map(toVotingSessionDto),
+  });
+}
+
+/**
  * POST /v1/me/voting-sessions - Create an owner voting session for active situationships.
  */
 export async function handleCreateVotingSession(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
@@ -192,7 +221,7 @@ export async function handleCreateVotingSession(
     throw new AppError(
       'validation_error',
       'At least two active situationships are required to create a voting session',
-      400,
+      400
     );
   }
 
@@ -249,7 +278,7 @@ export async function handleExpireVotingSession(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  votingSessionId: string,
+  votingSessionId: string
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const supabase = getServiceClient(config);
@@ -281,17 +310,13 @@ export async function handleGetPublicVotingSession(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  inviteCode: string,
+  inviteCode: string
 ): Promise<void> {
   const session = await getVotingSessionByInviteCode(config, inviteCode);
   const supabase = getServiceClient(config);
 
   const [ownerResult, situationshipRows] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, username, name')
-      .eq('id', session.owner_id)
-      .single(),
+    supabase.from('profiles').select('id, username, name').eq('id', session.owner_id).single(),
     getOwnerActiveSituationships(config, session.owner_id),
   ]);
 
@@ -331,7 +356,7 @@ export async function handleSubmitVote(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  inviteCode: string,
+  inviteCode: string
 ): Promise<void> {
   const session = await getVotingSessionByInviteCode(config, inviteCode);
   const status = resolveVotingSessionStatus({
@@ -345,11 +370,11 @@ export async function handleSubmitVote(
   const voterName = normalizeOptionalVoterName(body.voterName);
   const comment = normalizeOptionalComment(body.comment);
   const activeSituationships = await getOwnerActiveSituationships(config, session.owner_id);
-  const allowedIds = activeSituationships.map((item) => item.id);
+  const allowedIds = activeSituationships.map(item => item.id);
   const selection = validateVoteSubmission(
     allowedIds,
     body.bestSituationshipId,
-    body.worstSituationshipId,
+    body.worstSituationshipId
   );
 
   const supabase = getServiceClient(config);
@@ -368,7 +393,7 @@ export async function handleSubmitVote(
     throw new AppError(
       'duplicate_vote',
       'This voter identity has already submitted a vote for the session',
-      409,
+      409
     );
   }
 
@@ -404,7 +429,7 @@ export async function handleSubmitVote(
       throw new AppError(
         'duplicate_vote',
         'This voter identity has already submitted a vote for the session',
-        409,
+        409
       );
     }
 
@@ -430,16 +455,22 @@ export async function handleGetVotingResults(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  votingSessionId: string,
+  votingSessionId: string
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
-  const session = await getVotingSessionByIdForOwner(config, votingSessionId, authCtx.user.profileId);
+  const session = await getVotingSessionByIdForOwner(
+    config,
+    votingSessionId,
+    authCtx.user.profileId
+  );
   const supabase = getServiceClient(config);
   const situationships = await getOwnerActiveSituationships(config, session.owner_id);
 
   const { data: votes, error } = await supabase
     .from('votes')
-    .select('id, voting_session_id, situationship_id, voter_id, voter_identity, voter_name, vote_type, comment, created_at')
+    .select(
+      'id, voting_session_id, situationship_id, voter_id, voter_identity, voter_name, vote_type, comment, created_at'
+    )
     .eq('voting_session_id', session.id);
 
   if (error) {
@@ -447,15 +478,16 @@ export async function handleGetVotingResults(
   }
 
   const aggregate = buildVotingResultsAggregate(
-    situationships.map((item) => ({
+    situationships.map(item => ({
       situationshipId: item.id,
       name: item.name,
       emoji: item.emoji,
       rank: item.rank,
     })),
-    (votes ?? []).map((vote) => {
+    (votes ?? []).map(vote => {
       const row = vote as VoteRow;
       return {
+        voteId: row.id,
         situationshipId: row.situationship_id,
         voteType: row.vote_type,
         voterIdentity: row.voter_identity,
@@ -465,7 +497,7 @@ export async function handleGetVotingResults(
         createdAt: row.created_at,
       };
     }),
-    { isAnonymous: session.is_anonymous },
+    { isAnonymous: session.is_anonymous }
   );
 
   sendJsonSuccess(response, 200, context.requestId, {

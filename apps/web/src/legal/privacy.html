@@ -1,0 +1,156 @@
+<!doctype html>
+<!--
+  DRAFT - requires legal review before publishing.
+  This page is a working draft written by the product team. It has not been
+  reviewed by a lawyer. Replace the effective date and review every section
+  before this URL is submitted to Apple, Meta, or shown to real users.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy - HINTO</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      :root { color-scheme: light; }
+      body { margin: 0; background: #fff8f4; color: #1f1824; font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; line-height: 1.6; }
+      main { max-width: 760px; margin: 0 auto; padding: 40px 20px 64px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 32px; }
+      .brand { font-weight: 800; letter-spacing: 0.14em; color: #d84071; text-decoration: none; }
+      nav a { color: #5f5767; text-decoration: none; margin-left: 14px; font-size: 0.92rem; }
+      nav a:hover { color: #d84071; }
+      h1 { font-family: "Iowan Old Style", "Palatino Linotype", serif; font-size: 2.2rem; margin: 0 0 6px; }
+      h2 { font-family: "Iowan Old Style", "Palatino Linotype", serif; font-size: 1.35rem; margin: 32px 0 8px; }
+      p, li { color: #3c3442; }
+      .meta { color: #5f5767; font-size: 0.92rem; margin-bottom: 24px; }
+      .draft { background: #fff1c2; border: 1px solid #f5bf56; border-radius: 12px; padding: 12px 16px; font-weight: 600; margin-bottom: 28px; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(31,24,36,0.12); vertical-align: top; }
+      footer { margin-top: 48px; color: #5f5767; font-size: 0.9rem; }
+      a { color: #d84071; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="brand" href="/">HINTO</a>
+        <nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/support">Support</a><a href="/data-deletion">Data deletion</a></nav>
+      </header>
+
+      <div class="draft">DRAFT - requires legal review before publishing.</div>
+
+      <h1>Privacy Policy</h1>
+      <p class="meta">Effective date: [EFFECTIVE DATE - TBD] · Last updated: [DATE - TBD]</p>
+
+      <p>
+        HINTO ("we", "us") is a private app for keeping a ranked list of the people you're seeing,
+        letting friends you choose vote on it, and talking things through with an AI coach.
+        This policy explains what we collect, why, who we share it with, and the choices you have.
+        We wrote it to be read, not skimmed. If anything is unclear, email
+        <a href="mailto:support@hinto.app">support@hinto.app</a>.
+      </p>
+
+      <h2>1. Who can use HINTO</h2>
+      <p>
+        HINTO is for people aged 16 and older. We ask for your age when you create an account.
+        If we learn that someone under 16 has an account, we delete it. If you believe a user is
+        under 16, report it in the app or email us.
+      </p>
+
+      <h2>2. What we collect</h2>
+      <table>
+        <thead><tr><th>Data</th><th>Where it comes from</th><th>Why we use it</th></tr></thead>
+        <tbody>
+          <tr><td>Email address</td><td>You, at sign-in</td><td>To sign you in with a one-time code, send account emails, and identify your account for support and deletion requests.</td></tr>
+          <tr><td>Name, username, bio, profile photo, age</td><td>You, in your profile</td><td>To show your friends whose list they're voting on and to confirm you meet the minimum age.</td></tr>
+          <tr><td>Sign-in provider identity (Apple ID or Facebook account ID, and the name/email they share)</td><td>Apple or Meta, when you choose that sign-in</td><td>To create and secure your account without a password.</td></tr>
+          <tr><td>Situationship entries (names or nicknames, emoji, category, notes, order)</td><td>You</td><td>To keep your list, show it to friends you invite, and give the coach context.</td></tr>
+          <tr><td>Votes and comments</td><td>Friends who open your invite link</td><td>To show you results. Voters without an account are identified only by a random browser identifier and, if they choose, a name.</td></tr>
+          <tr><td>AI coach conversations</td><td>You, when you chat with the coach</td><td>To generate replies and let you return to earlier conversations.</td></tr>
+          <tr><td>Reports and blocks</td><td>You</td><td>To act on abuse and keep blocked people away from your content.</td></tr>
+          <tr><td>Technical data (IP address, device and browser type, timestamps, request IDs, error logs)</td><td>Automatically</td><td>To run the service securely, prevent abuse, and fix problems. We do not use advertising trackers.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>3. How the AI coach uses your data</h2>
+      <p>
+        When you send a message to the coach, we send that message, your recent messages in the
+        same conversation, and relevant context from your list (entry names, notes, and vote
+        results) to OpenAI to generate a reply. We do not send your email address. OpenAI processes
+        this data under its API terms and, per its published policy, does not use API data to train
+        its models. Coach replies are automated and are not medical, legal, or mental-health advice.
+      </p>
+
+      <h2>4. Who we share data with</h2>
+      <ul>
+        <li><strong>Supabase</strong> - hosts our database, authentication, and file storage.</li>
+        <li><strong>OpenAI</strong> - generates AI coach responses (see section 3).</li>
+        <li><strong>Apple and Meta</strong> - only if you choose to sign in with them; they tell us who you are and we do not post anything to your accounts.</li>
+        <li><strong>Email delivery provider</strong> - sends your sign-in codes.</li>
+        <li><strong>Your invited friends</strong> - anyone with a vote link you share can see the entries on your list and, if you chose named votes, the names other voters entered. Vote results are visible only to you.</li>
+        <li><strong>Legal requests</strong> - we disclose data when required by law or to protect users from harm.</li>
+      </ul>
+      <p>We do not sell your data and we do not share it with advertisers.</p>
+
+      <h2>5. What your friends see</h2>
+      <p>
+        Your list is private by default. It becomes visible only to people who open a vote link you
+        created and shared, and only for as long as that vote is open. Voters see entry names, emoji,
+        and notes - not your bio, email, or coach conversations. Voters never see other people's
+        votes.
+      </p>
+
+      <h2>6. How long we keep data</h2>
+      <ul>
+        <li>Account data, lists, votes, and coach conversations: until you delete them or your account.</li>
+        <li>Vote sessions: votes remain attached to your account after a session closes until you delete the account.</li>
+        <li>Reports: up to 12 months after resolution, so we can act on repeat behaviour.</li>
+        <li>Server logs: up to 30 days.</li>
+        <li>Backups: up to 30 days after deletion, after which deleted data is gone from backups too.</li>
+      </ul>
+
+      <h2>7. Your choices and rights</h2>
+      <ul>
+        <li><strong>Edit</strong> your profile and list at any time in the app.</li>
+        <li><strong>End a vote</strong> at any time from your results screen.</li>
+        <li><strong>Block and report</strong> people from Settings or from a comment.</li>
+        <li><strong>Delete your account</strong> in Settings, or by emailing <a href="mailto:support@hinto.app">support@hinto.app</a>. See <a href="/data-deletion">Data deletion</a> for what happens.</li>
+        <li><strong>Access or export</strong> your data by emailing us. We respond within 30 days.</li>
+      </ul>
+      <p>
+        If you are in the UK, EEA, or a US state with a privacy law, you may have additional rights
+        (access, correction, portability, restriction, objection, and the right to complain to a
+        supervisory authority). Email us to exercise them.
+      </p>
+
+      <h2>8. Security</h2>
+      <p>
+        Data is encrypted in transit and at rest with our hosting provider. Sign-in uses one-time
+        codes or Apple/Meta sign-in rather than passwords. Access to production data is limited to
+        the people who operate the service. No system is perfectly secure; if we discover a breach
+        that affects you, we will tell you.
+      </p>
+
+      <h2>9. Where data is stored</h2>
+      <p>
+        Our servers and database are hosted in [REGION - TBD]. If you use HINTO from outside that
+        region, your data is transferred there. We rely on our providers' standard contractual
+        protections for international transfers.
+      </p>
+
+      <h2>10. Changes to this policy</h2>
+      <p>
+        If we make a meaningful change, we'll show a notice in the app and update the date above.
+        Continuing to use HINTO after that means you accept the updated policy.
+      </p>
+
+      <h2>11. Contact</h2>
+      <p>
+        HINTO · [LEGAL ENTITY NAME AND ADDRESS - TBD]<br />
+        <a href="mailto:support@hinto.app">support@hinto.app</a>
+      </p>
+
+      <footer>&copy; HINTO. <a href="/terms">Terms of Service</a> · <a href="/support">Support</a> · <a href="/data-deletion">Data deletion</a></footer>
+    </main>
+  </body>
+</html>

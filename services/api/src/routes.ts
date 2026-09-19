@@ -42,6 +42,7 @@ import {
   handleExpireVotingSession,
   handleGetPublicVotingSession,
   handleGetVotingResults,
+  handleListVotingSessions,
   handleSubmitVote,
 } from './routes/voting.js';
 
@@ -141,6 +142,7 @@ async function routeAsync(
         'PATCH /v1/me/situationships/:id',
         'DELETE /v1/me/situationships/:id',
         'PUT  /v1/me/situationships/order',
+        'GET  /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions/:id/expire',
         'GET  /v1/me/voting-sessions/:id/results',
@@ -301,6 +303,11 @@ async function routeAsync(
 
   if (method === 'PUT' && path === '/v1/me/situationships/order') {
     await handleReorderSituationships(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/voting-sessions') {
+    await handleListVotingSessions(request, response, context, config);
     return true;
   }
 

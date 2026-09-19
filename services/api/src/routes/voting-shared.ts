@@ -18,6 +18,7 @@ export interface ResultSituationship {
 }
 
 export interface RecordedVote {
+  voteId?: string | null;
   situationshipId: string;
   voteType: 'best_fit' | 'not_the_one';
   voterIdentity: string | null;
@@ -28,6 +29,8 @@ export interface RecordedVote {
 }
 
 export interface VotingCommentSummary {
+  /** Vote row id, so the comment can be reported precisely via POST /v1/reports. */
+  voteId: string | null;
   comment: string;
   createdAt: string;
   voteType: 'best_fit' | 'not_the_one';
@@ -57,9 +60,7 @@ export function normalizeInviteCode(value: string): string {
   return value.trim().toUpperCase();
 }
 
-export function resolveVotingSessionStatus(
-  input: VotingSessionStatusInput,
-): VotingSessionStatus {
+export function resolveVotingSessionStatus(input: VotingSessionStatusInput): VotingSessionStatus {
   const now = input.now ?? new Date();
   const expiresAt = new Date(input.expiresAt);
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= now.getTime()) {
@@ -69,9 +70,7 @@ export function resolveVotingSessionStatus(
   return input.isActive ? 'active' : 'closed';
 }
 
-export function assertVotingSessionCanAcceptVotes(
-  status: VotingSessionStatus,
-): void {
+export function assertVotingSessionCanAcceptVotes(status: VotingSessionStatus): void {
   if (status === 'expired') {
     throw new AppError('session_expired', 'Voting session has expired', 410);
   }
@@ -91,7 +90,7 @@ export function normalizeVoterIdentity(value: unknown): string {
     throw new AppError(
       'validation_error',
       'voterIdentity must be between 8 and 128 characters',
-      400,
+      400
     );
   }
 
@@ -143,13 +142,13 @@ export function normalizeOptionalComment(value: unknown): string | null {
 export function validateVoteSubmission(
   allowedSituationshipIds: string[],
   bestSituationshipId: unknown,
-  worstSituationshipId: unknown,
+  worstSituationshipId: unknown
 ): { bestSituationshipId: string; worstSituationshipId: string } {
   if (typeof bestSituationshipId !== 'string' || typeof worstSituationshipId !== 'string') {
     throw new AppError(
       'validation_error',
       'bestSituationshipId and worstSituationshipId are required',
-      400,
+      400
     );
   }
 
@@ -157,7 +156,7 @@ export function validateVoteSubmission(
     throw new AppError(
       'validation_error',
       'bestSituationshipId and worstSituationshipId must be different',
-      400,
+      400
     );
   }
 
@@ -166,7 +165,7 @@ export function validateVoteSubmission(
     throw new AppError(
       'validation_error',
       'Vote selections must belong to the active situationships in this session',
-      400,
+      400
     );
   }
 
@@ -176,7 +175,7 @@ export function validateVoteSubmission(
 export function buildVotingResultsAggregate(
   situationships: ResultSituationship[],
   votes: RecordedVote[],
-  options: { isAnonymous: boolean },
+  options: { isAnonymous: boolean }
 ): VotingResultsAggregate {
   const countsBySituationship = new Map<string, RankedVoteResult>();
   for (const situationship of situationships) {
@@ -217,6 +216,7 @@ export function buildVotingResultsAggregate(
 
     if (vote.comment) {
       comments.push({
+        voteId: vote.voteId ?? null,
         comment: vote.comment,
         createdAt: vote.createdAt,
         voteType: vote.voteType,
@@ -235,8 +235,10 @@ export function buildVotingResultsAggregate(
         return right.totalVotes - left.totalVotes;
       }
 
-      const leftRank = situationships.find((item) => item.situationshipId === left.situationshipId)?.rank ?? 0;
-      const rightRank = situationships.find((item) => item.situationshipId === right.situationshipId)?.rank ?? 0;
+      const leftRank =
+        situationships.find(item => item.situationshipId === left.situationshipId)?.rank ?? 0;
+      const rightRank =
+        situationships.find(item => item.situationshipId === right.situationshipId)?.rank ?? 0;
       if (leftRank !== rightRank) {
         return leftRank - rightRank;
       }
