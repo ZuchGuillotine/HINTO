@@ -30,6 +30,10 @@ What does not exist or is a placeholder:
 
 Test status at audit time: `npm run api:build` passes; `npm run api:test` fails 2 of 52 because fixtures use columns that do not exist in the schema.
 
+## Status After The 2026-09-19 Session
+
+Fixed in code on this branch (unverified against a live Supabase project or Xcode): B1-B14, B16-B18, H1, H3-H8, H11-H14, M1-M3, M5-M8. B15 has draft legal pages that need legal review before publishing. Still open: H2 (migration baseline and `supabase/config.toml`), H9 partially (age gate exists; App Store rating decision is human), H10 (domain decision), M4 (media upload), M9 (stale tooling metadata), plus everything under Human Testing Required and LLM Testing And Evals Required.
+
 ## Blockers (must fix before any live deployment)
 
 | ID  | Area            | Finding                                                                                                                                                                                                                                    | Location                                                                                    |

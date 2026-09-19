@@ -9,7 +9,9 @@ struct SituationshipListView: View {
     @State private var showCreateSheet = false
     @State private var showShareSheet = false
     @State private var selectedSituationship: Situationship?
+    @State private var errorTitle = "Something went wrong"
     @State private var errorMessage: String?
+    @State private var showError = false
 
     var body: some View {
         NavigationStack {
@@ -36,7 +38,7 @@ struct SituationshipListView: View {
                                 Image(systemName: isReordering ? "checkmark.circle.fill" : "arrow.up.arrow.down")
                                     .symbolEffect(.bounce, value: isReordering)
                             }
-                            .tint(isReordering ? .hintoSuccess : .primary)
+                            .tint(isReordering ? Color.hintoSuccess : Color.primary)
 
                             Button {
                                 showShareSheet = true
@@ -55,16 +57,25 @@ struct SituationshipListView: View {
                 }
             }
             .sheet(isPresented: $showCreateSheet) {
-                SituationshipDetailView(mode: .create) { newItem in
-                    situationships.append(newItem)
-                }
+                SituationshipDetailView(
+                    mode: .create,
+                    onSave: { newItem in
+                        situationships.append(newItem)
+                    }
+                )
             }
             .sheet(item: $selectedSituationship) { item in
-                SituationshipDetailView(mode: .edit(item)) { updated in
-                    if let index = situationships.firstIndex(where: { $0.id == updated.id }) {
-                        situationships[index] = updated
+                SituationshipDetailView(
+                    mode: .edit(item),
+                    onSave: { updated in
+                        if let index = situationships.firstIndex(where: { $0.id == updated.id }) {
+                            situationships[index] = updated
+                        }
+                    },
+                    onDelete: { deletedId in
+                        situationships.removeAll { $0.id == deletedId }
                     }
-                }
+                )
             }
             .sheet(isPresented: $showShareSheet) {
                 ShareSessionView(situationships: situationships)
@@ -74,6 +85,11 @@ struct SituationshipListView: View {
             }
             .task {
                 await loadSituationships()
+            }
+            .alert(errorTitle, isPresented: $showError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage ?? "Please try again.")
             }
         }
     }
@@ -166,7 +182,10 @@ struct SituationshipListView: View {
     // MARK: - Data Loading
 
     private func loadSituationships() async {
-        guard let token = auth.accessToken else { return }
+        guard let token = auth.accessToken else {
+            isLoading = false
+            return
+        }
         isLoading = situationships.isEmpty
 
         do {
@@ -176,36 +195,65 @@ struct SituationshipListView: View {
                 isLoading = false
             }
         } catch {
-            // Use mock data in dev mode
+            #if DEBUG
+            // Preview Mode (offline, fabricated session) falls back to sample data.
             if auth.accessToken == "dev-token" {
                 situationships = Self.mockSituationships
+                isLoading = false
+                return
             }
+            #endif
             isLoading = false
+            presentError(title: "Could not load your list", error)
         }
     }
 
     private func saveReorder() async {
         guard let token = auth.accessToken else { return }
         let ids = situationships.map(\.id)
-        _ = try? await api.reorderSituationships(
-            token: token,
-            order: ReorderRequest(orderedSituationshipIds: ids)
-        )
+
+        do {
+            let response = try await api.reorderSituationships(
+                token: token,
+                order: ReorderRequest(orderedSituationshipIds: ids)
+            )
+            let serverItems = response.data.items.sorted { $0.rank < $1.rank }
+            if !serverItems.isEmpty {
+                situationships = serverItems
+            }
+        } catch {
+            presentError(title: "Could not save the new order", error)
+            await loadSituationships()
+        }
     }
 
     private func deleteSituationship(id: String) async {
         guard let token = auth.accessToken else { return }
-        _ = try? await api.deleteSituationship(token: token, id: id)
+
+        do {
+            _ = try await api.deleteSituationship(token: token, id: id)
+        } catch {
+            presentError(title: "Could not delete", error)
+            await loadSituationships()
+        }
     }
 
-    // MARK: - Mock Data
+    private func presentError(title: String, _ error: Error) {
+        errorTitle = title
+        errorMessage = error.localizedDescription
+        showError = true
+    }
 
+    // MARK: - Sample Data (debug builds only)
+
+    #if DEBUG
     static let mockSituationships: [Situationship] = [
         Situationship(situationshipId: "1", ownerProfileId: "dev", name: "Alex", emoji: "😍", category: "Crush", description: "Met at the coffee shop", rank: 1, status: .active, createdAt: "", updatedAt: ""),
         Situationship(situationshipId: "2", ownerProfileId: "dev", name: "Jordan", emoji: "🤔", category: "Friend", description: nil, rank: 2, status: .active, createdAt: "", updatedAt: ""),
         Situationship(situationshipId: "3", ownerProfileId: "dev", name: "Riley", emoji: "😅", category: "Ex", description: nil, rank: 3, status: .active, createdAt: "", updatedAt: ""),
         Situationship(situationshipId: "4", ownerProfileId: "dev", name: "Sam", emoji: "😊", category: "Work", description: nil, rank: 4, status: .active, createdAt: "", updatedAt: ""),
     ]
+    #endif
 }
 
 #Preview {

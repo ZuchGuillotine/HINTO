@@ -2,8 +2,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AuthManager.self) private var auth
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
-    @AppStorage("hapticFeedback") private var hapticFeedback = true
 
     var body: some View {
         NavigationStack {
@@ -15,7 +13,7 @@ struct SettingsView: View {
                             AvatarView(url: profile.avatarUrl, emoji: nil, size: 44)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(profile.displayName)
+                                Text(profile.displayName.isEmpty ? profile.username : profile.displayName)
                                     .font(.hintoBody)
                                     .fontWeight(.medium)
                                 Text("@\(profile.username)")
@@ -40,28 +38,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // Preferences
-                Section("Preferences") {
-                    Toggle(isOn: $notificationsEnabled) {
-                        Label("Notifications", systemImage: "bell.fill")
-                    }
-                    .tint(.hintoPink)
-
-                    Toggle(isOn: $hapticFeedback) {
-                        Label("Haptic Feedback", systemImage: "waveform")
-                    }
-                    .tint(.hintoPink)
-                }
-
-                // Voting
-                Section("Voting") {
-                    NavigationLink {
-                        VoteResultsView(situationships: [])
-                    } label: {
-                        Label("Past Results", systemImage: "chart.bar.fill")
-                    }
-                }
-
                 // Support
                 Section("Support") {
                     Link(destination: URL(string: "https://hinto.app/privacy")!) {
@@ -72,7 +48,11 @@ struct SettingsView: View {
                         Label("Terms of Service", systemImage: "doc.text.fill")
                     }
 
-                    Label("Version 1.0.0", systemImage: "info.circle")
+                    Link(destination: URL(string: "mailto:support@hinto.app")!) {
+                        Label("Report a problem", systemImage: "exclamationmark.bubble")
+                    }
+
+                    Label(Self.versionString, systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
 
@@ -88,9 +68,17 @@ struct SettingsView: View {
             .navigationTitle("Settings")
         }
     }
+
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "0"
+        let build = info["CFBundleVersion"] as? String ?? "0"
+        return "Version \(version) (\(build))"
+    }
 }
 
 #Preview {
     SettingsView()
         .environment(AuthManager())
+        .environment(APIClient())
 }

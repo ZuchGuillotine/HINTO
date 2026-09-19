@@ -1,7 +1,11 @@
-import Foundation
 import AuthenticationServices
+import CryptoKit
+import Foundation
 import Observation
+import SwiftUI
+import UIKit
 
+@MainActor
 @Observable
 final class AuthManager: NSObject {
     var currentUser: MeAggregate?
@@ -9,162 +13,256 @@ final class AuthManager: NSObject {
     var isLoading = true
     var authError: String?
 
-    private(set) var accessToken: String?
+    /// Current API bearer token, read from the Keychain-backed `SessionStore`.
+    /// Always reflects the latest refreshed token, even when `APIClient` rotated it.
+    var accessToken: String? {
+        sessionStore.accessToken
+    }
 
-    private let tokenKey = "hinto_access_token"
-    private let refreshTokenKey = "hinto_refresh_token"
+    /// True once signed in until the user has confirmed their age (`profile.age == nil`).
+    var needsAgeConfirmation: Bool {
+        guard let currentUser else { return false }
+        return currentUser.profile.age == nil
+    }
+
+    private let sessionStore: SessionStore
+    private let api: APIClient
     private let profileKey = "hinto_profile_cache"
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
-    override init() {
+    @ObservationIgnored private var notificationObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var appleCoordinator: AppleSignInCoordinator?
+    @ObservationIgnored private var appleController: ASAuthorizationController?
+
+    init(sessionStore: SessionStore = .shared, api: APIClient = APIClient()) {
+        self.sessionStore = sessionStore
+        self.api = api
         super.init()
-        restoreSession()
+        sessionStore.migrateLegacyUserDefaultsIfNeeded()
+        observeSessionNotifications()
+        Task { await restoreSession() }
     }
 
     // MARK: - Session
 
-    private func restoreSession() {
-        if let token = UserDefaults.standard.string(forKey: tokenKey) {
-            self.accessToken = token
-            self.isAuthenticated = true
+    /// Validates any stored session against `GET /v1/me`. Rejected credentials clear the
+    /// session; a network failure keeps the cached profile so the app still opens offline.
+    func restoreSession() async {
+        defer { isLoading = false }
+
+        guard let token = sessionStore.accessToken else {
+            clearSessionState()
+            return
         }
-        if let data = UserDefaults.standard.data(forKey: profileKey),
-           let user = try? decoder.decode(MeAggregate.self, from: data) {
-            self.currentUser = user
+
+        let cachedUser = loadCachedProfile()
+
+        do {
+            let response = try await api.getMe(token: token)
+            applyUser(response.data)
+            isAuthenticated = true
+        } catch let error as APIError where error.isAuthenticationFailure {
+            sessionStore.clear()
+            clearSessionState()
+        } catch {
+            // Server unreachable or returned a non-auth error: keep the cached session.
+            currentUser = cachedUser
+            isAuthenticated = true
         }
-        self.isLoading = false
+    }
+
+    func setSession(_ session: AuthSession) {
+        setSession(token: session.accessToken, refreshToken: session.refreshToken, user: session.me)
     }
 
     func setSession(token: String, refreshToken: String? = nil, user: MeAggregate) {
-        self.accessToken = token
-        self.currentUser = user
-        self.isAuthenticated = true
-        self.authError = nil
-        UserDefaults.standard.set(token, forKey: tokenKey)
-        if let refreshToken {
-            UserDefaults.standard.set(refreshToken, forKey: refreshTokenKey)
+        sessionStore.save(accessToken: token, refreshToken: refreshToken)
+        applyUser(user)
+        isAuthenticated = true
+        authError = nil
+    }
+
+    func signOut() {
+        sessionStore.clear()
+        clearSessionState()
+    }
+
+    /// Calls `DELETE /v1/me` (server deletes the auth user and cascades) and then signs out locally.
+    func deleteAccount() async throws {
+        guard let token = accessToken else {
+            throw AuthError.sessionExpired
         }
+        _ = try await api.deleteMe(token: token)
+        signOut()
+    }
+
+    /// Records the user's self-reported age via `PATCH /v1/me`.
+    func confirmAge(_ age: Int) async throws {
+        guard age >= Profile.minimumAge else {
+            throw AuthError.underage
+        }
+        guard let token = accessToken else {
+            throw AuthError.sessionExpired
+        }
+        let response = try await api.updateMe(token: token, update: UpdateProfileRequest(age: age))
+        applyUser(response.data)
+    }
+
+    private func applyUser(_ user: MeAggregate) {
+        currentUser = user
         if let encoded = try? encoder.encode(user) {
             UserDefaults.standard.set(encoded, forKey: profileKey)
         }
     }
 
-    func signOut() {
-        accessToken = nil
+    private func loadCachedProfile() -> MeAggregate? {
+        guard let data = UserDefaults.standard.data(forKey: profileKey) else { return nil }
+        return try? decoder.decode(MeAggregate.self, from: data)
+    }
+
+    private func clearSessionState() {
         currentUser = nil
         isAuthenticated = false
-        UserDefaults.standard.removeObject(forKey: tokenKey)
-        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
         UserDefaults.standard.removeObject(forKey: profileKey)
     }
 
-    func signInForLocalDevelopment() async throws {
-        let request = DevelopmentSessionRequest(
-            profileId: "dev-user-001",
-            username: "local_dev",
-            displayName: "Local Dev",
-            email: "dev@hinto.app",
-            privacy: .private
+    private func observeSessionNotifications() {
+        let center = NotificationCenter.default
+
+        notificationObservers.append(
+            center.addObserver(forName: .hintoSessionInvalidated, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleSessionInvalidated()
+                }
+            }
         )
-        let client = APIClient()
-        let response = try await client.createDevelopmentSession(input: request)
-        setSession(token: response.data.accessToken, user: response.data.me)
+
+        notificationObservers.append(
+            center.addObserver(forName: .hintoSessionRefreshed, object: nil, queue: .main) { [weak self] notification in
+                let refreshedUser = notification.userInfo?["me"] as? MeAggregate
+                Task { @MainActor in
+                    self?.handleSessionRefreshed(refreshedUser)
+                }
+            }
+        )
+    }
+
+    private func handleSessionInvalidated() {
+        guard isAuthenticated || currentUser != nil else { return }
+        signOut()
+        authError = AuthError.sessionExpired.errorDescription
+    }
+
+    private func handleSessionRefreshed(_ user: MeAggregate?) {
+        if let user {
+            applyUser(user)
+        }
+        isAuthenticated = true
     }
 
     // MARK: - Sign in with Apple
 
     func signInWithApple() async throws {
+        let rawNonce = Self.randomNonce()
+
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]
+        request.nonce = Self.sha256Hex(rawNonce)
 
-        let result = try await performAppleSignIn(request: request)
-        guard let credential = result.credential as? ASAuthorizationAppleIDCredential,
-              let identityToken = credential.identityToken,
-              let tokenString = String(data: identityToken, encoding: .utf8) else {
+        let authorization = try await performAppleSignIn(request: request)
+
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let identityTokenData = credential.identityToken,
+              let identityToken = String(data: identityTokenData, encoding: .utf8),
+              !identityToken.isEmpty else {
             throw AuthError.invalidCredential
         }
 
-        // In production, send identityToken to backend for Supabase auth exchange
-        // For now, store as session token placeholder
-        let mockUser = MeAggregate(
-            profile: Profile(
-                profileId: credential.user,
-                username: credential.fullName?.givenName?.lowercased() ?? "user",
-                displayName: [credential.fullName?.givenName, credential.fullName?.familyName]
-                    .compactMap { $0 }.joined(separator: " "),
-                email: credential.email,
-                bio: nil,
-                avatarUrl: nil,
-                privacy: .private,
-                subscriptionTier: .free,
-                createdAt: ISO8601DateFormatter().string(from: Date()),
-                updatedAt: ISO8601DateFormatter().string(from: Date())
-            ),
-            auth: AuthIdentity(
-                authUserId: credential.user,
-                profileId: credential.user,
-                primaryProvider: "apple",
-                linkedProviders: ["apple"],
-                status: "active"
-            ),
-            capabilities: MeCapabilities(
-                canEditProfile: true,
-                canCreateSituationship: true,
-                canUseAiCoach: true
+        // Apple only provides the name on the first authorization for this app.
+        var fullName: AppleFullName?
+        if let components = credential.fullName,
+           components.givenName != nil || components.familyName != nil {
+            fullName = AppleFullName(givenName: components.givenName, familyName: components.familyName)
+        }
+
+        let response = try await api.signInWithApple(
+            input: AppleSignInRequest(
+                identityToken: identityToken,
+                nonce: rawNonce,
+                fullName: fullName
             )
         )
-
-        setSession(token: tokenString, user: mockUser)
+        setSession(response.data)
     }
 
-    @MainActor
     private func performAppleSignIn(request: ASAuthorizationAppleIDRequest) async throws -> ASAuthorization {
-        try await withCheckedThrowingContinuation { continuation in
-            let delegate = AppleSignInDelegate(continuation: continuation)
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = delegate
+        let coordinator = AppleSignInCoordinator(anchor: Self.presentationAnchor())
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = coordinator
+        controller.presentationContextProvider = coordinator
 
-            // Retain delegate for callback
-            objc_setAssociatedObject(controller, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN)
+        // Keep both alive for the duration of the system sheet.
+        appleCoordinator = coordinator
+        appleController = controller
+        defer {
+            appleCoordinator = nil
+            appleController = nil
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            coordinator.continuation = continuation
             controller.performRequests()
         }
+    }
+
+    private static func presentationAnchor() -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let windows = scenes.flatMap { $0.windows }
+        return windows.first(where: { $0.isKeyWindow }) ?? windows.first ?? ASPresentationAnchor()
+    }
+
+    /// Cryptographically random nonce (SystemRandomNumberGenerator is backed by the platform CSPRNG).
+    private static func randomNonce(length: Int = 32) -> String {
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
+        var generator = SystemRandomNumberGenerator()
+        return String((0..<length).map { _ in charset.randomElement(using: &generator)! })
+    }
+
+    private static func sha256Hex(_ input: String) -> String {
+        let digest = SHA256.hash(data: Data(input.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Email Auth
 
     func sendEmailOtp(email: String) async throws {
-        let client = APIClient()
-        let _ = try await client.sendEmailOtp(email: email)
+        _ = try await api.sendEmailOtp(email: email)
     }
 
     func verifyEmailOtp(email: String, code: String) async throws {
-        let client = APIClient()
-        let response = try await client.verifyEmailOtp(email: email, code: code)
-        setSession(
-            token: response.data.accessToken,
-            refreshToken: response.data.refreshToken,
-            user: response.data.me
-        )
+        let response = try await api.verifyEmailOtp(email: email, code: code)
+        setSession(response.data)
     }
 
     // MARK: - Token Refresh
 
+    /// Forces a refresh of the stored session. `APIClient` already refreshes transparently on 401,
+    /// so this is only needed by callers that want to pre-empt expiry.
     func refreshSessionIfNeeded() async throws {
-        guard let refreshToken = UserDefaults.standard.string(forKey: refreshTokenKey) else {
+        guard sessionStore.refreshToken != nil else {
             signOut()
             throw AuthError.sessionExpired
         }
-        let client = APIClient()
-        let response = try await client.refreshSession(refreshToken: refreshToken)
-        setSession(
-            token: response.data.accessToken,
-            refreshToken: response.data.refreshToken,
-            user: response.data.me
-        )
+        do {
+            _ = try await SessionRefresher.shared.refresh(store: sessionStore, baseURL: api.baseURL)
+        } catch let error as APIError where error.isAuthenticationFailure {
+            signOut()
+            throw AuthError.sessionExpired
+        }
     }
 
-    // MARK: - Social Auth Placeholder
+    // MARK: - Provider Dispatch
 
     func signInWithProvider(_ provider: AuthProvider) async throws {
         switch provider {
@@ -178,9 +276,25 @@ final class AuthManager: NSObject {
         }
     }
 
-    // MARK: - Dev Bypass
+    // MARK: - Development-only sign-in (never compiled into release)
 
+    #if DEBUG
+    func signInForLocalDevelopment() async throws {
+        let request = DevelopmentSessionRequest(
+            profileId: "dev-user-001",
+            username: "local_dev",
+            displayName: "Local Dev",
+            email: "dev@hinto.app",
+            privacy: .private
+        )
+        let response = try await api.createDevelopmentSession(input: request)
+        setSession(token: response.data.accessToken, user: response.data.me)
+    }
+
+    /// Offline preview mode with a fabricated profile. Uses the `dev-token` sentinel that
+    /// debug-only mock fallbacks in the list/detail views key off.
     func devSignIn() {
+        let now = ISO8601DateFormatter().string(from: Date())
         let mockUser = MeAggregate(
             profile: Profile(
                 profileId: "dev-user-001",
@@ -191,8 +305,10 @@ final class AuthManager: NSObject {
                 avatarUrl: nil,
                 privacy: .private,
                 subscriptionTier: .free,
-                createdAt: ISO8601DateFormatter().string(from: Date()),
-                updatedAt: ISO8601DateFormatter().string(from: Date())
+                age: 25,
+                ageVerified: true,
+                createdAt: now,
+                updatedAt: now
             ),
             auth: AuthIdentity(
                 authUserId: "dev-auth-001",
@@ -209,6 +325,7 @@ final class AuthManager: NSObject {
         )
         setSession(token: "dev-token", user: mockUser)
     }
+    #endif
 }
 
 // MARK: - Auth Types
@@ -221,6 +338,9 @@ enum AuthProvider: String, CaseIterable, Identifiable {
     case email
 
     var id: String { rawValue }
+
+    /// Providers with a working end-to-end flow. Only these render on the onboarding screen.
+    static let onboardingProviders: [AuthProvider] = [.apple, .email]
 
     var displayName: String {
         switch self {
@@ -242,60 +362,70 @@ enum AuthProvider: String, CaseIterable, Identifiable {
         }
     }
 
-    var backgroundColor: SwiftUI.Color {
+    var backgroundColor: Color {
         switch self {
-        case .apple: .socialApple
-        case .facebook: .socialFacebook
-        case .snapchat: .socialSnapchat
-        case .tiktok: .socialTikTok
-        case .email: .hintoBlue
+        case .apple: Color.socialApple
+        case .facebook: Color.socialFacebook
+        case .snapchat: Color.socialSnapchat
+        case .tiktok: Color.socialTikTok
+        case .email: Color.hintoBlue
         }
     }
 
-    var foregroundColor: SwiftUI.Color {
+    var foregroundColor: Color {
         switch self {
-        case .snapchat: .black
-        default: .white
+        case .snapchat: Color.black
+        default: Color.white
         }
     }
 }
-
-import SwiftUI
 
 enum AuthError: LocalizedError {
     case invalidCredential
     case providerNotImplemented(String)
     case cancelled
     case sessionExpired
+    case underage
 
     var errorDescription: String? {
         switch self {
         case .invalidCredential: "Invalid sign-in credential"
-        case .providerNotImplemented(let p): "\(p) sign-in coming soon"
+        case .providerNotImplemented(let provider): "\(provider.capitalized) sign-in is not available"
         case .cancelled: "Sign-in was cancelled"
         case .sessionExpired: "Your session has expired. Please sign in again."
+        case .underage: "You must be at least \(Profile.minimumAge) to use HINTO."
         }
     }
 }
 
-// MARK: - Apple Sign In Delegate
+// MARK: - Apple Sign In Coordinator
 
-private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate {
-    let continuation: CheckedContinuation<ASAuthorization, any Error>
+/// Delegate + presentation-context provider for `ASAuthorizationController`.
+/// Not actor-isolated: the anchor is captured up front on the main actor so the
+/// delegate callbacks never need to touch UIKit state.
+private final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let anchor: ASPresentationAnchor
+    var continuation: CheckedContinuation<ASAuthorization, any Error>?
 
-    init(continuation: CheckedContinuation<ASAuthorization, any Error>) {
-        self.continuation = continuation
+    init(anchor: ASPresentationAnchor) {
+        self.anchor = anchor
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        continuation.resume(returning: authorization)
+        continuation?.resume(returning: authorization)
+        continuation = nil
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: any Error) {
         if (error as? ASAuthorizationError)?.code == .canceled {
-            continuation.resume(throwing: AuthError.cancelled)
+            continuation?.resume(throwing: AuthError.cancelled)
         } else {
-            continuation.resume(throwing: error)
+            continuation?.resume(throwing: error)
         }
+        continuation = nil
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        anchor
     }
 }

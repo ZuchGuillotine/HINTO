@@ -9,7 +9,6 @@ struct ShareSessionView: View {
     @State private var isCreating = false
     @State private var shareURL: URL?
     @State private var createdSession: VotingSession?
-    @State private var showShareLink = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -74,15 +73,31 @@ struct ShareSessionView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let shareURL {
-                    ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
-                        Label("Share Link", systemImage: "square.and.arrow.up")
-                            .font(.hintoButton)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .foregroundStyle(.white)
-                            .background(Color.hintoPink)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                if let shareURL, let createdSession {
+                    VStack(spacing: Spacing.sm) {
+                        ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                                .font(.hintoButton)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .foregroundStyle(.white)
+                                .background(Color.hintoPink)
+                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        }
+
+                        NavigationLink {
+                            VoteResultsView(votingSessionId: createdSession.votingSessionId)
+                        } label: {
+                            Label("View Results", systemImage: "chart.bar.fill")
+                                .font(.hintoButton)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .foregroundStyle(Color.hintoPink)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: CornerRadius.md)
+                                        .strokeBorder(Color.hintoPink, lineWidth: 1.5)
+                                }
+                        }
                     }
                     .padding(.horizontal, Spacing.md)
                 } else {
@@ -152,6 +167,10 @@ struct ShareSessionView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ShareSessionView(situationships: SituationshipListView.mockSituationships)
+        .environment(AuthManager())
+        .environment(APIClient())
 }
+#endif

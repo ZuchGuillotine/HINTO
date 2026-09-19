@@ -1,42 +1,52 @@
 import SwiftUI
 
+/// Owner-only results for one voting session (`GET /v1/me/voting-sessions/:id/results`).
+/// Expects to be pushed or presented inside a `NavigationStack` supplied by the caller.
 struct VoteResultsView: View {
-    let situationships: [Situationship]
+    let votingSessionId: String
 
-    @State private var results: [VoteResult] = []
-    @State private var totalVoters = 0
+    @Environment(AuthManager.self) private var auth
+    @Environment(APIClient.self) private var api
+
+    @State private var aggregate: VoteResultsAggregate?
     @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if results.isEmpty {
-                    emptyState
-                } else {
-                    resultsList
-                }
+        Group {
+            if isLoading && aggregate == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage, aggregate == nil {
+                failedState(errorMessage)
+            } else if let aggregate, aggregate.totalVotes > 0 {
+                resultsList(aggregate)
+            } else {
+                emptyState
             }
-            .navigationTitle("Results")
-            .navigationBarTitleDisplayMode(.inline)
-            .task { await loadResults() }
         }
+        .navigationTitle("Results")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await loadResults() }
+        .refreshable { await loadResults() }
     }
 
-    private var resultsList: some View {
+    private func resultsList(_ aggregate: VoteResultsAggregate) -> some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
                 // Summary card
                 VStack(spacing: Spacing.xs) {
-                    Text("\(totalVoters)")
+                    Text("\(aggregate.totalVoters)")
                         .font(.hintoDisplay)
                         .foregroundStyle(Color.hintoPink)
 
-                    Text("friends voted")
+                    Text(aggregate.totalVoters == 1 ? "friend voted" : "friends voted")
                         .font(.hintoBody)
                         .foregroundStyle(.secondary)
+
+                    Text(aggregate.session.status == .active ? aggregate.session.timeRemaining : "Voting closed")
+                        .font(.hintoCaption)
+                        .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(Spacing.lg)
@@ -44,9 +54,13 @@ struct VoteResultsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
                 .padding(.horizontal, Spacing.md)
 
-                // Individual results
-                ForEach(Array(results.sorted { $0.score > $1.score }.enumerated()), id: \.element.id) { index, result in
-                    resultCard(result, rank: index + 1)
+                // Individual results (server already ranks by score)
+                ForEach(aggregate.results.sorted { $0.rank < $1.rank }) { result in
+                    resultCard(result)
+                }
+
+                if !aggregate.comments.isEmpty {
+                    commentsSection(aggregate)
                 }
             }
             .padding(.vertical, Spacing.md)
@@ -54,16 +68,16 @@ struct VoteResultsView: View {
     }
 
     @ViewBuilder
-    private func resultCard(_ result: VoteResult, rank: Int) -> some View {
+    private func resultCard(_ result: VoteResult) -> some View {
         VStack(spacing: Spacing.sm) {
             HStack {
                 // Rank + name
                 HStack(spacing: Spacing.sm) {
                     ZStack {
                         Circle()
-                            .fill(rank == 1 ? Color.hintoPink.gradient : Color.neutral300.gradient)
+                            .fill(result.rank == 1 ? Color.hintoPink.gradient : Color.neutral300.gradient)
                             .frame(width: 32, height: 32)
-                        Text("\(rank)")
+                        Text("\(result.rank)")
                             .font(.hintoLabel)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
@@ -130,12 +144,9 @@ struct VoteResultsView: View {
                     }
 
                     GeometryReader { geo in
-                        let worstPct = result.totalVotes > 0
-                            ? Double(result.worstVotes) / Double(result.totalVotes) * 100
-                            : 0
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.hintoError.gradient)
-                            .frame(width: geo.size.width * worstPct / 100)
+                            .frame(width: geo.size.width * result.worstPercentage / 100)
                     }
                     .frame(height: 6)
                     .background(Color(.tertiarySystemBackground))
@@ -149,6 +160,46 @@ struct VoteResultsView: View {
         .padding(.horizontal, Spacing.md)
     }
 
+    private func commentsSection(_ aggregate: VoteResultsAggregate) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Comments")
+                .font(.hintoH4)
+
+            ForEach(aggregate.comments) { comment in
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    HStack(spacing: Spacing.xxs) {
+                        Image(systemName: comment.isBestFit ? "heart.fill" : "xmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(comment.isBestFit ? Color.hintoSuccess : Color.hintoError)
+
+                        Text(situationshipName(for: comment.situationshipId, in: aggregate))
+                            .font(.hintoLabel)
+
+                        Spacer()
+
+                        if let voterLabel = comment.voterLabel, !voterLabel.isEmpty {
+                            Text(voterLabel)
+                                .font(.hintoCaption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(comment.comment)
+                        .font(.hintoBody)
+                }
+                .padding(Spacing.sm)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            }
+        }
+        .padding(.horizontal, Spacing.md)
+    }
+
+    private func situationshipName(for situationshipId: String, in aggregate: VoteResultsAggregate) -> String {
+        aggregate.results.first { $0.situationshipId == situationshipId }?.name ?? "Someone"
+    }
+
     private var emptyState: some View {
         VStack(spacing: Spacing.md) {
             Image(systemName: "chart.bar.doc.horizontal")
@@ -158,36 +209,62 @@ struct VoteResultsView: View {
             Text("No votes yet")
                 .font(.hintoH3)
 
-            Text("Share your list with friends to start getting votes")
+            Text("Share your link with friends. Pull down to refresh once they have voted.")
                 .font(.hintoBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(Spacing.xl)
+    }
+
+    private func failedState(_ message: String) -> some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundStyle(.tertiary)
+
+            Text("Could not load results")
+                .font(.hintoH3)
+
+            Text(message)
+                .font(.hintoBody)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            HINTOButton(title: "Try Again", style: .secondary, icon: "arrow.clockwise") {
+                Task { await loadResults() }
+            }
+            .frame(maxWidth: 200)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(Spacing.xl)
     }
 
     private func loadResults() async {
-        // In production, fetch from API
-        try? await Task.sleep(for: .seconds(0.5))
-
-        // Mock results
-        results = situationships.map { s in
-            let best = Int.random(in: 0...8)
-            let worst = Int.random(in: 0...5)
-            return VoteResult(
-                situationshipId: s.id,
-                name: s.name,
-                emoji: s.displayEmoji,
-                bestVotes: best,
-                worstVotes: worst,
-                totalVotes: best + worst
-            )
+        guard let token = auth.accessToken else {
+            errorMessage = AuthError.sessionExpired.errorDescription
+            isLoading = false
+            return
         }
-        totalVoters = Int.random(in: 3...12)
-        isLoading = false
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let response = try await api.getVotingResults(token: token, votingSessionId: votingSessionId)
+            aggregate = response.data
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
 #Preview {
-    VoteResultsView(situationships: SituationshipListView.mockSituationships)
+    NavigationStack {
+        VoteResultsView(votingSessionId: "preview")
+            .environment(AuthManager())
+            .environment(APIClient())
+    }
 }

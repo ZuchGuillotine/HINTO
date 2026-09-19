@@ -10,6 +10,10 @@ struct VotingSession: Codable, Identifiable {
     let votingSessionId: String
     let ownerProfileId: String
     let inviteCode: String
+    let title: String
+    let description: String?
+    let visibility: String
+    let anonymityMode: String
     let status: VotingSessionStatus
     let expiresAt: String
     let createdAt: String
@@ -17,12 +21,13 @@ struct VotingSession: Codable, Identifiable {
     var id: String { votingSessionId }
 
     var isExpired: Bool {
-        guard let date = ISO8601DateFormatter().date(from: expiresAt) else { return true }
+        guard status == .active else { return true }
+        guard let date = HINTODate.parse(expiresAt) else { return true }
         return date < Date()
     }
 
     var timeRemaining: String {
-        guard let date = ISO8601DateFormatter().date(from: expiresAt) else { return "Expired" }
+        guard let date = HINTODate.parse(expiresAt) else { return "Expired" }
         let interval = date.timeIntervalSince(Date())
         guard interval > 0 else { return "Expired" }
 
@@ -36,15 +41,6 @@ struct VotingSession: Codable, Identifiable {
     }
 }
 
-struct VoteSubmission: Codable {
-    let votingSessionId: String
-    let voterIdentity: String
-    var voterName: String?
-    let bestSituationshipId: String
-    let worstSituationshipId: String
-    var comment: String?
-}
-
 struct VoteResult: Codable, Identifiable {
     let situationshipId: String
     let name: String
@@ -52,14 +48,21 @@ struct VoteResult: Codable, Identifiable {
     let bestVotes: Int
     let worstVotes: Int
     let totalVotes: Int
+    /// `bestVotes - worstVotes`, computed server-side.
+    let score: Int
+    /// 1-based position after sorting by score, computed server-side.
+    let rank: Int
 
     var id: String { situationshipId }
-
-    var score: Int { bestVotes - worstVotes }
 
     var bestPercentage: Double {
         guard totalVotes > 0 else { return 0 }
         return Double(bestVotes) / Double(totalVotes) * 100
+    }
+
+    var worstPercentage: Double {
+        guard totalVotes > 0 else { return 0 }
+        return Double(worstVotes) / Double(totalVotes) * 100
     }
 }
 
@@ -81,6 +84,8 @@ struct VoteComment: Codable, Identifiable {
     var id: String {
         "\(situationshipId)-\(createdAt)-\(voteType)"
     }
+
+    var isBestFit: Bool { voteType == "best_fit" }
 }
 
 struct CreateVotingSessionRequest: Encodable {
@@ -124,10 +129,10 @@ struct PublicVotingAudience: Decodable {
 
 struct SubmitVoteRequest: Encodable {
     let voterIdentity: String
-    let voterName: String?
+    var voterName: String? = nil
     let bestSituationshipId: String
     let worstSituationshipId: String
-    let comment: String?
+    var comment: String? = nil
 }
 
 struct SubmitVoteData: Decodable {

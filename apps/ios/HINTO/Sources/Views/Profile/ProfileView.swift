@@ -1,14 +1,20 @@
 import SwiftUI
 import PhotosUI
 
+/// Profile editor. Expects to live inside a `NavigationStack` supplied by the caller
+/// (the Profile tab wraps it; Settings pushes it) so stacks never nest.
 struct ProfileView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(APIClient.self) private var api
     @State private var isEditing = false
     @State private var isSaving = false
+    @State private var isDeleting = false
     @State private var showSignOutConfirmation = false
     @State private var showDeleteConfirmation = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var errorTitle = "Something went wrong"
+    @State private var errorMessage: String?
+    @State private var showError = false
 
     // Form fields
     @State private var username = ""
@@ -19,46 +25,52 @@ struct ProfileView: View {
     private var profile: Profile? { auth.currentUser?.profile }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: Spacing.lg) {
-                    avatarSection
-                    profileFields
-                    linkedProvidersSection
-                    privacySection
-                    accountActions
-                }
-                .padding(Spacing.md)
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                avatarSection
+                profileFields
+                linkedProvidersSection
+                privacySection
+                accountActions
             }
-            .navigationTitle("Profile")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(isEditing ? "Save" : "Edit") {
-                        if isEditing {
-                            Task { await saveProfile() }
-                        } else {
-                            isEditing = true
-                        }
+            .padding(Spacing.md)
+        }
+        .navigationTitle("Profile")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(isEditing ? "Save" : "Edit") {
+                    if isEditing {
+                        Task { await saveProfile() }
+                    } else {
+                        isEditing = true
                     }
-                    .fontWeight(.semibold)
-                    .disabled(isSaving)
                 }
+                .fontWeight(.semibold)
+                .disabled(isSaving || isDeleting)
             }
-            .onAppear { populateFields() }
-            .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
-                Button("Sign Out", role: .destructive) { auth.signOut() }
+        }
+        .onAppear { populateFields() }
+        .onChange(of: profile) {
+            if !isEditing { populateFields() }
+        }
+        .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
+            Button("Sign Out", role: .destructive) { auth.signOut() }
+        }
+        .confirmationDialog(
+            "Delete Account",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                Task { await deleteAccount() }
             }
-            .confirmationDialog(
-                "Delete Account",
-                isPresented: $showDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete Account", role: .destructive) {
-                    auth.signOut()
-                }
-            } message: {
-                Text("This permanently deletes your account and all data. This cannot be undone.")
-            }
+        } message: {
+            Text("This permanently deletes your account, your list, votes, and coach conversations. This cannot be undone.")
+        }
+        .alert(errorTitle, isPresented: $showError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage ?? "Please try again.")
         }
     }
 
@@ -119,6 +131,10 @@ struct ProfileView: View {
                 if !displayName.isEmpty { displayField("Display Name", value: displayName) }
                 if !bio.isEmpty { displayField("Bio", value: bio) }
             }
+
+            if let age = profile?.age {
+                displayField("Age", value: "\(age)")
+            }
         }
     }
 
@@ -135,7 +151,7 @@ struct ProfileView: View {
                         .font(.hintoBody)
                 }
             } else {
-                Text("Provider linking will expand as more auth flows land.")
+                Text("No linked sign-in providers.")
                     .font(.hintoBodySmall)
                     .foregroundStyle(.tertiary)
             }
@@ -174,8 +190,9 @@ struct ProfileView: View {
             HINTOButton(title: "Sign Out", style: .secondary) {
                 showSignOutConfirmation = true
             }
+            .disabled(isDeleting)
 
-            HINTOButton(title: "Delete Account", style: .destructive) {
+            HINTOButton(title: "Delete Account", style: .destructive, isLoading: isDeleting) {
                 showDeleteConfirmation = true
             }
         }
@@ -233,29 +250,60 @@ struct ProfileView: View {
     }
 
     private func saveProfile() async {
-        isSaving = true
-        defer {
-            isSaving = false
-            isEditing = false
+        guard let token = auth.accessToken else {
+            presentError(title: "Could not save profile", AuthError.sessionExpired.errorDescription)
+            return
         }
 
-        guard let token = auth.accessToken else { return }
+        isSaving = true
+        defer { isSaving = false }
+
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hadBio = !(profile?.bio ?? "").isEmpty
 
         let update = UpdateProfileRequest(
-            username: username.isEmpty ? nil : username,
-            displayName: displayName.isEmpty ? nil : displayName,
-            bio: bio.isEmpty ? nil : bio,
+            username: trimmedUsername.isEmpty ? nil : trimmedUsername,
+            displayName: trimmedDisplayName.isEmpty ? nil : trimmedDisplayName,
+            bio: trimmedBio.isEmpty ? nil : trimmedBio,
+            clearBio: trimmedBio.isEmpty && hadBio,
             privacy: privacy
         )
 
-        if let response = try? await api.updateMe(token: token, update: update) {
+        do {
+            let response = try await api.updateMe(token: token, update: update)
             auth.currentUser = response.data
+            isEditing = false
+        } catch {
+            // Stay in edit mode so nothing the user typed is lost.
+            presentError(title: "Could not save profile", error.localizedDescription)
         }
+    }
+
+    private func deleteAccount() async {
+        isDeleting = true
+        defer { isDeleting = false }
+
+        do {
+            try await auth.deleteAccount()
+            // AuthManager signs out on success; RootView returns to onboarding.
+        } catch {
+            presentError(title: "Could not delete account", error.localizedDescription)
+        }
+    }
+
+    private func presentError(title: String, _ message: String?) {
+        errorTitle = title
+        errorMessage = message
+        showError = true
     }
 }
 
 #Preview {
-    ProfileView()
-        .environment(AuthManager())
-        .environment(APIClient())
+    NavigationStack {
+        ProfileView()
+            .environment(AuthManager())
+            .environment(APIClient())
+    }
 }

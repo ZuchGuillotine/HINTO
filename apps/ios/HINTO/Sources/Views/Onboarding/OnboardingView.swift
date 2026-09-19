@@ -43,7 +43,7 @@ struct OnboardingView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .frame(maxHeight: .infinity)
 
-            // Bottom: Auth buttons
+            // Bottom: Auth buttons (only providers with a working end-to-end flow)
             VStack(spacing: Spacing.sm) {
                 Text("Get started")
                     .font(.hintoH3)
@@ -53,7 +53,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
                     .padding(.bottom, Spacing.xs)
 
-                ForEach(AuthProvider.allCases) { provider in
+                ForEach(AuthProvider.onboardingProviders) { provider in
                     SocialAuthButton(provider: provider) {
                         Task { await handleAuth(provider) }
                     }
@@ -95,6 +95,14 @@ struct OnboardingView: View {
         } message: {
             Text(errorMessage ?? "Something went wrong")
         }
+        .onAppear {
+            // Surface a forced sign-out (rejected refresh token) once, then clear it.
+            if let pendingError = auth.authError {
+                errorMessage = pendingError
+                showError = true
+                auth.authError = nil
+            }
+        }
     }
 
     private func handleAuth(_ provider: AuthProvider) async {
@@ -116,6 +124,7 @@ struct OnboardingView: View {
         }
     }
 
+    #if DEBUG
     private func handleLocalDevelopmentAuth() async {
         isLoading = true
         defer { isLoading = false }
@@ -127,6 +136,7 @@ struct OnboardingView: View {
             showError = true
         }
     }
+    #endif
 }
 
 #Preview {

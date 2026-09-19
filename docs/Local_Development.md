@@ -76,7 +76,7 @@ This repo now includes:
 
 - `Project.swift`
 - `Workspace.swift`
-- `Tuist/Config.swift`
+- `Tuist.swift`
 
 Generate the Xcode project:
 
@@ -84,9 +84,11 @@ Generate the Xcode project:
 tuist generate
 ```
 
-The generated app target reads its default backend base URL from the `HINTOAPIBaseURL` Info.plist key.
+The app target uses a hand-written, preprocessed `apps/ios/HINTO/Info.plist`. `HINTOAPIBaseURL` is substituted from the `HINTO_API_BASE_URL` build setting (`http://127.0.0.1:3000` in Debug, `https://api.hinto.app` in Release), and the ATS local-networking exception exists only in Debug. Edit that plist as source; Xcode's plist editor cannot open it.
 
 Override the API base URL at runtime from Xcode by setting the `HINTO_API_BASE_URL` environment variable for the scheme if needed.
+
+Copy `.env.example` to `.env` and set `API_ENABLE_DEV_AUTH=true` for the `Use Local API` button to work; the API refuses dev sessions otherwise.
 
 ## Run The SwiftUI App
 

@@ -13,14 +13,20 @@ struct SituationshipDetailView: View {
 
     let mode: SituationshipDetailMode
     var onSave: ((Situationship) -> Void)?
+    /// Called with the deleted situationship id so the presenting list can drop the row.
+    var onDelete: ((String) -> Void)?
 
     @State private var name = ""
     @State private var emoji = "💖"
     @State private var category: SituationshipCategory? = .crush
     @State private var description = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
     @State private var showDeleteConfirmation = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var errorTitle = "Something went wrong"
+    @State private var errorMessage: String?
+    @State private var showError = false
 
     @FocusState private var nameFieldFocused: Bool
 
@@ -53,12 +59,13 @@ struct SituationshipDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving || isDeleting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isEditing ? "Save" : "Add") {
                         Task { await save() }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving || isDeleting)
                     .fontWeight(.semibold)
                 }
             }
@@ -73,6 +80,11 @@ struct SituationshipDetailView: View {
                 }
             } message: {
                 Text("This can't be undone. Are you sure?")
+            }
+            .alert(errorTitle, isPresented: $showError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage ?? "Please try again.")
             }
         }
     }
@@ -155,7 +167,7 @@ struct SituationshipDetailView: View {
     // MARK: - Delete Section
 
     private var deleteSection: some View {
-        HINTOButton(title: "Delete Situationship", style: .destructive, icon: "trash") {
+        HINTOButton(title: "Delete Situationship", style: .destructive, icon: "trash", isLoading: isDeleting) {
             showDeleteConfirmation = true
         }
         .padding(.top, Spacing.lg)
@@ -175,19 +187,26 @@ struct SituationshipDetailView: View {
     }
 
     private func save() async {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else { return }
+
+        guard let token = auth.accessToken else {
+            presentError(title: "Could not save", AuthError.sessionExpired.errorDescription)
+            return
+        }
+
         isSaving = true
         defer { isSaving = false }
 
-        guard let token = auth.accessToken else { return }
+        let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             if let existing = existingSituationship {
                 let request = UpdateSituationshipRequest(
-                    name: name.trimmingCharacters(in: .whitespaces),
+                    name: trimmedName,
                     emoji: emoji,
                     category: category?.rawValue,
-                    description: description.isEmpty ? nil : description
+                    description: trimmedDescription.isEmpty ? nil : trimmedDescription
                 )
                 let response = try await api.updateSituationship(
                     token: token, id: existing.id, input: request
@@ -195,10 +214,10 @@ struct SituationshipDetailView: View {
                 onSave?(response.data.situationship)
             } else {
                 let request = CreateSituationshipRequest(
-                    name: name.trimmingCharacters(in: .whitespaces),
+                    name: trimmedName,
                     emoji: emoji,
                     category: category?.rawValue,
-                    description: description.isEmpty ? nil : description
+                    description: trimmedDescription.isEmpty ? nil : trimmedDescription
                 )
                 let response = try await api.createSituationship(
                     token: token, input: request
@@ -207,31 +226,62 @@ struct SituationshipDetailView: View {
             }
             dismiss()
         } catch {
-            // In dev mode, create a mock
+            #if DEBUG
+            // Preview Mode (offline, fabricated session) fakes the write locally.
             if auth.accessToken == "dev-token" {
+                let now = ISO8601DateFormatter().string(from: Date())
                 let mock = Situationship(
-                    situationshipId: UUID().uuidString,
+                    situationshipId: existingSituationship?.id ?? UUID().uuidString,
                     ownerProfileId: "dev",
-                    name: name,
+                    name: trimmedName,
                     emoji: emoji,
                     category: category?.rawValue,
-                    description: description.isEmpty ? nil : description,
-                    rank: 99,
+                    description: trimmedDescription.isEmpty ? nil : trimmedDescription,
+                    rank: existingSituationship?.rank ?? 99,
                     status: .active,
-                    createdAt: ISO8601DateFormatter().string(from: Date()),
-                    updatedAt: ISO8601DateFormatter().string(from: Date())
+                    createdAt: existingSituationship?.createdAt ?? now,
+                    updatedAt: now
                 )
                 onSave?(mock)
                 dismiss()
+                return
             }
+            #endif
+            // Keep the sheet open so nothing the user typed is lost.
+            presentError(title: isEditing ? "Could not save changes" : "Could not add situationship", error.localizedDescription)
         }
     }
 
     private func deleteSituationship() async {
-        guard let existing = existingSituationship,
-              let token = auth.accessToken else { return }
-        _ = try? await api.deleteSituationship(token: token, id: existing.id)
-        dismiss()
+        guard let existing = existingSituationship else { return }
+        guard let token = auth.accessToken else {
+            presentError(title: "Could not delete", AuthError.sessionExpired.errorDescription)
+            return
+        }
+
+        isDeleting = true
+        defer { isDeleting = false }
+
+        do {
+            _ = try await api.deleteSituationship(token: token, id: existing.id)
+            onDelete?(existing.id)
+            dismiss()
+        } catch {
+            #if DEBUG
+            if auth.accessToken == "dev-token" {
+                onDelete?(existing.id)
+                dismiss()
+                return
+            }
+            #endif
+            presentError(title: "Could not delete", error.localizedDescription)
+        }
+    }
+
+    private func presentError(title: String, _ message: String?) {
+        errorTitle = title
+        errorMessage = message
+        showError = true
     }
 }
 

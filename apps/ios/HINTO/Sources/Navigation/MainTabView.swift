@@ -61,7 +61,11 @@ struct MainTabView: View {
         case .chat:
             ChatView()
         case .profile:
-            ProfileView()
+            // ProfileView carries no NavigationStack of its own so it can also be
+            // pushed from Settings without nesting stacks.
+            NavigationStack {
+                ProfileView()
+            }
         case .settings:
             SettingsView()
         }
