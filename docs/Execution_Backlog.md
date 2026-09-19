@@ -1,7 +1,7 @@
 # HINTO Execution Backlog
 
-*Created: 2026-03-27*
-*Reviewed: 2026-04-14*
+_Created: 2026-03-27_
+_Reviewed: 2026-09-19_
 
 ## Purpose
 
@@ -17,21 +17,37 @@ The active target is:
 - HTTP API and contracts that are clean for both Swift and web clients
 - gradual retirement of AWS Amplify, Cognito, AppSync, and Expo-first assumptions
 
-## Session Focus: 2026-04-14
+## Session Focus: 2026-09-19 (launch readiness)
 
-This section is the live execution tracker for the current build-and-verify push.
+The launch-readiness audit in `docs/Launch_Readiness_Audit.md` is now the source of truth for what blocks a live deployment. This table tracks the follow-through.
 
-| ID | Goal | Status | Notes |
-| --- | --- | --- | --- |
-| SX-01 | Review canonical restart docs and map current repo state to the next execution slice | Done | Canonical MVP brief, restart plan, backlog, API scaffold, and SwiftUI app shell reviewed at the start of the session |
-| SX-02 | Use this backlog as the status source while delivering the next slice | Done | Session goals, build attempts, and remaining blockers have been recorded here during implementation |
-| SX-03 | Harden local backend wiring for shared iOS + web development | Done | API now auto-loads repo `.env`, serves local CORS headers, and exposes `POST /v1/dev/session` with development-token auth support for `/v1/me` and situationship flows |
-| SX-04 | Build `/apps/web` with comparable JS onboarding, profile, and situationship features | Done | `/apps/web` now contains a dependency-light JS shell with local-dev sign-in, profile editing, situationship create/edit/delete/reorder, and honest roadmap panels for voting + AI |
-| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend | In Progress | Local API base URL override, development sign-in, profile contract alignment, and situationship route fixes are in place; simulator build is down to remaining voting/share view compile cleanup |
-| SX-06 | Add Tuist project generation and local build configuration docs | Done | `Project.swift`, `Workspace.swift`, `Tuist/Config.swift`, and `docs/Local_Development.md` added; `tuist generate` succeeded and produced `HINTO.xcworkspace` |
-| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build | In Progress | `npm run api:build` passed, targeted ESLint for new files passed, `tuist generate` passed, and iterative iOS builds were attempted; localhost server smoke tests still need an out-of-sandbox run and the iOS build still has one remaining SwiftUI compile blocker in the staged voting/share shell |
-| SX-08 | Capture dependency-install signal from the current root package graph | Done | `npm install` completed but confirmed the root dependency graph is still legacy-heavy; warnings were dominated by Expo/AWS/Amplify-era packages rather than the new web/API slice |
-| SX-09 | Implement the restart-era voting backend slice and update the backlog/docs to match branch reality | In Progress | Contracts, domain helpers, API routes, targeted node tests, and `supabase/migrations/011_voting_session_identity_support.sql` are now in tree; remote DB apply, client wiring, and end-to-end verification remain |
+| ID    | Goal                                                                                      | Status                    | Notes                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------- |
+| LR-01 | Full-repo audit: API, DB, iOS, web, infra, legal                                          | Done                      | `docs/Launch_Readiness_Audit.md`                                                              |
+| LR-02 | Backend security fixes (B1, B2, B18) and correctness (B3, B5)                             | Done                      | Anon auth client, dev-auth opt-in, redirect allowlist, transactional reorder, boot validation |
+| LR-03 | Migration 012: reorder function, bio, nullable email, view grants, voting RLS             | Done (needs remote apply) | Human must run against the live project and `supabase db diff`                                |
+| LR-04 | Missing MVP routes: `DELETE /v1/me`, reports/blocks, AI coach, Apple exchange             | Done                      | `packages/prompts` created; AI is 503 until `OPENAI_API_KEY` is set                           |
+| LR-05 | Deploy scaffolding: API package, Dockerfile, CI, `.env.example`, root `npm start`         | Done                      | Image build verified by CI only                                                               |
+| LR-06 | iOS launch blockers (B8-B12, H3-H5)                                                       | In Progress               | See audit; Xcode verification is human-only                                                   |
+| LR-07 | Web sign-in, config, legal pages, `/vote/:code`, results, coach (B13-B15, H11-H12)        | In Progress               | Static host config under `apps/web/vercel.json`                                               |
+| LR-08 | Human-only: provider dashboards, live DB apply, domain decision, TestFlight, legal review | Todo                      | `docs/Launch_Readiness_Audit.md` Human Testing Required                                       |
+| LR-09 | LLM evals for the coach                                                                   | Todo                      | `docs/Launch_Readiness_Audit.md` LLM Testing And Evals Required; needs a model key            |
+
+## Session Focus: 2026-04-14 (historical)
+
+This section was the live execution tracker for the April build-and-verify push.
+
+| ID    | Goal                                                                                               | Status      | Notes                                                                                                                                                                                                                                                                                                |
+| ----- | -------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SX-01 | Review canonical restart docs and map current repo state to the next execution slice               | Done        | Canonical MVP brief, restart plan, backlog, API scaffold, and SwiftUI app shell reviewed at the start of the session                                                                                                                                                                                 |
+| SX-02 | Use this backlog as the status source while delivering the next slice                              | Done        | Session goals, build attempts, and remaining blockers have been recorded here during implementation                                                                                                                                                                                                  |
+| SX-03 | Harden local backend wiring for shared iOS + web development                                       | Done        | API now auto-loads repo `.env`, serves local CORS headers, and exposes `POST /v1/dev/session` with development-token auth support for `/v1/me` and situationship flows                                                                                                                               |
+| SX-04 | Build `/apps/web` with comparable JS onboarding, profile, and situationship features               | Done        | `/apps/web` now contains a dependency-light JS shell with local-dev sign-in, profile editing, situationship create/edit/delete/reorder, and honest roadmap panels for voting + AI                                                                                                                    |
+| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend                                   | In Progress | Local API base URL override, development sign-in, profile contract alignment, and situationship route fixes are in place; simulator build is down to remaining voting/share view compile cleanup                                                                                                     |
+| SX-06 | Add Tuist project generation and local build configuration docs                                    | Done        | `Project.swift`, `Workspace.swift`, `Tuist/Config.swift`, and `docs/Local_Development.md` added; `tuist generate` succeeded and produced `HINTO.xcworkspace`                                                                                                                                         |
+| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build                 | In Progress | `npm run api:build` passed, targeted ESLint for new files passed, `tuist generate` passed, and iterative iOS builds were attempted; localhost server smoke tests still need an out-of-sandbox run and the iOS build still has one remaining SwiftUI compile blocker in the staged voting/share shell |
+| SX-08 | Capture dependency-install signal from the current root package graph                              | Done        | `npm install` completed but confirmed the root dependency graph is still legacy-heavy; warnings were dominated by Expo/AWS/Amplify-era packages rather than the new web/API slice                                                                                                                    |
+| SX-09 | Implement the restart-era voting backend slice and update the backlog/docs to match branch reality | In Progress | Contracts, domain helpers, API routes, targeted node tests, and `supabase/migrations/011_voting_session_identity_support.sql` are now in tree; remote DB apply, client wiring, and end-to-end verification remain                                                                                    |
 
 ## Assumptions
 
@@ -118,13 +134,13 @@ Default drift guardrails:
 
 The first agent wave should stay close to Phase A and unblock the first backend slice.
 
-| Queue | Backlog IDs | Goal | Worker Type | Evaluator Needed | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Q1 | EX-20, EX-21 | Import or reference donor schema cleanly and produce Amplify-to-Supabase entity mapping | Worker | Yes | Must treat donor repo as input, not target architecture |
-| Q2 | EX-22, EX-23 | Define canonical domain model and identify schema gaps for web + Swift | Worker | Yes | Should use EX-21 output as input |
-| Q3 | EX-30, EX-31, EX-32, EX-33, EX-34 | Scaffold `/services/api` with config, error model, logging, and health surface | Worker | Yes | Keep auth implementation out of first scaffold unless needed for structure |
-| Q4 | EX-50, EX-51 | Scaffold `/packages/contracts` and `/packages/domain` for first vertical slice | Worker | Yes | Should align with Q2 and Q3 outputs |
-| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Prioritize active paths under `apps/hnnt-app/src/` and scripts/config |
+| Queue | Backlog IDs                       | Goal                                                                                    | Worker Type | Evaluator Needed | Notes                                                                      |
+| ----- | --------------------------------- | --------------------------------------------------------------------------------------- | ----------- | ---------------- | -------------------------------------------------------------------------- |
+| Q1    | EX-20, EX-21                      | Import or reference donor schema cleanly and produce Amplify-to-Supabase entity mapping | Worker      | Yes              | Must treat donor repo as input, not target architecture                    |
+| Q2    | EX-22, EX-23                      | Define canonical domain model and identify schema gaps for web + Swift                  | Worker      | Yes              | Should use EX-21 output as input                                           |
+| Q3    | EX-30, EX-31, EX-32, EX-33, EX-34 | Scaffold `/services/api` with config, error model, logging, and health surface          | Worker      | Yes              | Keep auth implementation out of first scaffold unless needed for structure |
+| Q4    | EX-50, EX-51                      | Scaffold `/packages/contracts` and `/packages/domain` for first vertical slice          | Worker      | Yes              | Should align with Q2 and Q3 outputs                                        |
+| Q5    | EX-80                             | Audit AWS/Amplify/Cognito touchpoints in active code paths                              | Worker      | Optional         | Prioritize active paths under `apps/hnnt-app/src/` and scripts/config      |
 
 ## Evaluator Responsibilities
 
@@ -147,114 +163,114 @@ Evaluator output should always classify findings as:
 
 ### 0. Immediate Clarification And Source Capture
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files | Human | In Progress | Likely donor repo: `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/` |
-| EX-01 | Confirm the intended backend stack for the restart | Human | Done | Use Supabase Postgres + Supabase Auth + Supabase Storage + TypeScript API |
-| EX-02 | Confirm the intended web stack | Human | Assumed | Defaulting to Next.js unless changed |
-| EX-03 | Confirm whether the first iOS milestone is native SwiftUI from this repo or a staged bridge from existing React Native flows | Agent | Done | Recommendation: fresh SwiftUI app under `/apps/ios`; current `ios/` is Expo shell only |
-| EX-04 | Capture external service decisions still in scope for MVP | Human | Done | Supabase Auth is the canonical auth/session system. Apple auth is required. Meta/Facebook login is acceptable for the Instagram-discovery use case. Snapchat and TikTok also remain in scope. |
+| ID    | Task                                                                                                                         | Owner | Status      | Notes                                                                                                                                                                                         |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------- | ----- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files                                    | Human | In Progress | Likely donor repo: `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/`                                                                                        |
+| EX-01 | Confirm the intended backend stack for the restart                                                                           | Human | Done        | Use Supabase Postgres + Supabase Auth + Supabase Storage + TypeScript API                                                                                                                     |
+| EX-02 | Confirm the intended web stack                                                                                               | Human | Assumed     | Defaulting to Next.js unless changed                                                                                                                                                          |
+| EX-03 | Confirm whether the first iOS milestone is native SwiftUI from this repo or a staged bridge from existing React Native flows | Agent | Done        | Recommendation: fresh SwiftUI app under `/apps/ios`; current `ios/` is Expo shell only                                                                                                        |
+| EX-04 | Capture external service decisions still in scope for MVP                                                                    | Human | Done        | Supabase Auth is the canonical auth/session system. Apple auth is required. Meta/Facebook login is acceptable for the Instagram-discovery use case. Snapchat and TikTok also remain in scope. |
 
 ### 1. Canonical Product And Architecture Reset
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-10 | Write a new canonical MVP brief that replaces Seattle-only and Expo/AWS assumptions | Agent | Done | See `docs/Canonical_MVP_Brief.md` |
-| EX-11 | Write a new system architecture doc for web + Swift + shared backend | Agent | Done | See `docs/Canonical_Architecture.md` |
-| EX-12 | Define canonical top-level repo structure | Agent | In Progress | `/apps/web` now exists alongside `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts`; `/packages/prompts` and `/legacy` remain open |
-| EX-13 | Remove or quarantine legacy docs that conflict with the restart plan | Agent | Done | Conflicting AWS/Amplify/Expo planning docs removed; restart docs are now the active source of truth |
+| ID    | Task                                                                                | Owner | Status      | Notes                                                                                                                                                       |
+| ----- | ----------------------------------------------------------------------------------- | ----- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-10 | Write a new canonical MVP brief that replaces Seattle-only and Expo/AWS assumptions | Agent | Done        | See `docs/Canonical_MVP_Brief.md`                                                                                                                           |
+| EX-11 | Write a new system architecture doc for web + Swift + shared backend                | Agent | Done        | See `docs/Canonical_Architecture.md`                                                                                                                        |
+| EX-12 | Define canonical top-level repo structure                                           | Agent | In Progress | `/apps/web` now exists alongside `/apps/ios`, `/services/api`, `/packages/domain`, and `/packages/contracts`; `/packages/prompts` and `/legacy` remain open |
+| EX-13 | Remove or quarantine legacy docs that conflict with the restart plan                | Agent | Done        | Conflicting AWS/Amplify/Expo planning docs removed; restart docs are now the active source of truth                                                         |
 
 ### 2. Domain Model And Database Alignment
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-20 | Pull the current Supabase schema/migrations into this repo or reference them cleanly | Agent | Done | Donor repo migrations are now referenced cleanly via `docs/Schema_Entity_Mapping.md` and the donor inventory below |
-| EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Done | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md` |
-| EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Done | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
-| EX-23 | Identify schema gaps for web + Swift support | Agent | Done | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics. |
-| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Migration `010_auth_identities.sql` adds `auth_identities` and `auth_login_events` tables with RLS policies |
+| ID    | Task                                                                                 | Owner | Status | Notes                                                                                                                                                                                                                                               |
+| ----- | ------------------------------------------------------------------------------------ | ----- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-20 | Pull the current Supabase schema/migrations into this repo or reference them cleanly | Agent | Done   | Donor repo migrations are now referenced cleanly via `docs/Schema_Entity_Mapping.md` and the donor inventory below                                                                                                                                  |
+| EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping      | Agent | Done   | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md`                                                                                                                                                      |
+| EX-22 | Define the canonical domain model independent of storage vendor details              | Agent | Done   | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
+| EX-23 | Identify schema gaps for web + Swift support                                         | Agent | Done   | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics.                                 |
+| EX-24 | Create follow-up DB migrations for missing fields or mismatches                      | Agent | Done   | Migration `010_auth_identities.sql` adds `auth_identities` and `auth_login_events` tables with RLS policies                                                                                                                                         |
 
 ### 3. Backend Foundation
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-30 | Scaffold `/services/api` | Agent | Done | TypeScript scaffold created under `services/api` with versioned routes and minimal server structure |
-| EX-31 | Choose API style and codify it | Agent | Done | REST-style JSON and scaffold decisions documented in `services/api/README.md` |
-| EX-32 | Add environment/config management for local and deployed backend | Agent | Done | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md` |
-| EX-33 | Establish API error model and shared response envelope rules | Agent | Done | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md` |
-| EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
-| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts` |
-| EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
-| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | In Progress | Apple and Meta/Facebook should use Supabase-managed auth where practical; custom-provider backend wiring now exists alongside this work |
-| EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | In Progress | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` now exist; TikTok session bootstrap is wired, Snapchat still needs the provider external ID handshake finalized |
+| ID    | Task                                                                     | Owner | Status      | Notes                                                                                                                                                                                                     |
+| ----- | ------------------------------------------------------------------------ | ----- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-30 | Scaffold `/services/api`                                                 | Agent | Done        | TypeScript scaffold created under `services/api` with versioned routes and minimal server structure                                                                                                       |
+| EX-31 | Choose API style and codify it                                           | Agent | Done        | REST-style JSON and scaffold decisions documented in `services/api/README.md`                                                                                                                             |
+| EX-32 | Add environment/config management for local and deployed backend         | Agent | Done        | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md`                                                                                                          |
+| EX-33 | Establish API error model and shared response envelope rules             | Agent | Done        | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md`                                                 |
+| EX-34 | Add structured logging, request IDs, and health endpoints                | Agent | Done        | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold                                                                                                                          |
+| EX-35 | Add auth middleware and session/user resolution                          | Agent | Done        | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts`                                                                                           |
+| EX-36 | Design the canonical auth model and identity-linking tables              | Agent | Done        | See `docs/Auth_Model.md`                                                                                                                                                                                  |
+| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | In Progress | Apple and Meta/Facebook should use Supabase-managed auth where practical; custom-provider backend wiring now exists alongside this work                                                                   |
+| EX-38 | Implement custom provider integrations not covered natively by Supabase  | Agent | In Progress | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` now exist; TikTok session bootstrap is wired, Snapchat still needs the provider external ID handshake finalized |
 
 ### 4. Backend Modules
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
-| EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
-| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` now exist on `restart-plan`; runtime verification against a live Supabase project is still pending |
-| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` now records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; live DB verification is still pending |
-| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` now computes ranked owner-facing results plus comment summaries; client integration and remote verification remain |
-| EX-45 | Implement report/block routes/services | Agent | Todo | Minimal moderation-safe MVP |
-| EX-46 | Implement AI conversation/message routes/services | Agent | Todo | Conversation persistence, moderation hooks, quotas |
-| EX-47 | Implement storage helpers for media/share assets | Agent | Todo | Use backend-compatible storage assumptions |
+| ID    | Task                                              | Owner | Status                            | Notes                                                                                                                                                                                                                 |
+| ----- | ------------------------------------------------- | ----- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-40 | Implement profile routes/services                 | Agent | Done                              | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts`                                                                                                                    |
+| EX-41 | Implement situationship routes/services           | Agent | Done                              | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts`                                                                                                                           |
+| EX-42 | Implement voting session routes/services          | Agent | Done (unverified against live DB) | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` now exist on `restart-plan`; runtime verification against a live Supabase project is still pending |
+| EX-43 | Implement vote submission routes/services         | Agent | Done (unverified against live DB) | `POST /v1/voting-sessions/:inviteCode/votes` now records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; live DB verification is still pending                       |
+| EX-44 | Implement results aggregation routes/services     | Agent | Done (unverified against live DB) | `GET /v1/me/voting-sessions/:id/results` now computes ranked owner-facing results plus comment summaries; client integration and remote verification remain                                                           |
+| EX-45 | Implement report/block routes/services            | Agent | Done                              | `services/api/src/routes/moderation.ts`                                                                                                                                                                               |
+| EX-46 | Implement AI conversation/message routes/services | Agent | Done                              | `services/api/src/routes/ai.ts`; persistence, crisis detection, moderation, daily quota                                                                                                                               |
+| EX-47 | Implement storage helpers for media/share assets  | Agent | Todo                              | Use backend-compatible storage assumptions                                                                                                                                                                            |
 
 ### 5. Contracts And Shared Utilities
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs | Agent | Done | Scaffolded under `packages/contracts` for the first slice with `me` and situationship DTOs, aggregates, and reorder/create/update contracts |
-| EX-51 | Create `/packages/domain` for shared business rules and validators | Agent | Done | Scaffolded under `packages/domain` with profile privacy normalization, capability resolution, audience/access types, and reorder invariants |
-| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Todo | Salvage from donor repo if better |
-| EX-53 | Generate typed clients or client helpers for web and Swift consumption | Agent | Todo | Web can use generated TS types; Swift can use OpenAPI generation later |
+| ID    | Task                                                                   | Owner | Status | Notes                                                                                                                                       |
+| ----- | ---------------------------------------------------------------------- | ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs              | Agent | Done   | Scaffolded under `packages/contracts` for the first slice with `me` and situationship DTOs, aggregates, and reorder/create/update contracts |
+| EX-51 | Create `/packages/domain` for shared business rules and validators     | Agent | Done   | Scaffolded under `packages/domain` with profile privacy normalization, capability resolution, audience/access types, and reorder invariants |
+| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules    | Agent | Done   | `packages/prompts` (system prompt builder, safety rules, crisis detector)                                                                   |
+| EX-53 | Generate typed clients or client helpers for web and Swift consumption | Agent | Todo   | Web can use generated TS types; Swift can use OpenAPI generation later                                                                      |
 
 ### 6. Web App Foundation
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-60 | Scaffold `/apps/web` | Agent | Done | Restart-era web shell created under `/apps/web` with a local Node dev server and static JS entrypoint to avoid inventing a framework dependency before the first slice is stable |
-| EX-61 | Implement app shell, auth entry, and session handling | Agent | Done | Web shell now uses `POST /v1/dev/session`, stores the returned access token locally, and loads `/v1/me` plus `/v1/me/situationships` from the new backend |
-| EX-62 | Build profile flow on the new API | Agent | Done | Web profile form now edits username, display name, bio, and privacy through `PATCH /v1/me` |
-| EX-63 | Build situationship list/detail/create/edit flows | Agent | Done | Web shell now supports list, create, edit, delete, and reorder against the shared situationship routes |
-| EX-64 | Build voting session and vote submission flows | Agent | Todo | Public or semi-public share flow |
-| EX-65 | Build results view | Agent | Todo | Owner-facing |
-| EX-66 | Add admin-safe report triage view if needed for MVP | Agent | Todo | Could be deferred if manual ops suffice |
+| ID    | Task                                                  | Owner | Status | Notes                                                                                                                                                                            |
+| ----- | ----------------------------------------------------- | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-60 | Scaffold `/apps/web`                                  | Agent | Done   | Restart-era web shell created under `/apps/web` with a local Node dev server and static JS entrypoint to avoid inventing a framework dependency before the first slice is stable |
+| EX-61 | Implement app shell, auth entry, and session handling | Agent | Done   | Web shell now uses `POST /v1/dev/session`, stores the returned access token locally, and loads `/v1/me` plus `/v1/me/situationships` from the new backend                        |
+| EX-62 | Build profile flow on the new API                     | Agent | Done   | Web profile form now edits username, display name, bio, and privacy through `PATCH /v1/me`                                                                                       |
+| EX-63 | Build situationship list/detail/create/edit flows     | Agent | Done   | Web shell now supports list, create, edit, delete, and reorder against the shared situationship routes                                                                           |
+| EX-64 | Build voting session and vote submission flows        | Agent | Todo   | Public or semi-public share flow                                                                                                                                                 |
+| EX-65 | Build results view                                    | Agent | Todo   | Owner-facing                                                                                                                                                                     |
+| EX-66 | Add admin-safe report triage view if needed for MVP   | Agent | Todo   | Could be deferred if manual ops suffice                                                                                                                                          |
 
 ### 7. Native iOS Foundation
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-70 | Decide whether `/apps/ios` will be created fresh or derived from current `ios/` shell | Agent | Done | Fresh SwiftUI is lower-complexity than reworking the existing Expo-native shell |
-| EX-71 | Scaffold native SwiftUI app structure | Agent | Done | Swift package and app structure exist under `apps/ios` with design tokens, models, navigation, and feature views |
-| EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` now supports local base URL overrides, development session bootstrap, and the correct situationship reorder route; remaining work is full end-to-end validation after the simulator build is clean |
-| EX-73 | Build auth and onboarding shell | Agent | In Progress | `OnboardingView` now offers `Use Local API` in debug builds and `AuthManager` caches the restored profile/session; real Apple and other provider flows remain staged |
-| EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile editing now matches the current backend contract more honestly and situationship CRUD/reorder wiring is improved, but simulator verification is still in progress |
-| EX-75 | Build voting and results flows | Agent | In Progress | SwiftUI share-session creation now targets the backend, but vote submission and results still use placeholder calls and need full API integration plus simulator verification |
-| EX-76 | Build AI coach UI against backend API | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet |
+| ID    | Task                                                                                  | Owner | Status      | Notes                                                                                                                                                                                                                |
+| ----- | ------------------------------------------------------------------------------------- | ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-70 | Decide whether `/apps/ios` will be created fresh or derived from current `ios/` shell | Agent | Done        | Fresh SwiftUI is lower-complexity than reworking the existing Expo-native shell                                                                                                                                      |
+| EX-71 | Scaffold native SwiftUI app structure                                                 | Agent | Done        | Swift package and app structure exist under `apps/ios` with design tokens, models, navigation, and feature views                                                                                                     |
+| EX-72 | Establish networking layer against the shared API contract                            | Agent | In Progress | `APIClient.swift` now supports local base URL overrides, development session bootstrap, and the correct situationship reorder route; remaining work is full end-to-end validation after the simulator build is clean |
+| EX-73 | Build auth and onboarding shell                                                       | Agent | In Progress | `OnboardingView` now offers `Use Local API` in debug builds and `AuthManager` caches the restored profile/session; real Apple and other provider flows remain staged                                                 |
+| EX-74 | Build profile and situationship flows                                                 | Agent | In Progress | SwiftUI profile editing now matches the current backend contract more honestly and situationship CRUD/reorder wiring is improved, but simulator verification is still in progress                                    |
+| EX-75 | Build voting and results flows                                                        | Agent | In Progress | SwiftUI share-session creation now targets the backend, but vote submission and results still use placeholder calls and need full API integration plus simulator verification                                        |
+| EX-76 | Build AI coach UI against backend API                                                 | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet                                                                                                                   |
 
 ### 8. Client Migration And De-AWS Work
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; active blockers are root bootstrap, `useAuth`, `useUserProfile`, `useSituationships`, and AWS storage/upload paths |
-| EX-81 | Replace client auth assumptions with backend-neutral interfaces | Agent | Todo | Begin with adapters rather than full deletion |
-| EX-82 | Replace GraphQL/AWS API calls with new service clients | Agent | Todo | Incrementally by feature slice |
-| EX-83 | Remove AWS-specific env/config usage from active app paths | Agent | Todo | Only after replacements exist |
-| EX-84 | Move legacy Expo/Amplify implementation under `/legacy` | Agent | Todo | Only once new structure is ready |
-| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Todo | After archive/move step |
+| ID    | Task                                                             | Owner | Status | Notes                                                                                                                                                            |
+| ----- | ---------------------------------------------------------------- | ----- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo    | Agent | Done   | Audit complete in `docs/Legacy_AWS_Audit.md`; active blockers are root bootstrap, `useAuth`, `useUserProfile`, `useSituationships`, and AWS storage/upload paths |
+| EX-81 | Replace client auth assumptions with backend-neutral interfaces  | Agent | Todo   | Begin with adapters rather than full deletion                                                                                                                    |
+| EX-82 | Replace GraphQL/AWS API calls with new service clients           | Agent | Todo   | Incrementally by feature slice                                                                                                                                   |
+| EX-83 | Remove AWS-specific env/config usage from active app paths       | Agent | Todo   | Only after replacements exist                                                                                                                                    |
+| EX-84 | Move legacy Expo/Amplify implementation under `/legacy`          | Agent | Todo   | Only once new structure is ready                                                                                                                                 |
+| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Todo   | After archive/move step                                                                                                                                          |
 
 ### 9. Quality, Testing, And Delivery
 
-| ID | Task | Owner | Status | Notes |
-| --- | --- | --- | --- | --- |
-| EX-90 | Add backend test harness | Agent | Done | 44 unit tests covering health, profile, situationship CRUD, reorder, and auth middleware. Jest + ts-jest under `services/api/src/__tests__/`. Run via `npm run api:test`. |
-| EX-91 | Add contract validation in CI | Agent | Todo | Prevent API drift across clients |
-| EX-92 | Add web app smoke tests | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
-| EX-93 | Add iOS networking/model tests | Agent | Todo | Expand as native app grows |
-| EX-94 | Add migration verification and seed/dev fixtures | Agent | Done | Migration file verification tests in `migration.verify.test.ts`. Dev seed fixtures (3 users, 4 situationships, auth identities) with SQL generator in `seed.fixtures.ts`. |
-| EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |
+| ID    | Task                                             | Owner | Status      | Notes                                                                                                                                                                                  |
+| ----- | ------------------------------------------------ | ----- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EX-90 | Add backend test harness                         | Agent | Done        | 44 unit tests covering health, profile, situationship CRUD, reorder, and auth middleware. Jest + ts-jest under `services/api/src/__tests__/`. Run via `npm run api:test`.              |
+| EX-91 | Add contract validation in CI                    | Agent | In Progress | `.github/workflows/ci.yml` runs build/lint/test; contract drift check still manual                                                                                                     |
+| EX-92 | Add web app smoke tests                          | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
+| EX-93 | Add iOS networking/model tests                   | Agent | Todo        | Expand as native app grows                                                                                                                                                             |
+| EX-94 | Add migration verification and seed/dev fixtures | Agent | Done        | Migration file verification tests in `migration.verify.test.ts`. Dev seed fixtures (3 users, 4 situationships, auth identities) with SQL generator in `seed.fixtures.ts`.              |
+| EX-95 | Define deployment path for API and web           | Human | In Progress | API: container (`services/api/Dockerfile`) on any PORT-based host; web: static host via `apps/web/vercel.json`. Domain and hosting account still human decisions                       |
 
 ## Recommended Sequence
 
@@ -467,14 +483,14 @@ Acceptance notes:
 
 These are the next preferred bounded tasks after the accepted outputs above.
 
-| Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
-| --- | --- | --- | --- | --- |
-| ~~Q9~~ | ~~EX-90, EX-94~~ | ~~Add backend route tests, migration verification, and DB connectivity checks for the first slice~~ | — | **Done** (merged to main 2026-04-07) |
-| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
-| Q11 | EX-42, EX-43, EX-44 | Verify and integrate voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts` | DB verification, client integration, and follow-up hardening for voting routes |
-| Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
-| Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
-| Q14 | EX-72, EX-73, EX-74, EX-75, EX-76 | Align the existing SwiftUI shell with the live backend and current scope | `apps/ios`, `packages/contracts`, `services/api/src/routes/*` | route alignment, real session handling where available, and explicit placeholder boundaries |
+| Queue  | Backlog IDs                       | Goal                                                                                                | Primary Inputs                                                                                             | Deliverable                                                                                                         |
+| ------ | --------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| ~~Q9~~ | ~~EX-90, EX-94~~                  | ~~Add backend route tests, migration verification, and DB connectivity checks for the first slice~~ | —                                                                                                          | **Done** (merged to main 2026-04-07)                                                                                |
+| Q10    | EX-37, EX-38                      | Implement provider auth flows (Supabase-managed and custom backend OAuth)                           | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
+| Q11    | EX-42, EX-43, EX-44               | Verify and integrate voting session, vote submission, and results aggregation routes                | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts`       | DB verification, client integration, and follow-up hardening for voting routes                                      |
+| Q12    | EX-82, EX-83                      | Replace active client GraphQL/AWS API paths with backend-neutral service clients                    | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes                                          | adapter layer or service client replacement for `useUserProfile` and `useSituationships`                            |
+| Q13    | EX-60, EX-61, EX-62, EX-63        | Scaffold web app and build first vertical slice                                                     | `packages/contracts`, `services/api` routes                                                                | Next.js app with auth, profile, and situationship flows                                                             |
+| Q14    | EX-72, EX-73, EX-74, EX-75, EX-76 | Align the existing SwiftUI shell with the live backend and current scope                            | `apps/ios`, `packages/contracts`, `services/api/src/routes/*`                                              | route alignment, real session handling where available, and explicit placeholder boundaries                         |
 
 Queue constraints:
 
