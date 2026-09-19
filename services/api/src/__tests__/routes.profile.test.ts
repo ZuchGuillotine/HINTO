@@ -1,7 +1,11 @@
 import { routeRequest } from '../routes';
 import { createMockRequest, createMockResponse, createTestContext } from './helpers/http';
 import { createTestConfig } from './helpers/config';
-import { createMockSupabaseClient, mockAuthenticatedUser, MockSupabaseClient } from './helpers/supabase';
+import {
+  createMockSupabaseClient,
+  mockAuthenticatedUser,
+  MockSupabaseClient,
+} from './helpers/supabase';
 
 // Mock the supabase module so route handlers use our mock client
 jest.mock('../supabase', () => ({
@@ -26,13 +30,13 @@ afterEach(() => {
 function dispatchAndWait(
   method: string,
   url: string,
-  options: { headers?: Record<string, string>; body?: Record<string, unknown> } = {},
+  options: { headers?: Record<string, string>; body?: Record<string, unknown> } = {}
 ) {
   const req = createMockRequest({ method, url, ...options });
   const res = createMockResponse();
   const ctx = createTestContext();
 
-  return new Promise<typeof res>((resolve) => {
+  return new Promise<typeof res>(resolve => {
     res.on('finish', () => resolve(res));
     routeRequest(req, res, ctx, config);
   });
@@ -40,15 +44,20 @@ function dispatchAndWait(
 
 const TEST_USER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
+// Mirrors the real `profiles` columns (migrations 004 + 012).
 const PROFILE_ROW = {
   id: TEST_USER_ID,
   username: 'testuser',
-  display_name: 'Test User',
+  name: 'Test User',
   email: 'test@example.com',
   bio: 'Hello world',
   avatar_url: null,
-  privacy: 'public',
+  is_public: true,
+  mutuals_only: false,
   subscription_tier: 'free',
+  age: 24,
+  age_verified: true,
+  profile_image_id: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
@@ -82,7 +91,14 @@ describe('GET /v1/me', () => {
     // Auth succeeds but profile lookup returns nothing
     mockClient.auth.getUser.mockResolvedValue({
       data: {
-        user: { id: TEST_USER_ID, email: 'test@example.com', aud: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '' },
+        user: {
+          id: TEST_USER_ID,
+          email: 'test@example.com',
+          aud: 'authenticated',
+          app_metadata: {},
+          user_metadata: {},
+          created_at: '',
+        },
       },
       error: null,
     });
@@ -182,7 +198,7 @@ describe('PATCH /v1/me', () => {
   test('updates profile successfully', async () => {
     setupAuthenticatedUser();
 
-    const updatedRow = { ...PROFILE_ROW, display_name: 'New Name', bio: 'New bio' };
+    const updatedRow = { ...PROFILE_ROW, name: 'New Name', bio: 'New bio' };
     mockClient._mockTable('profiles', { data: updatedRow, error: null });
 
     const res = await dispatchAndWait('PATCH', '/v1/me', {
@@ -198,7 +214,10 @@ describe('PATCH /v1/me', () => {
 
   test('accepts valid privacy values', async () => {
     setupAuthenticatedUser();
-    mockClient._mockTable('profiles', { data: { ...PROFILE_ROW, privacy: 'mutuals_only' }, error: null });
+    mockClient._mockTable('profiles', {
+      data: { ...PROFILE_ROW, is_public: false, mutuals_only: true },
+      error: null,
+    });
 
     const res = await dispatchAndWait('PATCH', '/v1/me', {
       headers: { authorization: 'Bearer valid-token' },

@@ -77,7 +77,14 @@ describe('resolveAuthenticatedUser', () => {
   test('throws 404 when user has no profile', async () => {
     mockClient.auth.getUser.mockResolvedValue({
       data: {
-        user: { id: TEST_USER_ID, email: 'test@example.com', aud: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '' },
+        user: {
+          id: TEST_USER_ID,
+          email: 'test@example.com',
+          aud: 'authenticated',
+          app_metadata: {},
+          user_metadata: {},
+          created_at: '',
+        },
       },
       error: null,
     });
@@ -103,7 +110,14 @@ describe('resolveAuthenticatedUser', () => {
   test('returns AuthenticatedContext on success', async () => {
     mockClient.auth.getUser.mockResolvedValue({
       data: {
-        user: { id: TEST_USER_ID, email: 'test@example.com', aud: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '' },
+        user: {
+          id: TEST_USER_ID,
+          email: 'test@example.com',
+          aud: 'authenticated',
+          app_metadata: {},
+          user_metadata: {},
+          created_at: '',
+        },
       },
       error: null,
     });
@@ -123,5 +137,49 @@ describe('resolveAuthenticatedUser', () => {
     expect(result.user.email).toBe('test@example.com');
     expect(result.accessToken).toBe('valid-token');
     expect(result.requestId).toBe('test-request-id');
+  });
+});
+
+describe('development session tokens', () => {
+  const PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+  test('are ignored unless API_ENABLE_DEV_AUTH is on', async () => {
+    const client = createMockSupabaseClient();
+    (getServiceClient as jest.Mock).mockReturnValue(client);
+    const req = createMockRequest({
+      headers: { authorization: `Bearer dev-session:${PROFILE_ID}` },
+    });
+
+    await expect(
+      resolveAuthenticatedUser(req, createTestContext(), createTestConfig({ enableDevAuth: false }))
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  test('resolve a profile when explicitly enabled', async () => {
+    const client = createMockSupabaseClient();
+    (getServiceClient as jest.Mock).mockReturnValue(client);
+    client._mockTable('profiles', { data: { id: PROFILE_ID, email: 'dev@x.com' }, error: null });
+    const req = createMockRequest({
+      headers: { authorization: `Bearer dev-session:${PROFILE_ID}` },
+    });
+
+    const ctx = await resolveAuthenticatedUser(
+      req,
+      createTestContext(),
+      createTestConfig({ enableDevAuth: true })
+    );
+    expect(ctx.user.profileId).toBe(PROFILE_ID);
+  });
+
+  test('reject non-uuid ids even when enabled', async () => {
+    const client = createMockSupabaseClient();
+    (getServiceClient as jest.Mock).mockReturnValue(client);
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer dev-session:dev-user-001' },
+    });
+
+    await expect(
+      resolveAuthenticatedUser(req, createTestContext(), createTestConfig({ enableDevAuth: true }))
+    ).rejects.toMatchObject({ statusCode: 401 });
   });
 });

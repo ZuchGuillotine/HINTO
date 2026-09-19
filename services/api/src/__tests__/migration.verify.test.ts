@@ -21,7 +21,7 @@ describe('Supabase migration files', () => {
     }
     migrationFiles = fs
       .readdirSync(MIGRATIONS_DIR)
-      .filter((f) => f.endsWith('.sql'))
+      .filter(f => f.endsWith('.sql'))
       .sort();
   });
 
@@ -41,7 +41,7 @@ describe('Supabase migration files', () => {
   });
 
   test('migration files have no duplicate prefixes', () => {
-    const prefixes = migrationFiles.map((f) => f.slice(0, 3));
+    const prefixes = migrationFiles.map(f => f.slice(0, 3));
     const uniquePrefixes = new Set(prefixes);
     expect(uniquePrefixes.size).toBe(prefixes.length);
   });
@@ -54,13 +54,10 @@ describe('Supabase migration files', () => {
   });
 
   test('010_auth_identities.sql creates expected tables', () => {
-    const authMigration = migrationFiles.find((f) => f.startsWith('010'));
+    const authMigration = migrationFiles.find(f => f.startsWith('010'));
     expect(authMigration).toBeDefined();
 
-    const content = fs.readFileSync(
-      path.join(MIGRATIONS_DIR, authMigration!),
-      'utf-8',
-    );
+    const content = fs.readFileSync(path.join(MIGRATIONS_DIR, authMigration!), 'utf-8');
 
     expect(content).toContain('CREATE TABLE');
     expect(content).toContain('auth_identities');
@@ -70,19 +67,10 @@ describe('Supabase migration files', () => {
   });
 
   test('auth_identities migration has required columns', () => {
-    const authMigration = migrationFiles.find((f) => f.startsWith('010'));
-    const content = fs.readFileSync(
-      path.join(MIGRATIONS_DIR, authMigration!),
-      'utf-8',
-    );
+    const authMigration = migrationFiles.find(f => f.startsWith('010'));
+    const content = fs.readFileSync(path.join(MIGRATIONS_DIR, authMigration!), 'utf-8');
 
-    const requiredColumns = [
-      'user_id',
-      'provider',
-      'provider_user_id',
-      'is_primary',
-      'linked_at',
-    ];
+    const requiredColumns = ['user_id', 'provider', 'provider_user_id', 'is_primary', 'linked_at'];
 
     for (const col of requiredColumns) {
       expect(content).toContain(col);
@@ -90,15 +78,41 @@ describe('Supabase migration files', () => {
   });
 
   test('auth_identities has unique constraints for provider linkage', () => {
-    const authMigration = migrationFiles.find((f) => f.startsWith('010'));
-    const content = fs.readFileSync(
-      path.join(MIGRATIONS_DIR, authMigration!),
-      'utf-8',
-    );
+    const authMigration = migrationFiles.find(f => f.startsWith('010'));
+    const content = fs.readFileSync(path.join(MIGRATIONS_DIR, authMigration!), 'utf-8');
 
     // One linkage per provider per user
     expect(content).toContain('idx_auth_identities_user_provider');
     // Global uniqueness: one provider account per HINTO user
     expect(content).toContain('idx_auth_identities_provider_uid');
+  });
+});
+
+describe('012_launch_hardening.sql', () => {
+  const file = fs.readdirSync(MIGRATIONS_DIR).find(name => name.startsWith('012_'));
+  const content = file ? fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8') : '';
+
+  test('exists and is wrapped in a transaction', () => {
+    expect(file).toBeDefined();
+    expect(content.trim().startsWith('-- 012_launch_hardening.sql')).toBe(true);
+    expect(content).toMatch(/\nBEGIN;/u);
+    expect(content.trim().endsWith('COMMIT;')).toBe(true);
+  });
+
+  test('defines the reorder function the API depends on', () => {
+    expect(content).toContain('CREATE OR REPLACE FUNCTION public.reorder_situationships');
+    expect(content).toContain('p_ordered_ids UUID[]');
+  });
+
+  test('adds the bio column and relaxes profile email', () => {
+    expect(content).toContain('ADD COLUMN IF NOT EXISTS bio');
+    expect(content).toContain('ALTER COLUMN email DROP NOT NULL');
+  });
+
+  test('removes permissive voting policies and view grants', () => {
+    expect(content).toContain('DROP POLICY IF EXISTS "Users can view active voting sessions"');
+    expect(content).toContain('DROP POLICY IF EXISTS "Users can view votes for active sessions"');
+    expect(content).toContain('REVOKE ALL ON public.vote_statistics FROM anon, authenticated');
+    expect(content).toContain('DROP POLICY IF EXISTS "System can manage usage"');
   });
 });

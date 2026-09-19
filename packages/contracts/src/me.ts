@@ -10,6 +10,9 @@ export interface ProfileDto {
   avatarUrl: string | null;
   privacy: ProfilePrivacy;
   subscriptionTier: SubscriptionTier;
+  /** Self-reported age, null until the user confirms it during onboarding. */
+  age: number | null;
+  ageVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,8 +47,21 @@ export interface UpdateMeRequestDto {
   bio?: string | null;
   avatarUrl?: string | null;
   privacy?: ProfilePrivacy;
+  /** Minimum accepted age is 16. */
+  age?: number;
 }
 
 export interface UpdateMeResponseDto {
   data: MeAggregateDto;
+}
+
+/**
+ * DELETE /v1/me
+ * Permanently deletes the auth user; profile and all owned rows cascade.
+ */
+export interface DeleteMeResponseDto {
+  data: {
+    deleted: true;
+    profileId: string;
+  };
 }

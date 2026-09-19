@@ -1,7 +1,11 @@
 import { routeRequest } from '../routes';
 import { createMockRequest, createMockResponse, createTestContext } from './helpers/http';
 import { createTestConfig } from './helpers/config';
-import { createMockSupabaseClient, mockAuthenticatedUser, MockSupabaseClient } from './helpers/supabase';
+import {
+  createMockSupabaseClient,
+  mockAuthenticatedUser,
+  MockSupabaseClient,
+} from './helpers/supabase';
 
 jest.mock('../supabase', () => ({
   getServiceClient: jest.fn(),
@@ -24,7 +28,7 @@ const SITUATIONSHIP_ROWS = [
     category: 'dating',
     description: 'Met at coffee shop',
     rank: 0,
-    status: 'active',
+    is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },
@@ -36,7 +40,7 @@ const SITUATIONSHIP_ROWS = [
     category: 'talking',
     description: null,
     rank: 1,
-    status: 'active',
+    is_active: true,
     created_at: '2026-01-02T00:00:00Z',
     updated_at: '2026-01-02T00:00:00Z',
   },
@@ -45,7 +49,7 @@ const SITUATIONSHIP_ROWS = [
 const PROFILE_ROW = {
   id: TEST_USER_ID,
   username: 'testuser',
-  display_name: 'Test User',
+  name: 'Test User',
 };
 
 beforeEach(() => {
@@ -61,14 +65,14 @@ afterEach(() => {
 function dispatchAndWait(
   method: string,
   url: string,
-  options: { headers?: Record<string, string>; body?: Record<string, unknown> } = {},
+  options: { headers?: Record<string, string>; body?: Record<string, unknown> } = {}
 ) {
   const defaultHeaders = { authorization: 'Bearer valid-token', ...options.headers };
   const req = createMockRequest({ method, url, headers: defaultHeaders, body: options.body });
   const res = createMockResponse();
   const ctx = createTestContext();
 
-  return new Promise<typeof res>((resolve) => {
+  return new Promise<typeof res>(resolve => {
     res.on('finish', () => resolve(res));
     routeRequest(req, res, ctx, config);
   });
@@ -80,7 +84,7 @@ describe('GET /v1/me/situationships', () => {
     const res = createMockResponse();
     const ctx = createTestContext();
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       res.on('finish', () => resolve());
       routeRequest(req, res, ctx, config);
     });
@@ -164,7 +168,9 @@ describe('POST /v1/me/situationships', () => {
     });
 
     expect(res._getStatusCode()).toBe(201);
-    const body = res._getJson() as { data: { situationship: { name: string; situationshipId: string } } };
+    const body = res._getJson() as {
+      data: { situationship: { name: string; situationshipId: string } };
+    };
     expect(body.data.situationship.name).toBe('Sam');
     expect(body.data.situationship.situationshipId).toBe('33333333-3333-3333-3333-333333333333');
   });
@@ -177,7 +183,7 @@ describe('PATCH /v1/me/situationships/:id', () => {
     const res = await dispatchAndWait(
       'PATCH',
       `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`,
-      { body: { unknownField: 'x' } },
+      { body: { unknownField: 'x' } }
     );
 
     expect(res._getStatusCode()).toBe(400);
@@ -189,7 +195,7 @@ describe('PATCH /v1/me/situationships/:id', () => {
     const res = await dispatchAndWait(
       'PATCH',
       `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`,
-      { body: { status: 'deleted' } },
+      { body: { status: 'deleted' } }
     );
 
     expect(res._getStatusCode()).toBe(400);
@@ -202,7 +208,7 @@ describe('PATCH /v1/me/situationships/:id', () => {
     const res = await dispatchAndWait(
       'PATCH',
       `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`,
-      { body: { name: 'Updated' } },
+      { body: { name: 'Updated' } }
     );
 
     expect(res._getStatusCode()).toBe(404);
@@ -216,7 +222,7 @@ describe('PATCH /v1/me/situationships/:id', () => {
     const res = await dispatchAndWait(
       'PATCH',
       `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`,
-      { body: { name: 'Updated Alex' } },
+      { body: { name: 'Updated Alex' } }
     );
 
     expect(res._getStatusCode()).toBe(200);
@@ -232,7 +238,7 @@ describe('DELETE /v1/me/situationships/:id', () => {
 
     const res = await dispatchAndWait(
       'DELETE',
-      `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`,
+      `/v1/me/situationships/${SITUATIONSHIP_ROWS[0].id}`
     );
 
     expect(res._getStatusCode()).toBe(200);
@@ -271,7 +277,12 @@ describe('PUT /v1/me/situationships/order', () => {
   test('returns 400 for mismatched ID count', async () => {
     mockClient._mockTable('profiles', { data: PROFILE_ROW, error: null });
     mockClient._mockTable('situationships', {
-      data: SITUATIONSHIP_ROWS.map((r) => ({ id: r.id, user_id: r.user_id, rank: r.rank, status: r.status })),
+      data: SITUATIONSHIP_ROWS.map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        rank: r.rank,
+        is_active: r.is_active,
+      })),
       error: null,
     });
 
@@ -285,7 +296,12 @@ describe('PUT /v1/me/situationships/order', () => {
   test('returns 400 for duplicate IDs', async () => {
     mockClient._mockTable('profiles', { data: PROFILE_ROW, error: null });
     mockClient._mockTable('situationships', {
-      data: SITUATIONSHIP_ROWS.map((r) => ({ id: r.id, user_id: r.user_id, rank: r.rank, status: r.status })),
+      data: SITUATIONSHIP_ROWS.map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        rank: r.rank,
+        is_active: r.is_active,
+      })),
       error: null,
     });
 
@@ -304,7 +320,12 @@ describe('PUT /v1/me/situationships/order', () => {
     // The handler reads situationships twice: once for validation, once for the updated list
     const reversedRows = [...SITUATIONSHIP_ROWS].reverse().map((r, i) => ({ ...r, rank: i }));
     mockClient._mockTable('situationships', {
-      data: SITUATIONSHIP_ROWS.map((r) => ({ id: r.id, user_id: r.user_id, rank: r.rank, status: r.status })),
+      data: SITUATIONSHIP_ROWS.map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        rank: r.rank,
+        is_active: r.is_active,
+      })),
       error: null,
     });
 
@@ -317,5 +338,35 @@ describe('PUT /v1/me/situationships/order', () => {
     expect(res._getStatusCode()).toBe(200);
     const body = res._getJson() as { data: { ordering: { orderedSituationshipIds: string[] } } };
     expect(body.data.ordering).toBeDefined();
+    // Ranks are UNIQUE(user_id, rank); the handler must go through the transactional RPC.
+    expect(mockClient.rpc).toHaveBeenCalledWith('reorder_situationships', {
+      p_user_id: TEST_USER_ID,
+      p_ordered_ids: [SITUATIONSHIP_ROWS[1].id, SITUATIONSHIP_ROWS[0].id],
+    });
+    void reversedRows;
+  });
+
+  test('returns 500 with reason when the reorder RPC fails', async () => {
+    mockClient._mockTable('profiles', { data: PROFILE_ROW, error: null });
+    mockClient._mockTable('situationships', {
+      data: SITUATIONSHIP_ROWS.map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        rank: r.rank,
+        is_active: r.is_active,
+      })),
+      error: null,
+    });
+    mockClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+
+    const res = await dispatchAndWait('PUT', '/v1/me/situationships/order', {
+      body: {
+        orderedSituationshipIds: [SITUATIONSHIP_ROWS[1].id, SITUATIONSHIP_ROWS[0].id],
+      },
+    });
+
+    expect(res._getStatusCode()).toBe(500);
+    const body = res._getJson() as { error: { code: string } };
+    expect(body.error.code).toBe('reorder_failed');
   });
 });

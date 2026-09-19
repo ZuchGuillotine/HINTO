@@ -30,31 +30,34 @@ export const SEED_PROFILES = {
   alice: {
     id: SEED_USERS.alice.id,
     username: 'alice',
-    display_name: 'Alice Test',
+    name: 'Alice Test',
     email: SEED_USERS.alice.email,
     bio: 'Testing queen',
     avatar_url: null,
-    privacy: 'public',
+    is_public: true,
+    mutuals_only: false,
     subscription_tier: 'free',
   },
   bob: {
     id: SEED_USERS.bob.id,
     username: 'bob',
-    display_name: 'Bob Test',
+    name: 'Bob Test',
     email: SEED_USERS.bob.email,
     bio: 'Just vibing',
     avatar_url: null,
-    privacy: 'private',
+    is_public: false,
+    mutuals_only: false,
     subscription_tier: 'free',
   },
   carol: {
     id: SEED_USERS.carol.id,
     username: 'carol',
-    display_name: 'Carol Test',
+    name: 'Carol Test',
     email: SEED_USERS.carol.email,
     bio: null,
     avatar_url: null,
-    privacy: 'mutuals_only',
+    is_public: false,
+    mutuals_only: true,
     subscription_tier: 'premium',
   },
 } as const;
@@ -68,7 +71,7 @@ export const SEED_SITUATIONSHIPS = {
     category: 'dating',
     description: 'Met at coffee shop',
     rank: 0,
-    status: 'active',
+    is_active: true,
   },
   alice_jordan: {
     id: 'aaaaaaaa-0001-0001-0002-aaaaaaaaaaaa',
@@ -78,7 +81,7 @@ export const SEED_SITUATIONSHIPS = {
     category: 'talking',
     description: 'From the gym',
     rank: 1,
-    status: 'active',
+    is_active: true,
   },
   alice_sam: {
     id: 'aaaaaaaa-0001-0001-0003-aaaaaaaaaaaa',
@@ -88,7 +91,7 @@ export const SEED_SITUATIONSHIPS = {
     category: 'complicated',
     description: 'Ex but still around',
     rank: 2,
-    status: 'active',
+    is_active: true,
   },
   bob_taylor: {
     id: 'bbbbbbbb-0001-0001-0001-bbbbbbbbbbbb',
@@ -98,7 +101,7 @@ export const SEED_SITUATIONSHIPS = {
     category: 'dating',
     description: null,
     rank: 0,
-    status: 'active',
+    is_active: true,
   },
 } as const;
 
@@ -132,9 +135,9 @@ export function generateSeedSQL(): string {
 
   for (const profile of Object.values(SEED_PROFILES)) {
     lines.push(
-      `INSERT INTO public.profiles (id, username, display_name, email, bio, avatar_url, privacy, subscription_tier)` +
-        ` VALUES ('${profile.id}', '${profile.username}', '${profile.display_name}', '${profile.email}', ${profile.bio ? `'${profile.bio}'` : 'NULL'}, NULL, '${profile.privacy}', '${profile.subscription_tier}')` +
-        ` ON CONFLICT (id) DO NOTHING;`,
+      `INSERT INTO public.profiles (id, username, name, email, bio, avatar_url, is_public, mutuals_only, subscription_tier)` +
+        ` VALUES ('${profile.id}', '${profile.username}', '${profile.name}', '${profile.email}', ${profile.bio ? `'${profile.bio}'` : 'NULL'}, NULL, ${profile.is_public}, ${profile.mutuals_only}, '${profile.subscription_tier}')` +
+        ` ON CONFLICT (id) DO NOTHING;`
     );
   }
 
@@ -142,9 +145,9 @@ export function generateSeedSQL(): string {
 
   for (const sit of Object.values(SEED_SITUATIONSHIPS)) {
     lines.push(
-      `INSERT INTO public.situationships (id, user_id, name, emoji, category, description, rank, status)` +
-        ` VALUES ('${sit.id}', '${sit.user_id}', '${sit.name}', '${sit.emoji}', '${sit.category}', ${sit.description ? `'${sit.description}'` : 'NULL'}, ${sit.rank}, '${sit.status}')` +
-        ` ON CONFLICT (id) DO NOTHING;`,
+      `INSERT INTO public.situationships (id, user_id, name, emoji, category, description, rank, is_active)` +
+        ` VALUES ('${sit.id}', '${sit.user_id}', '${sit.name}', '${sit.emoji}', '${sit.category}', ${sit.description ? `'${sit.description}'` : 'NULL'}, ${sit.rank}, ${sit.is_active})` +
+        ` ON CONFLICT (id) DO NOTHING;`
     );
   }
 
@@ -154,7 +157,7 @@ export function generateSeedSQL(): string {
     lines.push(
       `INSERT INTO public.auth_identities (user_id, provider, provider_user_id, provider_email, is_primary)` +
         ` VALUES ('${ident.user_id}', '${ident.provider}', '${ident.provider_user_id}', '${ident.provider_email}', ${ident.is_primary})` +
-        ` ON CONFLICT (user_id, provider) DO NOTHING;`,
+        ` ON CONFLICT (user_id, provider) DO NOTHING;`
     );
   }
 

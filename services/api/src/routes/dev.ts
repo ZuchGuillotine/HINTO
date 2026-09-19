@@ -24,12 +24,14 @@ function normalizeUsername(value: unknown, fallbackProfileId: string): string {
     return fallbackProfileId;
   }
 
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/gu, '_')
-    .replace(/_{2,}/gu, '_')
-    .replace(/^_|_$/gu, '') || fallbackProfileId;
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/gu, '_')
+      .replace(/_{2,}/gu, '_')
+      .replace(/^_|_$/gu, '') || fallbackProfileId
+  );
 }
 
 function normalizeDisplayName(value: unknown, fallbackUsername: string): string {
@@ -37,7 +39,7 @@ function normalizeDisplayName(value: unknown, fallbackUsername: string): string 
     return fallbackUsername
       .split(/[-_]/u)
       .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
       .join(' ');
   }
 
@@ -48,14 +50,17 @@ export async function handleCreateDevelopmentSession(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
-  if (config.nodeEnv === 'production') {
+  if (!config.enableDevAuth) {
     throw new AppError('not_found', 'Route not found', 404);
   }
 
   const body = await readJsonBody(request);
-  const rawUsername = normalizeUsername(body.username, typeof body.profileId === 'string' ? body.profileId : 'dev-user');
+  const rawUsername = normalizeUsername(
+    body.username,
+    typeof body.profileId === 'string' ? body.profileId : 'dev-user'
+  );
   const displayName = normalizeDisplayName(body.displayName, rawUsername);
   const email =
     typeof body.email === 'string' && body.email.trim().length > 0 ? body.email.trim() : null;
@@ -120,7 +125,11 @@ export async function handleCreateDevelopmentSession(
     });
 
     if (authError || !authUser.user) {
-      throw new AppError('profile_create_failed', `Failed to create auth user: ${authError?.message}`, 500);
+      throw new AppError(
+        'profile_create_failed',
+        `Failed to create auth user: ${authError?.message}`,
+        500
+      );
     }
 
     profileId = authUser.user.id;

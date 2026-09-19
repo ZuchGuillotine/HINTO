@@ -6,7 +6,7 @@ import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { fetchMeAggregateForProfileId } from './profile.js';
 import { AppConfig, RequestContext } from '../types.js';
-import { getServiceClient } from '../supabase.js';
+import { getAuthClient, getServiceClient } from '../supabase.js';
 
 export type CustomAuthProvider = 'snapchat' | 'tiktok';
 export type CustomAuthPlatform = 'web' | 'mobile' | 'desktop';
@@ -54,7 +54,7 @@ function assertSupportedProvider(value: string): CustomAuthProvider | null {
 }
 
 export function matchCustomAuthProvider(
-  path: string,
+  path: string
 ): { provider: CustomAuthProvider; action: 'start' | 'callback' } | null {
   const match = path.match(/^\/v1\/auth\/providers\/([a-z]+)\/(start|callback)$/);
   if (!match) {
@@ -77,7 +77,7 @@ function ensureAuthStateSecret(config: AppConfig): string {
     throw new AppError(
       'provider_auth_not_configured',
       'AUTH_STATE_SECRET is required for custom provider auth flows',
-      500,
+      500
     );
   }
 
@@ -92,7 +92,13 @@ function normalizePlatform(value: unknown): CustomAuthPlatform {
   return 'mobile';
 }
 
-function assertClientRedirectUri(value: unknown): string {
+/**
+ * Validates the URI the provider callback will redirect tokens to.
+ * The URI must match one of `AUTH_ALLOWED_REDIRECT_URIS` by exact value or
+ * by prefix (an entry ending in `/` or `*`). Without an allowlist, an attacker
+ * could start a flow with their own URI and receive the victim's session.
+ */
+export function assertClientRedirectUri(value: unknown, config: AppConfig): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new AppError('validation_error', 'clientRedirectUri is required', 400);
   }
@@ -107,6 +113,28 @@ function assertClientRedirectUri(value: unknown): string {
 
   if (!parsed.protocol) {
     throw new AppError('validation_error', 'clientRedirectUri must include a URI scheme', 400);
+  }
+
+  if (config.allowedRedirectUris.length === 0) {
+    throw new AppError(
+      'redirect_not_allowed',
+      'No AUTH_ALLOWED_REDIRECT_URIS configured; custom provider sign-in is disabled',
+      503
+    );
+  }
+
+  const allowed = config.allowedRedirectUris.some(entry => {
+    if (entry.endsWith('*')) {
+      return normalized.startsWith(entry.slice(0, -1));
+    }
+    if (entry.endsWith('/')) {
+      return normalized === entry || normalized.startsWith(entry);
+    }
+    return normalized === entry;
+  });
+
+  if (!allowed) {
+    throw new AppError('redirect_not_allowed', 'clientRedirectUri is not in the allowlist', 400);
   }
 
   return normalized;
@@ -126,7 +154,11 @@ function signState(state: SignedProviderState, secret: string): string {
   return `${payload}.${signature}`;
 }
 
-function readSignedState(value: string, provider: CustomAuthProvider, secret: string): SignedProviderState {
+function readSignedState(
+  value: string,
+  provider: CustomAuthProvider,
+  secret: string
+): SignedProviderState {
   const [payload, signature] = value.split('.');
   if (!payload || !signature) {
     throw new AppError('invalid_state', 'Provider auth state is invalid', 400);
@@ -151,7 +183,11 @@ function readSignedState(value: string, provider: CustomAuthProvider, secret: st
   }
 
   if (parsed.provider !== provider) {
-    throw new AppError('invalid_state', 'Provider auth state does not match callback provider', 400);
+    throw new AppError(
+      'invalid_state',
+      'Provider auth state does not match callback provider',
+      400
+    );
   }
 
   if (!parsed.clientRedirectUri || !parsed.codeVerifier || !parsed.issuedAt) {
@@ -178,7 +214,7 @@ function getTikTokAuthorizeUrl(config: AppConfig, state: SignedProviderState): s
     throw new AppError(
       'provider_auth_not_configured',
       'TikTok auth requires TIKTOK_CLIENT_KEY and TIKTOK_REDIRECT_URI',
-      500,
+      500
     );
   }
 
@@ -198,7 +234,7 @@ function getSnapchatAuthorizeUrl(config: AppConfig, state: SignedProviderState):
     throw new AppError(
       'provider_auth_not_configured',
       'Snapchat auth requires SNAPCHAT_CLIENT_ID and SNAPCHAT_REDIRECT_URI',
-      500,
+      500
     );
   }
 
@@ -215,7 +251,7 @@ function getSnapchatAuthorizeUrl(config: AppConfig, state: SignedProviderState):
 
 function buildClientRedirectUrl(
   baseUri: string,
-  payload: Record<string, string | number | null | undefined>,
+  payload: Record<string, string | number | null | undefined>
 ): string {
   const fragment = new URLSearchParams();
 
@@ -238,13 +274,13 @@ function redirectToClient(response: ServerResponse, location: string): void {
 async function exchangeTikTokCode(
   code: string,
   state: SignedProviderState,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<Record<string, unknown>> {
   if (!config.tiktokClientKey || !config.tiktokClientSecret || !config.tiktokRedirectUri) {
     throw new AppError(
       'provider_auth_not_configured',
       'TikTok auth requires TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, and TIKTOK_REDIRECT_URI',
-      500,
+      500
     );
   }
 
@@ -274,14 +310,17 @@ async function exchangeTikTokCode(
         ? data.error_description
         : 'TikTok token exchange failed',
       401,
-      { provider: 'tiktok', providerError: data.error ?? null },
+      { provider: 'tiktok', providerError: data.error ?? null }
     );
   }
 
   return data;
 }
 
-async function fetchTikTokIdentity(accessToken: string, tokenData: Record<string, unknown>): Promise<ProviderIdentity> {
+async function fetchTikTokIdentity(
+  accessToken: string,
+  tokenData: Record<string, unknown>
+): Promise<ProviderIdentity> {
   const url = new URL(TIKTOK_USER_INFO_URL);
   url.searchParams.set('fields', 'open_id,union_id,avatar_url,display_name');
 
@@ -293,8 +332,7 @@ async function fetchTikTokIdentity(accessToken: string, tokenData: Record<string
   const data = (await response.json()) as Record<string, unknown>;
 
   const error = (data.error ?? null) as Record<string, unknown> | null;
-  const user =
-    ((data.data ?? null) as { user?: Record<string, unknown> } | null)?.user ?? null;
+  const user = ((data.data ?? null) as { user?: Record<string, unknown> } | null)?.user ?? null;
 
   if (!response.ok || !user || (error && error.code !== 'ok')) {
     throw new AppError(
@@ -303,7 +341,7 @@ async function fetchTikTokIdentity(accessToken: string, tokenData: Record<string
         ? error.message
         : 'Failed to fetch TikTok user profile',
       401,
-      { provider: 'tiktok', providerError: error?.code ?? null },
+      { provider: 'tiktok', providerError: error?.code ?? null }
     );
   }
 
@@ -323,10 +361,8 @@ async function fetchTikTokIdentity(accessToken: string, tokenData: Record<string
     providerEmail: null,
     emailVerified: false,
     providerUsername: null,
-    providerDisplayName:
-      typeof user.display_name === 'string' ? user.display_name : null,
-    providerAvatarUrl:
-      typeof user.avatar_url === 'string' ? user.avatar_url : null,
+    providerDisplayName: typeof user.display_name === 'string' ? user.display_name : null,
+    providerAvatarUrl: typeof user.avatar_url === 'string' ? user.avatar_url : null,
     providerMetadata: {
       openId,
       unionId: typeof user.union_id === 'string' ? user.union_id : null,
@@ -339,13 +375,13 @@ async function fetchTikTokIdentity(accessToken: string, tokenData: Record<string
 async function exchangeSnapchatCode(
   code: string,
   state: SignedProviderState,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<Record<string, unknown>> {
   if (!config.snapchatClientId || !config.snapchatClientSecret || !config.snapchatRedirectUri) {
     throw new AppError(
       'provider_auth_not_configured',
       'Snapchat auth requires SNAPCHAT_CLIENT_ID, SNAPCHAT_CLIENT_SECRET, and SNAPCHAT_REDIRECT_URI',
-      500,
+      500
     );
   }
 
@@ -372,7 +408,7 @@ async function exchangeSnapchatCode(
         ? data.error_description
         : 'Snapchat token exchange failed',
       401,
-      { provider: 'snapchat', providerError: data.error ?? null },
+      { provider: 'snapchat', providerError: data.error ?? null }
     );
   }
 
@@ -383,7 +419,7 @@ async function resolveProviderIdentity(
   provider: CustomAuthProvider,
   state: SignedProviderState,
   config: AppConfig,
-  code: string,
+  code: string
 ): Promise<{ identity: ProviderIdentity; tokenData: Record<string, unknown> }> {
   if (provider === 'tiktok') {
     const tokenData = await exchangeTikTokCode(code, state, config);
@@ -399,23 +435,25 @@ async function resolveProviderIdentity(
     {
       provider: 'snapchat',
       grantedScope: typeof tokenData.scope === 'string' ? tokenData.scope : null,
-    },
+    }
   );
 }
 
 function deriveSyntheticEmail(provider: CustomAuthProvider, providerUserId: string): string {
-  const normalized = providerUserId.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '');
+  const normalized = providerUserId
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');
   const suffix = normalized.length > 48 ? normalized.slice(0, 48) : normalized;
   return `${provider}-${suffix || 'user'}@users.hinto.invalid`;
 }
 
-async function findProfileIdByVerifiedEmail(email: string, config: AppConfig): Promise<string | null> {
+async function findProfileIdByVerifiedEmail(
+  email: string,
+  config: AppConfig
+): Promise<string | null> {
   const supabase = getServiceClient(config);
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .limit(1);
+  const { data, error } = await supabase.from('profiles').select('id').eq('email', email).limit(1);
 
   if (error || !data || data.length === 0) {
     return null;
@@ -427,7 +465,7 @@ async function findProfileIdByVerifiedEmail(email: string, config: AppConfig): P
 async function ensureAuthUserForIdentity(
   provider: CustomAuthProvider,
   identity: ProviderIdentity,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<{ userId: string; email: string }> {
   const supabase = getServiceClient(config);
 
@@ -439,7 +477,11 @@ async function ensureAuthUserForIdentity(
     .maybeSingle();
 
   if (identityError) {
-    throw new AppError('identity_lookup_failed', 'Failed to look up existing provider identity', 500);
+    throw new AppError(
+      'identity_lookup_failed',
+      'Failed to look up existing provider identity',
+      500
+    );
   }
 
   if (existingIdentity?.user_id) {
@@ -448,7 +490,7 @@ async function ensureAuthUserForIdentity(
       throw new AppError(
         'auth_user_lookup_failed',
         'Found linked provider identity, but could not resolve the auth user',
-        500,
+        500
       );
     }
 
@@ -468,9 +510,10 @@ async function ensureAuthUserForIdentity(
     }
   }
 
-  const email = identity.providerEmail && identity.emailVerified
-    ? identity.providerEmail
-    : deriveSyntheticEmail(provider, identity.providerUserId);
+  const email =
+    identity.providerEmail && identity.emailVerified
+      ? identity.providerEmail
+      : deriveSyntheticEmail(provider, identity.providerUserId);
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
@@ -486,7 +529,7 @@ async function ensureAuthUserForIdentity(
     throw new AppError(
       'auth_user_create_failed',
       error?.message ?? 'Failed to create auth user for provider identity',
-      500,
+      500
     );
   }
 
@@ -500,7 +543,7 @@ async function upsertIdentityAndProfile(
   provider: CustomAuthProvider,
   userId: string,
   identity: ProviderIdentity,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const supabase = getServiceClient(config);
 
@@ -537,9 +580,8 @@ async function upsertIdentityAndProfile(
     throw new AppError('profile_update_failed', 'Failed to update profile from provider data', 500);
   }
 
-  const { error: identityError } = await supabase
-    .from('auth_identities')
-    .upsert({
+  const { error: identityError } = await supabase.from('auth_identities').upsert(
+    {
       user_id: userId,
       provider,
       provider_user_id: identity.providerUserId,
@@ -550,9 +592,11 @@ async function upsertIdentityAndProfile(
       provider_metadata: identity.providerMetadata,
       last_used_at: new Date().toISOString(),
       is_primary: false,
-    }, {
+    },
+    {
       onConflict: 'provider,provider_user_id',
-    });
+    }
+  );
 
   if (identityError) {
     throw new AppError('identity_upsert_failed', 'Failed to store provider identity linkage', 500);
@@ -562,7 +606,7 @@ async function upsertIdentityAndProfile(
 async function bootstrapSupabaseSession(
   userId: string,
   email: string,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<SupabaseSessionBootstrap> {
   const supabase = getServiceClient(config);
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
@@ -574,11 +618,14 @@ async function bootstrapSupabaseSession(
     throw new AppError(
       'session_bootstrap_failed',
       linkError?.message ?? 'Failed to generate Supabase session bootstrap link',
-      500,
+      500
     );
   }
 
-  const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+  // Verify on a throwaway anon client so the service-role client never
+  // stores a user session (see supabase.ts).
+  const authClient = getAuthClient(config);
+  const { data: verifyData, error: verifyError } = await authClient.auth.verifyOtp({
     token_hash: linkData.properties.hashed_token,
     type: 'magiclink',
   });
@@ -587,7 +634,7 @@ async function bootstrapSupabaseSession(
     throw new AppError(
       'session_bootstrap_failed',
       verifyError?.message ?? 'Failed to verify Supabase session bootstrap token',
-      500,
+      500
     );
   }
 
@@ -611,7 +658,7 @@ async function logAuthEvent(
     request?: IncomingMessage;
     errorCode?: string;
     errorDetail?: string;
-  },
+  }
 ): Promise<void> {
   const supabase = getServiceClient(config);
   await supabase.from('auth_login_events').insert({
@@ -630,12 +677,12 @@ export async function handleCustomProviderStart(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  provider: CustomAuthProvider,
+  provider: CustomAuthProvider
 ): Promise<void> {
   ensureAuthStateSecret(config);
 
   const body = (await readJsonBody(request)) as StartCustomAuthBody;
-  const clientRedirectUri = assertClientRedirectUri(body.clientRedirectUri);
+  const clientRedirectUri = assertClientRedirectUri(body.clientRedirectUri, config);
   const platform = normalizePlatform(body.platform);
   const state: SignedProviderState = {
     provider,
@@ -664,7 +711,7 @@ export async function handleCustomProviderCallback(
   response: ServerResponse,
   _context: RequestContext,
   config: AppConfig,
-  provider: CustomAuthProvider,
+  provider: CustomAuthProvider
 ): Promise<void> {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? config.host}`);
   const stateParam = url.searchParams.get('state');
@@ -677,7 +724,8 @@ export async function handleCustomProviderCallback(
 
   const providerError = url.searchParams.get('error');
   if (providerError) {
-    const providerErrorDescription = url.searchParams.get('error_description') ?? 'Provider authorization failed';
+    const providerErrorDescription =
+      url.searchParams.get('error_description') ?? 'Provider authorization failed';
     await logAuthEvent(provider, false, config, {
       eventType: 'oauth_callback_error',
       request,
@@ -691,14 +739,18 @@ export async function handleCustomProviderCallback(
         provider,
         error: providerError,
         errorDescription: providerErrorDescription,
-      }),
+      })
     );
     return;
   }
 
   const code = url.searchParams.get('code');
   if (!code) {
-    throw new AppError('provider_code_missing', 'Missing authorization code from provider callback', 400);
+    throw new AppError(
+      'provider_code_missing',
+      'Missing authorization code from provider callback',
+      400
+    );
   }
 
   try {
@@ -720,7 +772,7 @@ export async function handleCustomProviderCallback(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
         expiresAt: session.expiresAt,
-      }),
+      })
     );
   } catch (error) {
     const appError =
@@ -741,7 +793,7 @@ export async function handleCustomProviderCallback(
         provider,
         error: appError.code,
         errorDescription: appError.message,
-      }),
+      })
     );
   }
 }

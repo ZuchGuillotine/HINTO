@@ -5,15 +5,14 @@
     "moduleResolution": "NodeNext",
     "rootDir": "./src",
     "outDir": "./dist",
+    "composite": true,
+    "declaration": true,
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "lib": ["ES2022", "DOM"],
-    "types": ["node"]
+    "lib": ["ES2022"],
+    "types": []
   },
-  "references": [{ "path": "../../packages/prompts" }],
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/__tests__/**"]
+  "include": ["src/**/*.ts"]
 }

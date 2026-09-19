@@ -12,10 +12,13 @@ interface MockQueryBuilder {
   insert: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
+  upsert: jest.Mock;
   eq: jest.Mock;
+  in: jest.Mock;
   order: jest.Mock;
   limit: jest.Mock;
   single: jest.Mock;
+  maybeSingle: jest.Mock;
   // Terminal result — set this to control what the chain resolves to
   _result: SupabaseResult;
 }
@@ -29,24 +32,40 @@ function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
     insert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+    upsert: jest.fn(),
     eq: jest.fn(),
+    in: jest.fn(),
     order: jest.fn(),
     limit: jest.fn(),
     single: jest.fn(),
+    maybeSingle: jest.fn(),
   };
 
   // Each method returns the builder for chaining, except when used as a
   // thenable (the last call in a chain). We make every method return the
   // builder, and also make the builder thenable so `await` works.
-  for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'limit', 'single'] as const) {
+  for (const method of [
+    'select',
+    'insert',
+    'update',
+    'delete',
+    'upsert',
+    'eq',
+    'in',
+    'order',
+    'limit',
+    'single',
+    'maybeSingle',
+  ] as const) {
     builder[method].mockReturnValue(builder);
   }
 
   // Make the builder await-able (thenable)
-  (builder as unknown as { then: Function }).then = function (
-    resolve: (v: SupabaseResult) => void,
-    reject?: (e: unknown) => void,
-  ) {
+  (
+    builder as unknown as {
+      then: (resolve: (v: SupabaseResult) => void, reject?: (e: unknown) => void) => Promise<void>;
+    }
+  ).then = function (resolve: (v: SupabaseResult) => void, reject?: (e: unknown) => void) {
     return Promise.resolve(builder._result).then(resolve, reject);
   };
 
@@ -55,8 +74,12 @@ function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
 
 export interface MockSupabaseClient {
   from: jest.Mock;
+  rpc: jest.Mock;
   auth: {
     getUser: jest.Mock;
+    admin: {
+      deleteUser: jest.Mock;
+    };
   };
   _builders: Map<string, MockQueryBuilder>;
   /**
@@ -84,11 +107,16 @@ export function createMockSupabaseClient(): MockSupabaseClient {
       return builders.get(table)!;
     }),
 
+    rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+
     auth: {
       getUser: jest.fn().mockResolvedValue({
         data: { user: null },
         error: { message: 'No token' },
       }),
+      admin: {
+        deleteUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      },
     },
 
     _mockTable(table: string, result: SupabaseResult): MockQueryBuilder {
@@ -116,7 +144,7 @@ export function mockAuthenticatedUser(
   opts: {
     userId?: string;
     email?: string;
-  } = {},
+  } = {}
 ) {
   const userId = opts.userId ?? 'test-user-id';
   const email = opts.email ?? 'test@example.com';

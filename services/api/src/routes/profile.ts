@@ -6,6 +6,11 @@ import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
+import { isAiCoachEnabled } from './ai.js';
+
+const MIN_AGE = 16;
+const MAX_AGE = 120;
+const HTTPS_URL_RE = /^https:\/\/[^\s]+$/u;
 
 export interface ProfileRow {
   id: string;
@@ -16,6 +21,7 @@ export interface ProfileRow {
   is_public: boolean;
   mutuals_only: boolean;
   subscription_tier: string | null;
+  bio?: string | null;
   age: number | null;
   age_verified: boolean;
   profile_image_id: string | null;
@@ -23,7 +29,10 @@ export interface ProfileRow {
   updated_at: string;
 }
 
-function derivePrivacy(isPublic: boolean, mutualsOnly: boolean): 'public' | 'private' | 'mutuals_only' {
+function derivePrivacy(
+  isPublic: boolean,
+  mutualsOnly: boolean
+): 'public' | 'private' | 'mutuals_only' {
   if (mutualsOnly) return 'mutuals_only';
   if (isPublic) return 'public';
   return 'private';
@@ -42,11 +51,12 @@ export function toProfileDto(row: ProfileRow) {
     username: row.username ?? row.id,
     displayName: row.name ?? '',
     email: row.email,
+    bio: row.bio ?? null,
     avatarUrl: row.avatar_url,
     privacy: derivePrivacy(row.is_public, row.mutuals_only),
     subscriptionTier: normalizeTier(row.subscription_tier),
-    age: row.age,
-    ageVerified: row.age_verified,
+    age: row.age ?? null,
+    ageVerified: Boolean(row.age_verified),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -71,6 +81,7 @@ export interface MeAggregate {
 export function buildMeAggregate(
   row: ProfileRow,
   auth: { authUserId: string; profileId: string },
+  config?: AppConfig
 ): MeAggregate {
   const profile = toProfileDto(row);
 
@@ -86,7 +97,7 @@ export function buildMeAggregate(
     capabilities: {
       canEditProfile: true,
       canCreateSituationship: true,
-      canUseAiCoach: false,
+      canUseAiCoach: config ? isAiCoachEnabled(config) : false,
     },
   };
 }
@@ -94,7 +105,7 @@ export function buildMeAggregate(
 export async function fetchMeAggregateForProfileId(
   profileId: string,
   authUserId: string,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<MeAggregate> {
   const supabase = getServiceClient(config);
   const { data: row, error } = await supabase
@@ -107,14 +118,16 @@ export async function fetchMeAggregateForProfileId(
     throw new AppError('profile_not_found', 'Profile not found', 404);
   }
 
-  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId });
+  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId }, config);
   const { data: identities } = await supabase
     .from('auth_identities')
     .select('provider, is_primary')
     .eq('user_id', profileId);
 
   if (identities && identities.length > 0) {
-    aggregate.auth.linkedProviders = identities.map((identity: { provider: string }) => identity.provider);
+    aggregate.auth.linkedProviders = identities.map(
+      (identity: { provider: string }) => identity.provider
+    );
     const primary = identities.find((identity: { is_primary: boolean }) => identity.is_primary);
     if (primary) {
       aggregate.auth.primaryProvider = (primary as { provider: string }).provider;
@@ -131,13 +144,13 @@ export async function handleGetMe(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const aggregate = await fetchMeAggregateForProfileId(
     authCtx.user.profileId,
     authCtx.user.authUserId,
-    config,
+    config
   );
   sendJsonSuccess(response, 200, context.requestId, aggregate);
 }
@@ -149,7 +162,7 @@ export async function handlePatchMe(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
@@ -163,10 +176,50 @@ export async function handlePatchMe(
     updateFields.username = (body.username as string).trim().toLowerCase();
   }
   if (body.displayName !== undefined) {
-    updateFields.name = body.displayName;
+    if (typeof body.displayName !== 'string' || body.displayName.trim().length === 0) {
+      throw new AppError('validation_error', 'displayName must be a non-empty string', 400);
+    }
+    if (body.displayName.trim().length > 80) {
+      throw new AppError('validation_error', 'displayName must be at most 80 characters', 400);
+    }
+    updateFields.name = body.displayName.trim();
+  }
+  if (body.bio !== undefined) {
+    if (body.bio === null || (typeof body.bio === 'string' && body.bio.trim().length === 0)) {
+      updateFields.bio = null;
+    } else if (typeof body.bio !== 'string') {
+      throw new AppError('validation_error', 'bio must be a string', 400);
+    } else if (body.bio.trim().length > 300) {
+      throw new AppError('validation_error', 'bio must be at most 300 characters', 400);
+    } else {
+      updateFields.bio = body.bio.trim();
+    }
   }
   if (body.avatarUrl !== undefined) {
-    updateFields.avatar_url = body.avatarUrl;
+    if (body.avatarUrl === null) {
+      updateFields.avatar_url = null;
+    } else if (typeof body.avatarUrl !== 'string' || !HTTPS_URL_RE.test(body.avatarUrl)) {
+      throw new AppError('validation_error', 'avatarUrl must be an https URL', 400);
+    } else {
+      updateFields.avatar_url = body.avatarUrl;
+    }
+  }
+  if (body.age !== undefined) {
+    if (typeof body.age !== 'number' || !Number.isInteger(body.age)) {
+      throw new AppError('validation_error', 'age must be an integer', 400);
+    }
+    if (body.age < MIN_AGE) {
+      throw new AppError(
+        'age_requirement_not_met',
+        `You must be at least ${MIN_AGE} to use HINTO`,
+        403
+      );
+    }
+    if (body.age > MAX_AGE) {
+      throw new AppError('validation_error', 'age is out of range', 400);
+    }
+    updateFields.age = body.age;
+    updateFields.age_verified = true;
   }
   if (body.privacy !== undefined) {
     const validPrivacy = ['public', 'private', 'mutuals_only'];
@@ -201,13 +254,59 @@ export async function handlePatchMe(
     .single();
 
   if (error || !row) {
+    const pg = (error ?? {}) as { code?: string };
+    if (pg.code === '23505') {
+      throw new AppError('username_taken', 'That username is already taken', 409);
+    }
     throw new AppError('update_failed', 'Failed to update profile', 500);
   }
 
   const aggregate = await fetchMeAggregateForProfileId(
     authCtx.user.profileId,
     authCtx.user.authUserId,
-    config,
+    config
   );
   sendJsonSuccess(response, 200, context.requestId, aggregate);
+}
+
+/**
+ * DELETE /v1/me - Permanently deletes the account.
+ * Removing the auth user cascades to profiles and every owned row
+ * (situationships, voting sessions, votes, AI conversations, blocks, reports).
+ * Required by App Store Review Guideline 5.1.1(v) and Meta data-deletion rules.
+ */
+export async function handleDeleteMe(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+  const supabase = getServiceClient(config);
+
+  // Log the deletion before the row disappears so support can answer
+  // "did my account get deleted" questions.
+  await supabase.from('auth_login_events').insert({
+    user_id: authCtx.user.profileId,
+    provider: 'account',
+    event_type: 'account_deleted',
+    success: true,
+  });
+
+  const { error } = await supabase.auth.admin.deleteUser(authCtx.user.authUserId);
+  if (error) {
+    // Development sessions have a profile but no auth user; still remove the profile.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', authCtx.user.profileId);
+    if (profileError) {
+      throw new AppError('delete_failed', 'Failed to delete account', 500);
+    }
+  }
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    deleted: true,
+    profileId: authCtx.user.profileId,
+  });
 }

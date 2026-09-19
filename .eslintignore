@@ -1,3 +1,16 @@
+# Build output
 amplify-codegen-temp/models/models
 services/api/dist
+packages/*/dist
 web-build
+
+# Legacy Expo / AWS Amplify tree (retiring; see docs/Legacy_AWS_Audit.md).
+# Excluded from lint so CI reflects the restart-era code only.
+amplify/
+lambda/
+apps/hnnt-app/
+scripts/
+App.tsx
+index.ts
+metro.config.js
+babel.config.js

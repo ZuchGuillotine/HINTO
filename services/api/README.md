@@ -66,21 +66,35 @@ This intentionally avoids:
 - `GET /v1/me/voting-sessions/:id/results`
 - `GET /v1/voting-sessions/:inviteCode`
 - `POST /v1/voting-sessions/:inviteCode/votes`
+- `POST /v1/auth/apple` (Apple identity token exchange)
+- `DELETE /v1/me` (account deletion; cascades to all owned rows)
+- `POST /v1/reports`
+- `GET|POST /v1/me/blocks`, `DELETE /v1/me/blocks/:profileId`
+- `GET|POST /v1/me/ai/conversations`
+- `GET|POST /v1/me/ai/conversations/:id/messages`
+- `POST /v1/dev/session` (only when `API_ENABLE_DEV_AUTH=true`)
 
 ## Environment Contract
 
-Supported environment variables:
+See `/.env.example` for the full annotated list. The server refuses to start
+when `SUPABASE_URL`, `SUPABASE_ANON_KEY`, or `SUPABASE_SERVICE_ROLE_KEY` is
+missing, when `API_ENABLE_DEV_AUTH` is set with `NODE_ENV=production`, or when
+production CORS is a wildcard.
 
-- `API_HOST`
-- `API_PORT`
+- `API_HOST` (default `127.0.0.1`, `0.0.0.0` in production)
+- `API_PORT` or `PORT`
 - `API_LOG_LEVEL`
 - `API_NAME`
+- `API_CORS_ALLOW_ORIGIN` (comma separated exact origins)
+- `API_ENABLE_DEV_AUTH` (local development only)
 - `NODE_ENV`
+- `PUBLIC_WEB_BASE_URL`, `PUBLIC_API_BASE_URL`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
+- `OPENAI_API_KEY`, `OPENAI_MODEL`, `AI_DAILY_MESSAGE_LIMIT_FREE`, `AI_DAILY_MESSAGE_LIMIT_PREMIUM`
 - `AUTH_STATE_SECRET`
+- `AUTH_ALLOWED_REDIRECT_URIS` (required for Snapchat/TikTok flows)
 - `TIKTOK_CLIENT_KEY`
 - `TIKTOK_CLIENT_SECRET`
 - `TIKTOK_REDIRECT_URI`
@@ -147,3 +161,15 @@ Dev watch:
 ```bash
 npm run api:watch
 ```
+
+## Supabase Client Rules
+
+- `getServiceClient` is a pinned service-role client for data access and `auth.admin.*`.
+- `getAuthClient` returns a fresh anon client per call and is the only client that may run `verifyOtp`, `refreshSession`, `signInWithOtp`, or `signInWithIdToken`. Running those on the service client stores a user session that then leaks into every later query.
+
+## Deployment
+
+- Container: `docker build -f services/api/Dockerfile -t hinto-api .` from the repo root. The image runs `node services/api/dist/server.js` as a non-root user and exposes `/health`.
+- Any PaaS that sets `PORT` works unchanged. Set `NODE_ENV=production`, the three Supabase variables, `API_CORS_ALLOW_ORIGIN`, and `PUBLIC_WEB_BASE_URL`.
+- CI: `.github/workflows/ci.yml` builds, lints, tests, and builds the image on every push and pull request.
+- Database: apply `supabase/migrations/*.sql` in order. `012_launch_hardening.sql` is required by the reorder route and by the RLS fixes; it is idempotent.

@@ -1,0 +1,20 @@
+{
+  "name": "@hinto/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HINTO HTTP API (Supabase-backed) serving the iOS and web clients",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "jest --config jest.config.ts"
+  },
+  "dependencies": {
+    "@hinto/prompts": "0.1.0",
+    "@supabase/supabase-js": "^2.100.1"
+  }
+}

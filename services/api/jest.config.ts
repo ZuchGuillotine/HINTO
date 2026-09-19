@@ -8,6 +8,8 @@ const config: Config = {
   moduleNameMapper: {
     // Strip .js extensions from imports so ts-jest resolves .ts files
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    // Resolve the workspace prompts package to source so tests need no build step
+    '^@hinto/prompts$': '<rootDir>/../../packages/prompts/src/index.ts',
   },
   transform: {
     '^.+\\.ts$': [

@@ -15,6 +15,8 @@ export interface AuthenticatedContext extends RequestContext {
   accessToken: string;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
 function extractBearerToken(request: IncomingMessage): string | null {
   const header = request.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -25,20 +27,20 @@ function extractBearerToken(request: IncomingMessage): string | null {
 
 async function resolveDevelopmentUser(
   token: string,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<AuthenticatedUser | null> {
-  if (config.nodeEnv === 'production') {
+  // Development impersonation tokens are only honored when the operator has
+  // explicitly opted in AND the process is not production (see config.ts).
+  if (!config.enableDevAuth) {
     return null;
   }
 
-  const usesLegacyToken = token === 'dev-token';
-  const usesScopedToken = token.startsWith('dev-session:');
-  if (!usesLegacyToken && !usesScopedToken) {
+  if (!token.startsWith('dev-session:')) {
     return null;
   }
 
-  const profileId = usesLegacyToken ? 'dev-user-001' : token.slice('dev-session:'.length).trim();
-  if (!profileId) {
+  const profileId = token.slice('dev-session:'.length).trim();
+  if (!profileId || !UUID_RE.test(profileId)) {
     throw new AppError('unauthorized', 'Invalid development session token', 401);
   }
 
@@ -53,7 +55,7 @@ async function resolveDevelopmentUser(
     throw new AppError(
       'profile_not_found',
       'Development profile not found. Create a development session first.',
-      404,
+      404
     );
   }
 
@@ -75,7 +77,7 @@ async function resolveDevelopmentUser(
 export async function resolveAuthenticatedUser(
   request: IncomingMessage,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<AuthenticatedContext> {
   const token = extractBearerToken(request);
   if (!token) {
@@ -93,7 +95,10 @@ export async function resolveAuthenticatedUser(
 
   const supabase = getServiceClient(config);
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
     throw new AppError('unauthorized', 'Invalid or expired token', 401);
@@ -109,7 +114,7 @@ export async function resolveAuthenticatedUser(
     throw new AppError(
       'profile_not_found',
       'No profile found for authenticated user. Profile may need to be created.',
-      404,
+      404
     );
   }
 

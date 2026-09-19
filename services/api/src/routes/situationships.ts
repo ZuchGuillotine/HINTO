@@ -7,6 +7,62 @@ import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
+const DEFAULT_EMOJI = '💭';
+const DEFAULT_CATEGORY = 'other';
+
+/**
+ * Accepts a string (trimmed, length-capped) or null/undefined. Throws on any
+ * other type so bad JSON never reaches PostgREST as a 500.
+ */
+export function normalizeShortText(
+  value: unknown,
+  field: string,
+  maxLength: number
+): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    throw new AppError('validation_error', `${field} must be a string`, 400);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  if (trimmed.length > maxLength) {
+    throw new AppError('validation_error', `${field} must be at most ${maxLength} characters`, 400);
+  }
+  return trimmed;
+}
+
+interface PostgrestErrorLike {
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Maps database constraint failures to 4xx errors instead of opaque 500s.
+ * P0001 is raised by the free-tier limit trigger; 23514 is a CHECK violation;
+ * 23505 is a unique violation.
+ */
+export function mapWriteError(
+  error: unknown,
+  fallbackCode: string,
+  fallbackMessage: string
+): AppError {
+  const pg = (error ?? {}) as PostgrestErrorLike;
+  if (pg.code === 'P0001') {
+    return new AppError('limit_reached', pg.message ?? 'Limit reached', 403);
+  }
+  if (pg.code === '23514') {
+    return new AppError('validation_error', pg.message ?? 'Value violates a constraint', 400);
+  }
+  if (pg.code === '23505') {
+    return new AppError('conflict', pg.message ?? 'Duplicate value', 409);
+  }
+  return new AppError(fallbackCode, fallbackMessage, 500);
+}
+
 interface SituationshipRow {
   id: string;
   user_id: string;
@@ -45,7 +101,7 @@ export async function handleListSituationships(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const supabase = getServiceClient(config);
@@ -74,7 +130,7 @@ export async function handleListSituationships(
     },
     items,
     ordering: {
-      orderedSituationshipIds: items.map((i) => i.situationshipId),
+      orderedSituationshipIds: items.map(i => i.situationshipId),
     },
     capabilities: {
       canEdit: true,
@@ -108,7 +164,7 @@ export async function handleCreateSituationship(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
@@ -116,12 +172,9 @@ export async function handleCreateSituationship(
   if (!body.name || typeof body.name !== 'string' || (body.name as string).trim().length === 0) {
     throw new AppError('validation_error', 'name is required', 400);
   }
-  if (!body.emoji || typeof body.emoji !== 'string') {
-    throw new AppError('validation_error', 'emoji is required', 400);
-  }
-  if (!body.category || typeof body.category !== 'string') {
-    throw new AppError('validation_error', 'category is required', 400);
-  }
+  const emoji = normalizeShortText(body.emoji, 'emoji', 10) ?? DEFAULT_EMOJI;
+  const category = normalizeShortText(body.category, 'category', 50) ?? DEFAULT_CATEGORY;
+  const description = normalizeShortText(body.description, 'description', 500);
 
   const supabase = getServiceClient(config);
 
@@ -140,9 +193,9 @@ export async function handleCreateSituationship(
     .insert({
       user_id: authCtx.user.profileId,
       name: (body.name as string).trim(),
-      emoji: (body.emoji as string).trim(),
-      category: (body.category as string).trim(),
-      description: body.description ?? null,
+      emoji,
+      category,
+      description,
       rank: nextRank,
       is_active: true,
     })
@@ -150,7 +203,7 @@ export async function handleCreateSituationship(
     .single();
 
   if (error || !row) {
-    throw new AppError('create_failed', 'Failed to create situationship', 500);
+    throw mapWriteError(error, 'create_failed', 'Failed to create situationship');
   }
 
   sendJsonSuccess(response, 201, context.requestId, {
@@ -166,7 +219,7 @@ export async function handleUpdateSituationship(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  situationshipId: string,
+  situationshipId: string
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
@@ -179,9 +232,15 @@ export async function handleUpdateSituationship(
     }
     updateFields.name = (body.name as string).trim();
   }
-  if (body.emoji !== undefined) updateFields.emoji = body.emoji;
-  if (body.category !== undefined) updateFields.category = body.category;
-  if (body.description !== undefined) updateFields.description = body.description;
+  if (body.emoji !== undefined) {
+    updateFields.emoji = normalizeShortText(body.emoji, 'emoji', 10) ?? DEFAULT_EMOJI;
+  }
+  if (body.category !== undefined) {
+    updateFields.category = normalizeShortText(body.category, 'category', 50) ?? DEFAULT_CATEGORY;
+  }
+  if (body.description !== undefined) {
+    updateFields.description = normalizeShortText(body.description, 'description', 500);
+  }
   if (body.status !== undefined) {
     if (body.status !== 'active' && body.status !== 'archived') {
       throw new AppError('validation_error', 'status must be active or archived', 400);
@@ -222,19 +281,24 @@ export async function handleDeleteSituationship(
   response: ServerResponse,
   context: RequestContext,
   config: AppConfig,
-  situationshipId: string,
+  situationshipId: string
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const supabase = getServiceClient(config);
 
-  const { error } = await supabase
+  const { data: deletedRows, error } = await supabase
     .from('situationships')
     .delete()
     .eq('id', situationshipId)
-    .eq('user_id', authCtx.user.profileId);
+    .eq('user_id', authCtx.user.profileId)
+    .select('id');
 
   if (error) {
     throw new AppError('delete_failed', 'Failed to delete situationship', 500);
+  }
+
+  if (Array.isArray(deletedRows) && deletedRows.length === 0) {
+    throw new AppError('not_found', 'Situationship not found or not owned by user', 404);
   }
 
   sendJsonSuccess(response, 200, context.requestId, {
@@ -250,19 +314,16 @@ export async function handleReorderSituationships(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   const body = await readJsonBody(request);
 
-  if (
-    !Array.isArray(body.orderedSituationshipIds) ||
-    body.orderedSituationshipIds.length === 0
-  ) {
+  if (!Array.isArray(body.orderedSituationshipIds) || body.orderedSituationshipIds.length === 0) {
     throw new AppError(
       'validation_error',
       'orderedSituationshipIds must be a non-empty array',
-      400,
+      400
     );
   }
 
@@ -280,17 +341,22 @@ export async function handleReorderSituationships(
     throw new AppError('fetch_failed', 'Failed to fetch current situationships', 500);
   }
 
-  const currentRows = current as { id: string; user_id: string; rank: number; is_active: boolean }[];
+  const currentRows = current as {
+    id: string;
+    user_id: string;
+    rank: number;
+    is_active: boolean;
+  }[];
 
   // Validate: all IDs must match
-  const currentIds = new Set(currentRows.map((r) => r.id));
+  const currentIds = new Set(currentRows.map(r => r.id));
   const orderedSet = new Set(orderedIds);
 
   if (orderedIds.length !== currentRows.length) {
     throw new AppError(
       'validation_error',
       'orderedSituationshipIds must include every situationship exactly once',
-      400,
+      400
     );
   }
 
@@ -304,16 +370,19 @@ export async function handleReorderSituationships(
     throw new AppError('validation_error', 'Duplicate IDs in orderedSituationshipIds', 400);
   }
 
-  // Update ranks
-  const updates = orderedIds.map((id, rank) =>
-    supabase
-      .from('situationships')
-      .update({ rank, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', authCtx.user.profileId),
-  );
+  // Ranks are UNIQUE(user_id, rank), so per-row updates collide on any swap.
+  // `reorder_situationships` (migration 012) reassigns every rank inside one
+  // transaction using a temporary offset.
+  const { error: reorderError } = await supabase.rpc('reorder_situationships', {
+    p_user_id: authCtx.user.profileId,
+    p_ordered_ids: orderedIds,
+  });
 
-  await Promise.all(updates);
+  if (reorderError) {
+    throw new AppError('reorder_failed', 'Failed to reorder situationships', 500, {
+      reason: reorderError.message,
+    });
+  }
 
   // Fetch updated list
   const { data: updated } = await supabase
@@ -322,11 +391,11 @@ export async function handleReorderSituationships(
     .eq('user_id', authCtx.user.profileId)
     .order('rank', { ascending: true });
 
-  const items = (updated as SituationshipRow[] ?? []).map(toSituationshipDto);
+  const items = ((updated as SituationshipRow[]) ?? []).map(toSituationshipDto);
 
   sendJsonSuccess(response, 200, context.requestId, {
     ordering: {
-      orderedSituationshipIds: items.map((i) => i.situationshipId),
+      orderedSituationshipIds: items.map(i => i.situationshipId),
     },
     items,
   });

@@ -8,9 +8,28 @@ import {
   handleCustomProviderStart,
   matchCustomAuthProvider,
 } from './routes/auth-providers.js';
-import { handleEmailOtp, handleEmailVerify, handleRefreshToken } from './routes/auth.js';
+import {
+  handleAppleSignIn,
+  handleEmailOtp,
+  handleEmailVerify,
+  handleRefreshToken,
+} from './routes/auth.js';
 import { handleCreateDevelopmentSession } from './routes/dev.js';
-import { handleGetMe, handlePatchMe } from './routes/profile.js';
+import { handleDeleteMe, handleGetMe, handlePatchMe } from './routes/profile.js';
+import {
+  handleCreateBlock,
+  handleCreateReport,
+  handleDeleteBlock,
+  handleListBlocks,
+  matchBlockProfileId,
+} from './routes/moderation.js';
+import {
+  handleCreateAiConversation,
+  handleListAiConversations,
+  handleListAiMessages,
+  handleSendAiMessage,
+  matchAiConversationPath,
+} from './routes/ai.js';
 import {
   handleListSituationships,
   handleCreateSituationship,
@@ -35,7 +54,9 @@ function matchSituationshipId(path: string): string | null {
   return match ? match[1] : null;
 }
 
-function matchOwnerVotingAction(path: string): { votingSessionId: string; action: 'expire' | 'results' } | null {
+function matchOwnerVotingAction(
+  path: string
+): { votingSessionId: string; action: 'expire' | 'results' } | null {
   const match = path.match(/^\/v1\/me\/voting-sessions\/([a-f0-9-]+)\/(expire|results)$/);
   if (!match) {
     return null;
@@ -47,7 +68,9 @@ function matchOwnerVotingAction(path: string): { votingSessionId: string; action
   };
 }
 
-function matchPublicVotingPath(path: string): { inviteCode: string; action: 'session' | 'votes' } | null {
+function matchPublicVotingPath(
+  path: string
+): { inviteCode: string; action: 'session' | 'votes' } | null {
   const votesMatch = path.match(/^\/v1\/voting-sessions\/([A-Za-z0-9]+)\/votes$/);
   if (votesMatch) {
     return {
@@ -71,7 +94,7 @@ async function routeAsync(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): Promise<boolean> {
   const method = request.method ?? 'GET';
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? config.host}`);
@@ -106,11 +129,13 @@ async function routeAsync(
         'POST /v1/auth/email/otp',
         'POST /v1/auth/email/verify',
         'POST /v1/auth/refresh',
+        'POST /v1/auth/apple',
         'POST /v1/auth/providers/:provider/start',
         'GET  /v1/auth/providers/:provider/callback',
         'GET  /v1/me',
         'PATCH /v1/me',
-        'POST /v1/dev/session',
+        'DELETE /v1/me',
+        ...(config.enableDevAuth ? ['POST /v1/dev/session'] : []),
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
@@ -121,6 +146,14 @@ async function routeAsync(
         'GET  /v1/me/voting-sessions/:id/results',
         'GET  /v1/voting-sessions/:inviteCode',
         'POST /v1/voting-sessions/:inviteCode/votes',
+        'POST /v1/reports',
+        'GET  /v1/me/blocks',
+        'POST /v1/me/blocks',
+        'DELETE /v1/me/blocks/:profileId',
+        'GET  /v1/me/ai/conversations',
+        'POST /v1/me/ai/conversations',
+        'GET  /v1/me/ai/conversations/:id/messages',
+        'POST /v1/me/ai/conversations/:id/messages',
       ],
     });
     return true;
@@ -148,6 +181,11 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'POST' && path === '/v1/auth/apple') {
+    await handleAppleSignIn(request, response, context, config);
+    return true;
+  }
+
   const customAuthProvider = matchCustomAuthProvider(path);
   if (customAuthProvider) {
     if (method === 'POST' && customAuthProvider.action === 'start') {
@@ -156,7 +194,7 @@ async function routeAsync(
         response,
         context,
         config,
-        customAuthProvider.provider,
+        customAuthProvider.provider
       );
       return true;
     }
@@ -167,7 +205,7 @@ async function routeAsync(
         response,
         context,
         config,
-        customAuthProvider.provider,
+        customAuthProvider.provider
       );
       return true;
     }
@@ -183,6 +221,70 @@ async function routeAsync(
   if (method === 'PATCH' && path === '/v1/me') {
     await handlePatchMe(request, response, context, config);
     return true;
+  }
+
+  if (method === 'DELETE' && path === '/v1/me') {
+    await handleDeleteMe(request, response, context, config);
+    return true;
+  }
+
+  // ── Moderation routes (authenticated) ──────────────────────
+
+  if (method === 'POST' && path === '/v1/reports') {
+    await handleCreateReport(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/blocks') {
+    await handleListBlocks(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/blocks') {
+    await handleCreateBlock(request, response, context, config);
+    return true;
+  }
+
+  const blockProfileId = matchBlockProfileId(path);
+  if (blockProfileId && method === 'DELETE') {
+    await handleDeleteBlock(request, response, context, config, blockProfileId);
+    return true;
+  }
+
+  // ── AI coach routes (authenticated) ────────────────────────
+
+  if (method === 'GET' && path === '/v1/me/ai/conversations') {
+    await handleListAiConversations(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/ai/conversations') {
+    await handleCreateAiConversation(request, response, context, config);
+    return true;
+  }
+
+  const aiConversationPath = matchAiConversationPath(path);
+  if (aiConversationPath) {
+    if (method === 'GET') {
+      await handleListAiMessages(
+        request,
+        response,
+        context,
+        config,
+        aiConversationPath.conversationId
+      );
+      return true;
+    }
+    if (method === 'POST') {
+      await handleSendAiMessage(
+        request,
+        response,
+        context,
+        config,
+        aiConversationPath.conversationId
+      );
+      return true;
+    }
   }
 
   // ── Situationship routes (authenticated) ───────────────────
@@ -228,7 +330,7 @@ async function routeAsync(
         response,
         context,
         config,
-        ownerVotingAction.votingSessionId,
+        ownerVotingAction.votingSessionId
       );
       return true;
     }
@@ -239,7 +341,7 @@ async function routeAsync(
         response,
         context,
         config,
-        ownerVotingAction.votingSessionId,
+        ownerVotingAction.votingSessionId
       );
       return true;
     }
@@ -253,19 +355,13 @@ async function routeAsync(
         response,
         context,
         config,
-        publicVotingPath.inviteCode,
+        publicVotingPath.inviteCode
       );
       return true;
     }
 
     if (method === 'POST' && publicVotingPath.action === 'votes') {
-      await handleSubmitVote(
-        request,
-        response,
-        context,
-        config,
-        publicVotingPath.inviteCode,
-      );
+      await handleSubmitVote(request, response, context, config, publicVotingPath.inviteCode);
       return true;
     }
   }
@@ -281,18 +377,20 @@ export function routeRequest(
   request: IncomingMessage,
   response: ServerResponse,
   context: RequestContext,
-  config: AppConfig,
+  config: AppConfig
 ): void {
-  routeAsync(request, response, context, config).then((handled) => {
-    if (!handled) {
-      const { statusCode, body } = toErrorEnvelope(
-        new AppError('not_found', 'Route not found', 404),
-        context.requestId,
-      );
+  routeAsync(request, response, context, config)
+    .then(handled => {
+      if (!handled) {
+        const { statusCode, body } = toErrorEnvelope(
+          new AppError('not_found', 'Route not found', 404),
+          context.requestId
+        );
+        sendJsonError(response, statusCode, body);
+      }
+    })
+    .catch(error => {
+      const { statusCode, body } = toErrorEnvelope(error, context.requestId);
       sendJsonError(response, statusCode, body);
-    }
-  }).catch((error) => {
-    const { statusCode, body } = toErrorEnvelope(error, context.requestId);
-    sendJsonError(response, statusCode, body);
-  });
+    });
 }
