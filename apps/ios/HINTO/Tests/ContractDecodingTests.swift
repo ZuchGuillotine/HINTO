@@ -181,6 +181,45 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertTrue(json.contains("\"worstSituationshipId\""))
     }
 
+    func testSendConversationMessageDataDecodes() throws {
+        let payload = """
+        {
+          "data": {
+            "userMessage": {
+              "messageId": "44444444-4444-4444-4444-444444444444",
+              "conversationId": "33333333-3333-3333-3333-333333333333",
+              "content": "Should I text him back?",
+              "isUser": true,
+              "tokensUsed": 0,
+              "moderationFlagged": false,
+              "createdAt": "2026-01-05T10:00:00.000Z"
+            },
+            "assistantMessage": {
+              "messageId": "55555555-5555-5555-5555-555555555555",
+              "conversationId": "33333333-3333-3333-3333-333333333333",
+              "content": "Let's look at how he has shown up so far.",
+              "isUser": false,
+              "tokensUsed": 120,
+              "moderationFlagged": false,
+              "createdAt": "2026-01-05T10:00:02Z"
+            },
+            "dailyUsage": { "aiMessagesUsed": 3, "limit": 30 }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let response = try decoder.decode(APIResponse<SendConversationMessageData>.self, from: payload)
+        XCTAssertTrue(response.data.userMessage.isUser)
+        XCTAssertFalse(response.data.assistantMessage.isUser)
+        XCTAssertEqual(response.data.dailyUsage.remaining, 27)
+        XCTAssertNotNil(response.data.userMessage.createdAtDate)
+        XCTAssertNotNil(response.data.assistantMessage.createdAtDate)
+
+        let mapped = ChatMessage(apiMessage: response.data.assistantMessage)
+        XCTAssertEqual(mapped.id, "55555555-5555-5555-5555-555555555555")
+        XCTAssertFalse(mapped.isUser)
+    }
+
     func testFriendsFeedAggregateDecodes() throws {
         let payload = """
         {

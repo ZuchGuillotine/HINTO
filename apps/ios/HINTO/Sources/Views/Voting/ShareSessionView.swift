@@ -224,6 +224,8 @@ struct ShareSessionView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ShareSessionView(situationships: SituationshipListView.mockSituationships)
 }
+#endif

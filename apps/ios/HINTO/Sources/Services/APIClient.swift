@@ -3,9 +3,14 @@ import Observation
 
 @Observable
 final class APIClient {
+    /// Session owner used to refresh an expired access token. Wired by
+    /// `HINTOApp`; when nil a 401 is surfaced as `APIError.unauthorized`.
+    @ObservationIgnored weak var authManager: AuthManager?
+
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let refreshCoordinator = SessionRefreshCoordinator()
 
     var baseURL: URL {
         URL(string: Configuration.apiBaseURL)!
@@ -27,11 +32,30 @@ final class APIClient {
 
     // MARK: - Generic Request
 
+    /// Sends a request. For authenticated requests (`token != nil`) a 401
+    /// triggers a single refresh through `POST /v1/auth/refresh` followed by
+    /// one retry with the new access token.
     func request<T: Decodable>(
         _ method: HTTPMethod,
         path: String,
         body: (any Encodable)? = nil,
         token: String? = nil
+    ) async throws -> T {
+        try await performRequest(
+            method,
+            path: path,
+            body: body,
+            token: token,
+            allowRefresh: token != nil
+        )
+    }
+
+    private func performRequest<T: Decodable>(
+        _ method: HTTPMethod,
+        path: String,
+        body: (any Encodable)?,
+        token: String?,
+        allowRefresh: Bool
     ) async throws -> T {
         let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
         let url = baseURL.appendingPathComponent(normalizedPath)
@@ -73,6 +97,19 @@ final class APIClient {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 {
+                if allowRefresh, let token, let authManager {
+                    let refreshedToken = try await refreshAccessToken(
+                        staleToken: token,
+                        authManager: authManager
+                    )
+                    return try await performRequest(
+                        method,
+                        path: path,
+                        body: body,
+                        token: refreshedToken,
+                        allowRefresh: false
+                    )
+                }
                 throw APIError.unauthorized
             }
             if let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data) {
@@ -88,6 +125,50 @@ final class APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    // MARK: - Session Refresh
+
+    /// Refreshes the session once per stale token, coalescing concurrent 401s.
+    /// A rejected refresh clears the session through `AuthManager`; a network
+    /// failure is rethrown without touching the session.
+    private func refreshAccessToken(
+        staleToken: String,
+        authManager: AuthManager
+    ) async throws -> String {
+        do {
+            return try await refreshCoordinator.refresh(staleToken: staleToken) {
+                guard let refreshToken = authManager.refreshToken else {
+                    throw APIError.unauthorized
+                }
+                let response: APIResponse<AuthSessionData> = try await self.performRequest(
+                    .post,
+                    path: "/v1/auth/refresh",
+                    body: RefreshTokenRequest(refreshToken: refreshToken),
+                    token: nil,
+                    allowRefresh: false
+                )
+                await MainActor.run {
+                    authManager.setSession(
+                        token: response.data.accessToken,
+                        refreshToken: response.data.refreshToken,
+                        user: response.data.me
+                    )
+                }
+                return response.data.accessToken
+            }
+        } catch let error as APIError {
+            if case .network = error {
+                throw error
+            }
+            #if DEBUG
+            print("[HINTO API] refresh_rejected: \(error.localizedDescription)")
+            #endif
+            await MainActor.run {
+                authManager.handleSessionExpired()
+            }
+            throw APIError.unauthorized
+        }
+    }
+
     // MARK: - Profile
 
     func getMe(token: String) async throws -> APIResponse<MeAggregate> {
@@ -96,6 +177,10 @@ final class APIClient {
 
     func updateMe(token: String, update: UpdateProfileRequest) async throws -> APIResponse<MeAggregate> {
         try await request(.patch, path: "/v1/me", body: update, token: token)
+    }
+
+    func deleteMe(token: String) async throws -> APIResponse<DeleteMeData> {
+        try await request(.delete, path: "/v1/me", token: token)
     }
 
     func uploadProfileAvatar(
@@ -331,6 +416,40 @@ final class APIClient {
         try await request(.put, path: "/v1/me/situationships/order", body: order, token: token)
     }
 
+    // MARK: - AI Coach Conversations
+
+    func listConversations(token: String) async throws -> APIResponse<ConversationListData> {
+        try await request(.get, path: "/v1/me/conversations", token: token)
+    }
+
+    func createConversation(
+        token: String,
+        input: CreateConversationRequest = CreateConversationRequest()
+    ) async throws -> APIResponse<ConversationMutationData> {
+        try await request(.post, path: "/v1/me/conversations", body: input, token: token)
+    }
+
+    func getConversation(token: String, conversationId: String) async throws -> APIResponse<ConversationDetailData> {
+        try await request(.get, path: "/v1/me/conversations/\(conversationId)", token: token)
+    }
+
+    func deleteConversation(token: String, conversationId: String) async throws -> APIResponse<DeleteConversationData> {
+        try await request(.delete, path: "/v1/me/conversations/\(conversationId)", token: token)
+    }
+
+    func sendConversationMessage(
+        token: String,
+        conversationId: String,
+        content: String
+    ) async throws -> APIResponse<SendConversationMessageData> {
+        try await request(
+            .post,
+            path: "/v1/me/conversations/\(conversationId)/messages",
+            body: SendConversationMessageRequest(content: content),
+            token: token
+        )
+    }
+
     // MARK: - Voting
 
     func createVotingSession(token: String, input: CreateVotingSessionRequest = CreateVotingSessionRequest()) async throws -> APIResponse<CreateVotingSessionData> {
@@ -447,6 +566,11 @@ struct DeletedData: Decodable {
     let deleted: Bool
 }
 
+struct DeleteMeData: Decodable {
+    let deleted: Bool
+    let profileId: String
+}
+
 struct ReorderResponseData: Decodable {
     let ordering: Ordering
     let items: [Situationship]
@@ -559,6 +683,36 @@ enum APIError: LocalizedError {
     }
 }
 
+/// Serializes token refreshes so concurrent 401s share one `/v1/auth/refresh`
+/// call. A refresh that already replaced `staleToken` is reused instead of
+/// being repeated.
+actor SessionRefreshCoordinator {
+    private var inFlight: Task<String, Error>?
+    private var lastStaleToken: String?
+    private var lastRefreshedToken: String?
+
+    func refresh(
+        staleToken: String,
+        operation: @escaping @Sendable () async throws -> String
+    ) async throws -> String {
+        if let inFlight {
+            return try await inFlight.value
+        }
+        if lastStaleToken == staleToken, let lastRefreshedToken {
+            return lastRefreshedToken
+        }
+
+        let task = Task { try await operation() }
+        inFlight = task
+        defer { inFlight = nil }
+
+        let refreshed = try await task.value
+        lastStaleToken = staleToken
+        lastRefreshedToken = refreshed
+        return refreshed
+    }
+}
+
 struct AnyEncodable: Encodable {
     private let _encode: (Encoder) throws -> Void
 
@@ -572,6 +726,8 @@ struct AnyEncodable: Encodable {
 }
 
 enum Configuration {
+    /// Resolution order: `HINTO_API_BASE_URL` process environment (Xcode scheme)
+    /// -> `HINTOAPIBaseURL` Info.plist key (build-setting driven) -> production.
     static var apiBaseURL: String {
         if let environmentValue = ProcessInfo.processInfo.environment["HINTO_API_BASE_URL"],
            !environmentValue.isEmpty {

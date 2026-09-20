@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HINTO Privacy Policy · hnnt.app</title>
+    <meta name="description" content="How HNNT collects, uses, shares, and protects your information." />
+    <meta name="theme-color" content="#0a0608" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://hnnt.app/privacy" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0608'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23FF4275'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #0a0608;
+        --ink-deep: #050204;
+        --surface: #140b10;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f5f5f5;
+        --muted: rgba(245, 245, 245, 0.72);
+        --pink: #ff4275;
+        --pink-soft: #ff7396;
+        --mark: #ffd166;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--text);
+        font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Inter, system-ui, sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a { color: var(--pink-soft); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { color: var(--pink); }
+      .skip {
+        position: absolute; left: -999px; top: 8px; background: var(--pink); color: #fff; padding: 8px 12px; border-radius: 8px;
+      }
+      .skip:focus { left: 16px; }
+      .masthead, .colophon {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+        max-width: 72ch; margin: 0 auto; padding: 20px 16px;
+      }
+      .masthead { border-bottom: 1px solid var(--line); }
+      .colophon { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+      .brand {
+        font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; color: #fafafa; text-decoration: none;
+      }
+      .brand .dot {
+        display: inline-block; width: 0.22em; height: 0.22em; border-radius: 50%; background: var(--pink); margin-left: 0.05em;
+        box-shadow: 0 0 12px var(--pink);
+      }
+      .legal-nav { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+      .legal-nav a { color: var(--muted); text-decoration: none; }
+      .legal-nav a:hover, .legal-nav a[aria-current="page"] { color: var(--pink-soft); }
+      main { max-width: 72ch; margin: 0 auto; padding: 24px 16px 48px; }
+      .banner {
+        border: 1px solid rgba(255, 66, 117, 0.6); border-left: 4px solid var(--pink); background: rgba(255, 66, 117, 0.1);
+        border-radius: 10px; padding: 12px 16px; margin: 0 0 28px; font-weight: 600;
+      }
+      .eyebrow { color: var(--pink); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 8px; }
+      h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 12px; }
+      h2 { font-size: 1.45rem; line-height: 1.25; margin: 40px 0 12px; padding-top: 8px; }
+      h3 { font-size: 1.12rem; line-height: 1.3; margin: 26px 0 8px; color: var(--pink-soft); }
+      p { margin: 0 0 16px; }
+      .meta { color: var(--muted); margin-bottom: 24px; }
+      ul, ol { margin: 0 0 18px; padding-left: 1.4em; }
+      li { margin: 0 0 8px; }
+      li > p { margin: 0; }
+      strong { font-weight: 700; }
+      mark.placeholder {
+        background: var(--mark); color: #241a00; padding: 0 5px; border-radius: 4px; font-weight: 700; white-space: nowrap;
+      }
+      .review-note {
+        border-left: 3px solid rgba(255, 209, 102, 0.75); background: rgba(255, 209, 102, 0.06); color: var(--muted);
+        font-style: italic; padding: 10px 14px; margin: 0 0 18px; border-radius: 0 8px 8px 0;
+      }
+      .callout {
+        border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; font-weight: 700;
+      }
+      address { font-style: normal; line-height: 1.7; margin: 0 0 18px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc { margin: 0 0 32px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc h2 { font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; padding: 0; }
+      .toc ol { margin: 0; padding-left: 1.2em; columns: 2; column-gap: 24px; }
+      .toc li { break-inside: avoid; margin: 0 0 6px; }
+      .toc a { text-decoration: none; }
+      .steps li { margin-bottom: 12px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 0 0 18px; }
+      .card h3 { margin-top: 0; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 4px; }
+      @media (max-width: 640px) {
+        body { font-size: 16px; }
+        .toc ol { columns: 1; }
+        h2 { margin-top: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/">hnnt<span class="dot" aria-hidden="true"></span></a>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html" aria-current="page">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </header>
+    <main id="content">
+      <article class="legal" data-legal-doc="privacy">
+        <p class="banner" role="note">Draft. This document is pending legal review and is not yet in effect.</p>
+        <p class="eyebrow">Legal</p>
+        <h1>HINTO Privacy Policy</h1>
+        <p class="meta"><em>Effective Date: May 16, 2026</em><br /><em>Last Updated: May 16, 2026</em></p>
+        <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#s1">1. Introduction</a></li><li><a href="#s2">2. Who Can Use HINTO</a></li><li><a href="#s3">3. Information We Collect</a></li><li><a href="#s4">4. How We Use Information</a></li><li><a href="#s5">5. Legal Bases for Processing (EEA / UK Users)</a></li><li><a href="#s6">6. Third Parties Who Process Your Information</a></li><li><a href="#s7">7. International Data Transfers</a></li><li><a href="#s8">8. HAIDAA Research Platform (Opt-In)</a></li><li><a href="#s9">9. Marketing Communications</a></li><li><a href="#s10">10. Data Retention</a></li><li><a href="#s11">11. Cookies and Similar Technologies</a></li><li><a href="#s12">12. Your Privacy Rights</a></li><li><a href="#s13">13. Security</a></li><li><a href="#s14">14. Friends, Invitees, and Third Parties Mentioned by Users</a></li><li><a href="#s15">15. Changes to This Privacy Policy</a></li><li><a href="#s16">16. How to Contact Us</a></li></ol></nav>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: This is a draft for legal review. Bracketed fields (e.g., <mark class="placeholder">[COMPANY LEGAL NAME]</mark>, <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>) must be completed by counsel before publication.]</aside>
+<h2 id="s1">1. Introduction</h2>
+<p><mark class="placeholder">[COMPANY LEGAL NAME]</mark> (“HINTO,” “we,” “us,” or “our”) operates the HINTO mobile application, website, and related services (collectively, the “Service”). HINTO is a social relationship coaching and voting platform that allows users to manage ranked lists of romantic interests, invite trusted friends to vote and comment, and receive personalized guidance from an AI relationship coach.</p>
+<p>This Privacy Policy explains what information we collect, how we use it, who we share it with, the choices and rights you have, and the steps we take to protect it. By creating an account or otherwise using the Service, you acknowledge that you have read and understood this Privacy Policy.</p>
+<p>We are headquartered in Seattle, Washington, United States. This Policy applies to all users of the Service worldwide, including users in the European Economic Area (“EEA”) and the United Kingdom (“UK”).</p>
+<h2 id="s2">2. Who Can Use HINTO</h2>
+<p>HINTO is intended for users who are at least 16 years old. We do not knowingly collect personal information from anyone under the age of 16. If we learn that we have collected personal information from a user under 16, we will delete that information promptly. If you believe a user under 16 has provided us with personal information, please contact us at <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>.</p>
+<p>Because HINTO involves sensitive social and relationship content, we recommend that users between 16 and 18 review this Policy with a parent or guardian. We rely on self-attestation of age at sign-up and reserve the right to suspend or terminate accounts that misrepresent the user’s age.</p>
+<h2 id="s3">3. Information We Collect</h2>
+<p>We collect the following categories of information:</p>
+<h3 id="s3-1">3.1 Account and Authentication Information</h3>
+<p>When you create an account or sign in, we collect:</p>
+<ul>
+  <li>Your name, email address, date of birth or age confirmation, profile photo, and any optional bio or social handles you choose to provide.</li>
+  <li>Authentication identifiers from third-party providers you use to sign in or link your account, including Apple, Meta (Facebook/Instagram), Google, Snapchat, and TikTok. These providers may share with us a unique user ID, your name, email address, profile picture, and, where you authorize it, your friends list or connections list.</li>
+  <li>Account preferences, language, notification settings, and similar configuration data.</li>
+</ul>
+<h3 id="s3-2">3.2 Profile and Relationship Content (Sensitive)</h3>
+<p>Because of HINTO’s purpose, certain content you provide is inherently sensitive. We treat the following as Sensitive Information and apply heightened safeguards:</p>
+<ul>
+  <li>Situationships: names, photos, nicknames, descriptions, ranks, notes, status (e.g., active, archived), and any other details you record about romantic or dating interests.</li>
+  <li>Voting sessions: rankings, comments, reactions, and free-text feedback that you or your invited friends submit.</li>
+  <li>AI coach conversations: messages you send to the AI coach and the responses it generates, which may include disclosures about your relationships, emotions, or personal life.</li>
+  <li>Friends and contacts data: lists of friends, followers, or connections we obtain from third-party social providers when you choose to use friend-voting features.</li>
+</ul>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: confirm whether any HINTO content (e.g., references to health, sexuality, or political opinion) falls within GDPR Article 9 “special categories” and adjust consent flows accordingly.]</aside>
+<h3 id="s3-3">3.3 Device, Usage, and Technical Information</h3>
+<p>Automatically collected when you use the Service:</p>
+<ul>
+  <li>Device type, operating system, device identifiers, app version, and crash logs.</li>
+  <li>IP address, approximate location derived from IP, browser type, referring URLs, and language settings.</li>
+  <li>Usage data such as screens viewed, features used, buttons tapped, session duration, and timestamps.</li>
+  <li>Cookies, SDKs, and similar technologies (web only). See Section 11 below.</li>
+</ul>
+<h3 id="s3-4">3.4 Communications With Us</h3>
+<p>If you contact us through email, support forms, or in-app messaging, we keep a record of that correspondence and any information you choose to share.</p>
+<h3 id="s3-5">3.5 Payment Information</h3>
+<p>If you purchase a subscription or in-app product, payment information is collected and processed by the relevant payment processor (e.g., Apple App Store, Google Play, or our web payment processor). We do not store full payment card numbers on our servers. We receive limited transaction information such as a transaction ID, product purchased, amount, currency, and renewal status.</p>
+<h2 id="s4">4. How We Use Information</h2>
+<p>We use the information we collect to:</p>
+<ul>
+  <li>Create and manage your account, including age verification and provider linking.</li>
+  <li>Operate core features, including situationship lists, friend voting sessions, comments, and reactions.</li>
+  <li>Provide the AI relationship coach by sending relevant context to our AI subprocessors (see Section 6).</li>
+  <li>Personalize your experience and improve in-app recommendations and prompts.</li>
+  <li>Send service communications, such as security alerts, terms updates, transactional receipts, and support replies.</li>
+  <li>Send marketing communications about HINTO and our other first-party products, subject to your preferences and applicable law. You can opt out at any time (see Section 9).</li>
+  <li>Maintain trust and safety, including detecting and responding to harassment, stalking, impersonation, fraud, and other policy violations.</li>
+  <li>Conduct analytics, debugging, product research, and to improve and develop new features.</li>
+  <li>Comply with our legal obligations and enforce our Terms of Service.</li>
+</ul>
+<p>We do not sell your personal information, and we do not share your personal information with third parties for their own marketing purposes.</p>
+<h2 id="s5">5. Legal Bases for Processing (EEA / UK Users)</h2>
+<p>If you are located in the EEA or UK, we rely on the following legal bases under the General Data Protection Regulation (“GDPR”) and the UK GDPR:</p>
+<ul>
+  <li><strong>Contract:</strong> to provide the Service you have signed up for, including account creation, voting sessions, and the AI coach.</li>
+  <li><strong>Consent:</strong> for optional features that involve Sensitive Information, marketing communications where required by law, accessing friends lists from social providers, and participation in the HAIDAA research platform (see Section 8).</li>
+  <li><strong>Legitimate interests:</strong> to secure and improve the Service, prevent abuse, conduct analytics, and communicate with you about our own products, where these interests are not overridden by your rights.</li>
+  <li><strong>Legal obligation:</strong> to comply with applicable laws, court orders, and regulatory requests.</li>
+</ul>
+<h2 id="s6">6. Third Parties Who Process Your Information</h2>
+<p>We use a limited set of vendors and partners (“Service Providers”) to operate the Service. Each Service Provider is contractually restricted to processing your information only on our instructions for the purposes described below. We do not sell your personal information and we do not allow Service Providers to use your information to advertise their own products to you.</p>
+<h3 id="s6-1">6.1 AI Service Providers</h3>
+<p>To power the AI relationship coach and certain in-product intelligence, we send relevant prompts and limited account context to:</p>
+<ul>
+  <li>OpenAI, L.L.C.</li>
+  <li>Anthropic, PBC.</li>
+</ul>
+<p>We instruct these providers under written terms that prohibit using your prompts or outputs to train their general foundation models. Where available, we use enterprise or API settings that disable training and limit retention.</p>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: confirm exact OpenAI / Anthropic API tier and corresponding data processing addenda, and adjust language above to reflect actual training and retention settings.]</aside>
+<h3 id="s6-2">6.2 Authentication and Social Providers</h3>
+<p>When you choose to sign up, sign in, or invite friends through a social platform, we exchange information with the following providers:</p>
+<ul>
+  <li>Apple (Sign in with Apple, App Store, in-app purchases).</li>
+  <li>Meta Platforms, Inc. (Facebook and Instagram login, optional friends list access).</li>
+  <li>Google LLC (Google sign-in, Google Play billing where applicable).</li>
+  <li>Snap, Inc. (Snapchat login, optional friends list access).</li>
+  <li>TikTok / ByteDance (TikTok login, optional connections list access).</li>
+</ul>
+<p>Your use of these providers is also governed by their own terms and privacy policies. You can manage which providers are linked to your HINTO account in the app settings.</p>
+<h3 id="s6-3">6.3 Infrastructure and Operations</h3>
+<ul>
+  <li>Database, authentication, and storage hosting (e.g., Supabase, Inc.; cloud hosting providers).</li>
+  <li>Analytics, crash reporting, and product monitoring providers.</li>
+  <li>Email and notification delivery providers.</li>
+  <li>Payment processors (Apple App Store, Google Play, and web payment processor where applicable).</li>
+</ul>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: insert exact list of subprocessors (Supabase, hosting region, analytics, email/SMS, etc.) and link to a maintained subprocessor page.]</aside>
+<h3 id="s6-4">6.4 Legal, Safety, and Corporate Transactions</h3>
+<p>We may also disclose information:</p>
+<ul>
+  <li>To comply with applicable law, lawful requests from public authorities, or valid legal process.</li>
+  <li>To enforce our Terms of Service or investigate suspected violations, including harassment or stalking.</li>
+  <li>To protect the rights, property, or safety of HINTO, our users, or the public.</li>
+  <li>In connection with a merger, acquisition, financing, reorganization, or sale of assets, subject to standard confidentiality protections.</li>
+</ul>
+<h2 id="s7">7. International Data Transfers</h2>
+<p>HINTO is based in the United States. When you use the Service from outside the United States, your information will be transferred to, processed in, and stored in the United States and in other countries where our Service Providers operate.</p>
+<p>Where required by law, we rely on appropriate transfer mechanisms such as the European Commission’s Standard Contractual Clauses, the UK International Data Transfer Addendum, and supplementary safeguards. You can request more information about our transfer mechanisms by contacting us at <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>.</p>
+<h2 id="s8">8. HAIDAA Research Platform (Opt-In)</h2>
+<p>HAIDAA is our research and data platform that explores health-related correlations across our suite of applications. Participation in HAIDAA is strictly opt-in. You will be presented with a separate, clear consent flow that explains what data may be included, how it will be processed, and how you can withdraw.</p>
+<p>If you opt in to HAIDAA:</p>
+<ul>
+  <li>We may include de-identified or pseudonymized data derived from your HINTO activity in HAIDAA research datasets.</li>
+  <li>We may combine HAIDAA inputs with data from other applications you have opted into.</li>
+  <li>We will not publish information that identifies you personally.</li>
+  <li>You can withdraw consent at any time from the privacy settings in the app; withdrawal stops future processing for HAIDAA but does not affect research already completed.</li>
+</ul>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: confirm whether HAIDAA processing constitutes “scientific research” under GDPR Art. 89, whether IRB or equivalent oversight is required, and whether any health data may trigger HIPAA or state health-data laws (e.g., Washington My Health My Data Act).]</aside>
+<h2 id="s9">9. Marketing Communications</h2>
+<p>With your permission where required by law, we may send marketing emails, push notifications, or in-app messages about HINTO features, related HINTO products, and our other first-party applications. We do not share your personal information with third parties for those third parties’ own direct marketing.</p>
+<p>You can opt out of marketing communications at any time by:</p>
+<ul>
+  <li>Using the unsubscribe link in any marketing email.</li>
+  <li>Updating your notification preferences in app settings.</li>
+  <li>Contacting us at <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>.</li>
+</ul>
+<p>Even if you opt out of marketing, we will still send you transactional and service-related messages (e.g., security alerts, receipts, policy updates).</p>
+<h2 id="s10">10. Data Retention</h2>
+<p>We retain your information for as long as your account is active and for a reasonable period afterward to comply with legal obligations, resolve disputes, enforce agreements, and protect our users. Specific retention practices include:</p>
+<ul>
+  <li>Account and profile data: retained for the life of the account.</li>
+  <li>Situationships and voting content: retained until you delete the content or close the account; backups may persist for up to 90 days.</li>
+  <li>AI coach conversations: retained for the life of the account unless you delete individual conversations or your account; we may retain de-identified excerpts for safety and quality review.</li>
+  <li>Logs, analytics, and security records: typically retained 12–24 months.</li>
+  <li>Records required by law (e.g., tax, billing): retained as required by applicable law.</li>
+</ul>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: confirm actual retention windows for logs, AI conversation transcripts, and HAIDAA datasets, and align with applicable record-keeping laws.]</aside>
+<h2 id="s11">11. Cookies and Similar Technologies</h2>
+<p>On the web version of the Service, we use cookies and similar technologies for essential functionality (such as authentication and session management), performance analytics, and remembering preferences. We do not use third-party advertising cookies. Where required by law, we will present a cookie banner or preference center on first visit. You can manage cookies through your browser settings, but disabling certain cookies may impact functionality of the Service.</p>
+<h2 id="s12">12. Your Privacy Rights</h2>
+<p>Depending on where you live, you may have the following rights regarding your personal information:</p>
+<ul>
+  <li><strong>Access:</strong> request a copy of the personal information we hold about you.</li>
+  <li><strong>Correction:</strong> request that we correct inaccurate or incomplete information.</li>
+  <li><strong>Deletion:</strong> request that we delete your personal information, subject to legal exceptions.</li>
+  <li><strong>Portability:</strong> receive a portable copy of certain information you provided to us.</li>
+  <li><strong>Restriction / Objection:</strong> ask us to limit or stop processing of your information in certain circumstances.</li>
+  <li><strong>Withdraw consent:</strong> where we rely on consent, you can withdraw it at any time without affecting prior processing.</li>
+  <li><strong>Complaint:</strong> lodge a complaint with your local data protection authority. In the UK, this is the Information Commissioner’s Office (ICO).</li>
+</ul>
+<p>You can exercise most of these rights directly in the app (Settings → Privacy) or by contacting us at <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>. We will respond within the time frames required by applicable law (generally within 30 days for GDPR requests).</p>
+<p>You also have the ability to delete your account at any time from the app, which will trigger deletion of your account data in accordance with Section 10.</p>
+<h2 id="s13">13. Security</h2>
+<p>We use administrative, technical, and physical safeguards designed to protect personal information, including encryption in transit, encryption at rest for sensitive fields, access controls, row-level security in our database, monitoring, and employee training. No system is completely secure, however, and we cannot guarantee the absolute security of your information. If we learn of a security incident that affects your personal information, we will notify you and the relevant regulators as required by law.</p>
+<h2 id="s14">14. Friends, Invitees, and Third Parties Mentioned by Users</h2>
+<p>HINTO necessarily involves information about people other than you, including individuals you describe in situationships and friends you invite to vote. You agree that you have a lawful basis to share that information with us and that you will not include unlawful, harassing, defamatory, or stalking-related content. If a third party contacts us regarding content about them, we may review, restrict, or remove content consistent with our policies and applicable law.</p>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: consider a dedicated takedown / data subject request workflow for non-user third parties named in situationships.]</aside>
+<h2 id="s15">15. Changes to This Privacy Policy</h2>
+<p>We may update this Privacy Policy from time to time. When we do, we will revise the “Last Updated” date above and, for material changes, provide additional notice (such as in-app or email notification). Your continued use of the Service after the updated Policy becomes effective constitutes acceptance of the changes.</p>
+<h2 id="s16">16. How to Contact Us</h2>
+<p>If you have any questions about this Privacy Policy or our privacy practices, contact us at:</p>
+<address>
+<mark class="placeholder">[COMPANY LEGAL NAME]</mark>
+<br />Attn: Privacy
+<br /><mark class="placeholder">[STREET ADDRESS]</mark>, Seattle, WA <mark class="placeholder">[ZIP]</mark>
+<br />Email: <mark class="placeholder">[PRIVACY CONTACT EMAIL]</mark>
+</address>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: if HINTO has EU/UK users, designate (and list here) an Article 27 GDPR representative and a UK representative.]</aside>
+      </article>
+    </main>
+    <footer class="colophon">
+      <span>hnnt.app</span>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html" aria-current="page">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </footer>
+  </body>
+</html>

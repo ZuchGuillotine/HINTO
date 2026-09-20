@@ -11,10 +11,15 @@ final class AuthManager: NSObject {
     var authError: String?
 
     private(set) var accessToken: String?
+    private(set) var refreshToken: String?
+    /// Set when the user confirmed their age on this device but the profile
+    /// returned by the API does not carry it yet.
+    private(set) var hasLocalAgeConfirmation = false
 
     private let tokenKey = "hinto_access_token"
     private let refreshTokenKey = "hinto_refresh_token"
     private let profileKey = "hinto_profile_cache"
+    private let ageConfirmationKeyPrefix = "hinto_age_confirmed_"
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
     private var providerWebAuthSession: ASWebAuthenticationSession?
@@ -26,27 +31,64 @@ final class AuthManager: NSObject {
 
     // MARK: - Session
 
+    /// True when the signed-in profile has no confirmed age. The API returns
+    /// `profile.age`; a device-local confirmation covers the window before the
+    /// backend persists it.
+    var needsAgeConfirmation: Bool {
+        guard let user = currentUser else { return false }
+        if user.profile.age != nil { return false }
+        return !hasLocalAgeConfirmation
+    }
+
     private func restoreSession() {
-        if let token = UserDefaults.standard.string(forKey: tokenKey) {
+        migrateLegacyTokensIfNeeded()
+
+        if let token = KeychainStore.string(forKey: tokenKey) {
             self.accessToken = token
+            self.refreshToken = KeychainStore.string(forKey: refreshTokenKey)
             self.isAuthenticated = true
         }
         if let data = UserDefaults.standard.data(forKey: profileKey),
            let user = try? decoder.decode(MeAggregate.self, from: data) {
             self.currentUser = user
+            self.hasLocalAgeConfirmation = localAgeConfirmation(for: user.profile.profileId)
         }
         self.isLoading = false
     }
 
+    /// One-time move of tokens written by earlier builds into `UserDefaults`.
+    private func migrateLegacyTokensIfNeeded() {
+        let defaults = UserDefaults.standard
+        if let legacyToken = defaults.string(forKey: tokenKey) {
+            if KeychainStore.string(forKey: tokenKey) == nil {
+                KeychainStore.set(legacyToken, forKey: tokenKey)
+            }
+            defaults.removeObject(forKey: tokenKey)
+        }
+        if let legacyRefresh = defaults.string(forKey: refreshTokenKey) {
+            if KeychainStore.string(forKey: refreshTokenKey) == nil {
+                KeychainStore.set(legacyRefresh, forKey: refreshTokenKey)
+            }
+            defaults.removeObject(forKey: refreshTokenKey)
+        }
+    }
+
     func setSession(token: String, refreshToken: String? = nil, user: MeAggregate) {
         self.accessToken = token
-        self.currentUser = user
         self.isAuthenticated = true
         self.authError = nil
-        UserDefaults.standard.set(token, forKey: tokenKey)
+        KeychainStore.set(token, forKey: tokenKey)
         if let refreshToken {
-            UserDefaults.standard.set(refreshToken, forKey: refreshTokenKey)
+            self.refreshToken = refreshToken
+            KeychainStore.set(refreshToken, forKey: refreshTokenKey)
         }
+        updateCurrentUser(user)
+    }
+
+    /// Replaces the cached profile without touching tokens.
+    func updateCurrentUser(_ user: MeAggregate) {
+        hasLocalAgeConfirmation = localAgeConfirmation(for: user.profile.profileId)
+        currentUser = user
         if let encoded = try? encoder.encode(user) {
             UserDefaults.standard.set(encoded, forKey: profileKey)
         }
@@ -54,13 +96,62 @@ final class AuthManager: NSObject {
 
     func signOut() {
         accessToken = nil
+        refreshToken = nil
         currentUser = nil
+        hasLocalAgeConfirmation = false
         isAuthenticated = false
-        UserDefaults.standard.removeObject(forKey: tokenKey)
-        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
+        KeychainStore.remove(forKey: tokenKey)
+        KeychainStore.remove(forKey: refreshTokenKey)
         UserDefaults.standard.removeObject(forKey: profileKey)
     }
 
+    /// Called by `APIClient` when a refresh attempt is rejected by the API.
+    /// Clears the session so `RootView` returns to onboarding.
+    func handleSessionExpired() {
+        signOut()
+        authError = AuthError.sessionExpired.errorDescription
+    }
+
+    /// Re-fetches `/v1/me` so capabilities and age reflect the server. Network
+    /// failures are ignored; an expired session is cleared by `APIClient`.
+    func refreshCurrentUser(using api: APIClient) async {
+        guard let token = accessToken else { return }
+        #if DEBUG
+        if token == "dev-token" { return }
+        #endif
+        guard let response = try? await api.getMe(token: token) else { return }
+        updateCurrentUser(response.data)
+    }
+
+    // MARK: - Account Deletion
+
+    /// Deletes the account through `DELETE /v1/me` and clears the local session.
+    /// Throws when the API rejects the request; the session is left intact then.
+    func deleteAccount() async throws {
+        guard let token = accessToken else {
+            throw AuthError.sessionExpired
+        }
+        let client = APIClient()
+        client.authManager = self
+        _ = try await client.deleteMe(token: token)
+        signOut()
+    }
+
+    // MARK: - Age Confirmation
+
+    private func localAgeConfirmation(for profileId: String) -> Bool {
+        UserDefaults.standard.bool(forKey: ageConfirmationKeyPrefix + profileId)
+    }
+
+    /// Records the age the user confirmed. `me` is the aggregate returned by the
+    /// `PATCH /v1/me` call; the device-local flag covers backends that do not
+    /// echo `age` back yet.
+    func applyAgeConfirmation(me: MeAggregate) {
+        UserDefaults.standard.set(true, forKey: ageConfirmationKeyPrefix + me.profile.profileId)
+        updateCurrentUser(me)
+    }
+
+    #if DEBUG
     func signInForLocalDevelopment() async throws {
         let request = DevelopmentSessionRequest(
             profileId: "dev-user-001",
@@ -73,6 +164,7 @@ final class AuthManager: NSObject {
         let response = try await client.createDevelopmentSession(input: request)
         setSession(token: response.data.accessToken, user: response.data.me)
     }
+    #endif
 
     // MARK: - Sign in with Apple
 
@@ -194,8 +286,10 @@ final class AuthManager: NSObject {
 
     // MARK: - Token Refresh
 
+    /// Exchanges the stored refresh token for a new session. `APIClient` calls
+    /// this automatically on a 401; it is exposed for explicit use as well.
     func refreshSessionIfNeeded() async throws {
-        guard let refreshToken = UserDefaults.standard.string(forKey: refreshTokenKey) else {
+        guard let refreshToken else {
             signOut()
             throw AuthError.sessionExpired
         }
@@ -293,6 +387,7 @@ final class AuthManager: NSObject {
 
     // MARK: - Dev Bypass
 
+    #if DEBUG
     func devSignIn() {
         let mockUser = MeAggregate(
             profile: Profile(
@@ -305,7 +400,9 @@ final class AuthManager: NSObject {
                 privacy: .private,
                 subscriptionTier: .free,
                 createdAt: ISO8601DateFormatter().string(from: Date()),
-                updatedAt: ISO8601DateFormatter().string(from: Date())
+                updatedAt: ISO8601DateFormatter().string(from: Date()),
+                age: 24,
+                ageVerified: false
             ),
             auth: AuthIdentity(
                 authUserId: "dev-auth-001",
@@ -322,6 +419,7 @@ final class AuthManager: NSObject {
         )
         setSession(token: "dev-token", user: mockUser)
     }
+    #endif
 }
 
 // MARK: - Auth Types
@@ -377,6 +475,18 @@ enum AuthProvider: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Providers rendered on the onboarding screen. Facebook has no backend
+    /// route yet, so it stays out of the UI. Snapchat and TikTok have a wired
+    /// native flow but their API callbacks are not production-ready, so they
+    /// are only shown in debug builds until the portals and backend are live.
+    static var visibleProviders: [AuthProvider] {
+        #if DEBUG
+        return [.apple, .email, .snapchat, .tiktok]
+        #else
+        return [.apple, .email]
+        #endif
+    }
+
     var displayName: String {
         switch self {
         case .apple: "Sign in with Apple"
@@ -427,7 +537,7 @@ enum AuthError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidCredential: "Invalid sign-in credential"
-        case .providerNotImplemented(let p): "\(p) sign-in coming soon"
+        case .providerNotImplemented(let p): "\(p.capitalized) sign-in is not available yet"
         case .providerFailed(let message): message
         case .cancelled: "Sign-in was cancelled"
         case .sessionExpired: "Your session has expired. Please sign in again."

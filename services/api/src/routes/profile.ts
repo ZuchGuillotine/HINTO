@@ -90,6 +90,7 @@ export interface MeAggregate {
 export function buildMeAggregate(
   row: ProfileRow,
   auth: { authUserId: string; profileId: string },
+  config?: AppConfig,
 ): MeAggregate {
   const profile = toProfileDto(row);
 
@@ -105,7 +106,9 @@ export function buildMeAggregate(
     capabilities: {
       canEditProfile: true,
       canCreateSituationship: true,
-      canUseAiCoach: false,
+      // Clients hide the coach tab when this is false; the routes still work
+      // without a key (they answer with a "not configured" message).
+      canUseAiCoach: Boolean(config?.openAiApiKey),
     },
   };
 }
@@ -121,7 +124,7 @@ export async function fetchMeAggregateForProfileId(
       throw new AppError('profile_not_found', 'Profile not found', 404);
     }
 
-    const aggregate = buildMeAggregate(row, { authUserId, profileId });
+    const aggregate = buildMeAggregate(row, { authUserId, profileId }, config);
     const identities = await listAuthIdentities(config, row.platform_user_id);
 
     if (identities.length > 0) {
@@ -149,7 +152,7 @@ export async function fetchMeAggregateForProfileId(
     throw new AppError('profile_not_found', 'Profile not found', 404);
   }
 
-  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId });
+  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId }, config);
   const { data: identities } = await supabase
     .from('auth_identities')
     .select('provider, is_primary')

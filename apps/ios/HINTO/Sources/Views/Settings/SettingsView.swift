@@ -64,6 +64,10 @@ struct SettingsView: View {
 
                 // Support
                 Section("Support") {
+                    Link(destination: URL(string: "mailto:support@hnnt.app")!) {
+                        Label("Contact Support", systemImage: "envelope.fill")
+                    }
+
                     Link(destination: URL(string: "https://hnnt.app/privacy")!) {
                         Label("Privacy Policy", systemImage: "hand.raised.fill")
                     }
@@ -72,7 +76,11 @@ struct SettingsView: View {
                         Label("Terms of Service", systemImage: "doc.text.fill")
                     }
 
-                    Label("Version 1.0.0", systemImage: "info.circle")
+                    Link(destination: URL(string: "https://hnnt.app/data-deletion")!) {
+                        Label("Delete Your Data", systemImage: "trash.slash.fill")
+                    }
+
+                    Label("Version \(Self.appVersion)", systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
 
@@ -87,6 +95,16 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
         }
+    }
+
+    private static var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String
+        if let build, !build.isEmpty {
+            return "\(version) (\(build))"
+        }
+        return version
     }
 }
 

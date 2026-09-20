@@ -1,5 +1,75 @@
 export const SESSION_KEY = 'hinto_web_access_token';
+export const REFRESH_KEY = 'hinto_web_refresh_token';
 export const VOTER_IDENTITY_KEY = 'hinto_web_voter_identity';
+
+export const LEGAL_PAGES = {
+  '/privacy': { kind: 'privacy', eyebrow: 'Legal', title: 'Privacy Policy' },
+  '/terms': { kind: 'terms', eyebrow: 'Legal', title: 'Terms of Service' },
+  '/support': { kind: 'support', eyebrow: 'Support', title: 'Support' },
+  '/data-deletion': { kind: 'data-deletion', eyebrow: 'Your data', title: 'Delete your data' },
+};
+
+export const REPORT_CONTENT_TYPES = [
+  ['profile', 'A profile'],
+  ['situationship', 'A situationship or list entry'],
+  ['vote', 'A vote'],
+  ['message', 'A message or comment'],
+];
+
+export const REPORT_REASONS = [
+  ['harassment', 'Harassment or bullying'],
+  ['stalking_or_doxxing', 'Stalking, tracking, or sharing private info'],
+  ['impersonation', 'Impersonation'],
+  ['non_consensual_content', 'Content about someone without their consent'],
+  ['hate_or_violence', 'Hate speech or threats'],
+  ['sexual_content', 'Sexual content or involves a minor'],
+  ['spam', 'Spam or scam'],
+  ['other', 'Something else'],
+];
+
+export const CRISIS_NOTE =
+  'hnnt is not an emergency service. If you are in danger call your local emergency number; in the US call or text 988.';
+
+export function createEmptyCoachState() {
+  return {
+    conversations: [],
+    activeConversationId: null,
+    messages: [],
+    dailyUsage: null,
+    sending: false,
+    draft: '',
+    error: null,
+  };
+}
+
+export function createEmptyReportDraft() {
+  return {
+    open: false,
+    contentType: 'profile',
+    contentId: '',
+    reportedProfileId: '',
+    reason: '',
+    description: '',
+    context: '',
+  };
+}
+
+export function describeCoachError(error) {
+  const code = error?.code ?? error?.payload?.error?.code ?? null;
+  if (code === 'quota_exceeded') {
+    return "You've used all of today's coach messages. Your limit resets tomorrow.";
+  }
+  if (code === 'rate_limited') {
+    return 'Slow down a little. Give it a few seconds and send again.';
+  }
+  if (code === 'moderation_flagged' || code === 'content_flagged') {
+    return "hnnt can't respond to that message. If you are in danger, call your local emergency number.";
+  }
+  if (error?.isNetworkError) {
+    return error.message;
+  }
+  return error?.message ?? 'hnnt could not reply right now. Try again in a moment.';
+}
 
 export function createMemoryStorage(initialEntries = {}) {
   const store = new Map(Object.entries(initialEntries));
@@ -60,6 +130,12 @@ export function createInitialState({
     friendSuggestions: [],
     situationships: [],
     token: resolvedStorage.getItem(SESSION_KEY),
+    refreshToken: resolvedStorage.getItem(REFRESH_KEY),
+    coach: createEmptyCoachState(),
+    blocks: [],
+    report: createEmptyReportDraft(),
+    confirmDeleteAccount: false,
+    legalDocs: {},
     voterIdentity: existingVoterIdentity,
     votingSessions: [],
     selectedVotingSessionId: null,
@@ -110,12 +186,26 @@ export function createApp({
   });
   state.route = normalizeRoute(location?.pathname);
 
+  if (typeof apiClient.configureSession === 'function') {
+    apiClient.configureSession({
+      getRefreshToken: () => state.refreshToken,
+      onSessionRefreshed: (session) => setSession(session),
+    });
+  }
+
   function normalizeRoute(pathname = '/') {
     const path = pathname || '/';
     if (path === '/app') {
       return '/app/situationships';
     }
+    if (path.length > 1 && path.endsWith('/')) {
+      return path.slice(0, -1);
+    }
     return path;
+  }
+
+  function isLegalRoute(route = state.route) {
+    return Object.prototype.hasOwnProperty.call(LEGAL_PAGES, route);
   }
 
   function routeToPanel(route) {
@@ -173,13 +263,50 @@ export function createApp({
     render();
   }
 
+  function setRefreshToken(refreshToken) {
+    state.refreshToken = refreshToken ?? null;
+    if (refreshToken) {
+      resolvedStorage.setItem(REFRESH_KEY, refreshToken);
+    } else {
+      resolvedStorage.removeItem(REFRESH_KEY);
+    }
+  }
+
   function setToken(token) {
     state.token = token;
     if (token) {
       resolvedStorage.setItem(SESSION_KEY, token);
     } else {
       resolvedStorage.removeItem(SESSION_KEY);
+      setRefreshToken(null);
     }
+  }
+
+  function setSession({ accessToken, refreshToken } = {}) {
+    if (!accessToken) {
+      return;
+    }
+    setToken(accessToken);
+    if (refreshToken) {
+      setRefreshToken(refreshToken);
+    }
+  }
+
+  function isAuthFailure(error) {
+    return error?.statusCode === 401 || error?.statusCode === 403;
+  }
+
+  function clearSessionState() {
+    setToken(null);
+    state.me = null;
+    state.situationships = [];
+    state.coach = createEmptyCoachState();
+    state.blocks = [];
+    state.report = createEmptyReportDraft();
+    state.confirmDeleteAccount = false;
+    resetSocialState();
+    resetVotingState();
+    resetEditor();
   }
 
   function resetEditor() {
@@ -255,16 +382,32 @@ export function createApp({
         type: 'success',
         message: 'Signed in.',
       };
+      if (state.activePanel === 'coach') {
+        await handleLoadCoachPanel();
+      } else if (state.activePanel === 'settings') {
+        await handleLoadSettingsPanel();
+      }
     } catch (error) {
       console.error(error);
-      setToken(null);
-      state.me = null;
-      state.situationships = [];
-      resetSocialState();
-      state.notice = {
-        type: 'error',
-        message: error.message ?? 'Failed to restore the local session.',
-      };
+      if (isAuthFailure(error)) {
+        // The access token is invalid and the refresh (if any) failed: sign out.
+        clearSessionState();
+        state.notice = {
+          type: 'error',
+          message: 'Your session expired. Please sign in again.',
+        };
+        if (isAppRoute()) {
+          navigate('/signin', { replace: true });
+        }
+      } else {
+        // Network or server trouble: keep the stored session so a reload can retry.
+        state.notice = {
+          type: 'error',
+          message: error.isNetworkError
+            ? error.message
+            : (error.message ?? 'Failed to restore the local session.'),
+        };
+      }
     } finally {
       state.isLoading = false;
       render();
@@ -294,7 +437,7 @@ export function createApp({
               email,
               password,
             });
-      setToken(response.data.accessToken);
+      setSession(response.data);
       state.me = response.data.me;
       state.notice = {
         type: 'success',
@@ -687,6 +830,354 @@ export function createApp({
     }
   }
 
+  // ── Legal pages (static fragments under /legal/*.html) ─────────────────
+
+  function ensureLegalDoc(kind) {
+    if (state.legalDocs[kind]) {
+      return;
+    }
+
+    const fetchImpl = windowRef?.fetch;
+    const ParserCtor = windowRef?.DOMParser;
+    if (typeof fetchImpl !== 'function' || typeof ParserCtor !== 'function') {
+      state.legalDocs[kind] = { status: 'error', html: null };
+      return;
+    }
+
+    state.legalDocs[kind] = { status: 'loading', html: null };
+
+    fetchImpl
+      .call(windowRef, `/legal/${kind}.html`, { headers: { Accept: 'text/html' } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Legal page request failed (${response.status})`);
+        }
+        return response.text();
+      })
+      .then((markup) => {
+        const parsed = new ParserCtor().parseFromString(markup, 'text/html');
+        const article = parsed.querySelector('article.legal');
+        if (!article) {
+          throw new Error('Legal page fragment missing.');
+        }
+        state.legalDocs[kind] = { status: 'ready', html: article.innerHTML };
+      })
+      .catch((error) => {
+        console.error(error);
+        state.legalDocs[kind] = { status: 'error', html: null };
+      })
+      .finally(() => {
+        if (state.route === panelRouteForLegalKind(kind)) {
+          render();
+        }
+      });
+  }
+
+  function panelRouteForLegalKind(kind) {
+    return Object.keys(LEGAL_PAGES).find((route) => LEGAL_PAGES[route].kind === kind) ?? '/';
+  }
+
+  // ── Coach ───────────────────────────────────────────────────────────────
+
+  function coachAvailable() {
+    return state.me?.capabilities?.canUseAiCoach !== false;
+  }
+
+  function coachClientReady() {
+    return (
+      typeof apiClient.getConversations === 'function' &&
+      typeof apiClient.createConversation === 'function' &&
+      typeof apiClient.getConversation === 'function' &&
+      typeof apiClient.sendCoachMessage === 'function'
+    );
+  }
+
+  async function handleLoadCoachPanel() {
+    if (!state.token || !coachAvailable() || !coachClientReady()) {
+      render();
+      return;
+    }
+
+    state.isLoading = true;
+    state.coach.error = null;
+    render();
+
+    try {
+      const response = await apiClient.getConversations(state.token);
+      state.coach.conversations = response.data.conversations ?? [];
+      const activeStillExists = state.coach.conversations.some(
+        (item) => item.conversationId === state.coach.activeConversationId,
+      );
+      if (!activeStillExists) {
+        state.coach.activeConversationId = null;
+        state.coach.messages = [];
+      }
+      if (!state.coach.activeConversationId && state.coach.conversations.length > 0) {
+        await loadConversation(state.coach.conversations[0].conversationId);
+      }
+    } catch (error) {
+      state.coach.error = describeCoachError(error);
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  async function loadConversation(conversationId) {
+    const response = await apiClient.getConversation(state.token, conversationId);
+    state.coach.activeConversationId = response.data.conversation?.conversationId ?? conversationId;
+    state.coach.messages = response.data.messages ?? [];
+  }
+
+  async function handleOpenConversation(conversationId) {
+    if (!state.token || !conversationId) {
+      return;
+    }
+
+    state.isLoading = true;
+    state.coach.error = null;
+    render();
+
+    try {
+      await loadConversation(conversationId);
+    } catch (error) {
+      state.coach.error = describeCoachError(error);
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  async function handleNewConversation() {
+    if (!state.token || !coachAvailable()) {
+      return;
+    }
+
+    state.isLoading = true;
+    state.coach.error = null;
+    render();
+
+    try {
+      const response = await apiClient.createConversation(state.token, {});
+      const conversation = response.data.conversation ?? response.data;
+      state.coach.conversations = [conversation, ...state.coach.conversations];
+      state.coach.activeConversationId = conversation.conversationId;
+      state.coach.messages = [];
+    } catch (error) {
+      state.coach.error = describeCoachError(error);
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  async function handleDeleteConversation(conversationId) {
+    if (!state.token || !conversationId || typeof apiClient.deleteConversation !== 'function') {
+      return;
+    }
+
+    state.isLoading = true;
+    render();
+
+    try {
+      await apiClient.deleteConversation(state.token, conversationId);
+      state.coach.conversations = state.coach.conversations.filter(
+        (item) => item.conversationId !== conversationId,
+      );
+      if (state.coach.activeConversationId === conversationId) {
+        state.coach.activeConversationId = null;
+        state.coach.messages = [];
+      }
+      state.notice = { type: 'success', message: 'Conversation deleted.' };
+    } catch (error) {
+      state.coach.error = describeCoachError(error);
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  async function handleSendCoachMessage(form) {
+    if (!state.token || !coachAvailable() || state.coach.sending) {
+      return;
+    }
+
+    const formData = new FormDataCtor(form);
+    const content = formData.get('content')?.toString().trim() ?? '';
+    if (!content) {
+      state.coach.error = 'Write something first.';
+      render();
+      return;
+    }
+
+    state.coach.sending = true;
+    state.coach.draft = content;
+    state.coach.error = null;
+    render();
+
+    try {
+      if (!state.coach.activeConversationId) {
+        const created = await apiClient.createConversation(state.token, {});
+        const conversation = created.data.conversation ?? created.data;
+        state.coach.conversations = [conversation, ...state.coach.conversations];
+        state.coach.activeConversationId = conversation.conversationId;
+        state.coach.messages = [];
+      }
+
+      const response = await apiClient.sendCoachMessage(
+        state.token,
+        state.coach.activeConversationId,
+        content,
+      );
+      const { userMessage, assistantMessage, dailyUsage } = response.data;
+      state.coach.messages = [
+        ...state.coach.messages,
+        ...(userMessage ? [userMessage] : []),
+        ...(assistantMessage ? [assistantMessage] : []),
+      ];
+      if (dailyUsage) {
+        state.coach.dailyUsage = dailyUsage;
+      }
+      state.coach.draft = '';
+      state.coach.conversations = state.coach.conversations.map((item) =>
+        item.conversationId === state.coach.activeConversationId
+          ? { ...item, updatedAt: assistantMessage?.createdAt ?? item.updatedAt }
+          : item,
+      );
+    } catch (error) {
+      state.coach.error = describeCoachError(error);
+      if (error?.code === 'quota_exceeded' && state.coach.dailyUsage) {
+        state.coach.dailyUsage = {
+          ...state.coach.dailyUsage,
+          aiMessagesUsed: state.coach.dailyUsage.limit,
+        };
+      }
+    } finally {
+      state.coach.sending = false;
+      render();
+    }
+  }
+
+  // ── Settings: blocks, delete account, reports ───────────────────────────
+
+  async function handleLoadSettingsPanel() {
+    if (!state.token || typeof apiClient.getBlocks !== 'function') {
+      render();
+      return;
+    }
+
+    try {
+      const response = await apiClient.getBlocks(state.token);
+      state.blocks = response.data.blocks ?? [];
+    } catch (error) {
+      state.notice = {
+        type: 'error',
+        message: error.message ?? 'Failed to load blocked users.',
+      };
+    } finally {
+      render();
+    }
+  }
+
+  async function handleUnblock(profileId) {
+    if (!state.token || !profileId || typeof apiClient.deleteBlock !== 'function') {
+      return;
+    }
+
+    try {
+      await apiClient.deleteBlock(state.token, profileId);
+      state.blocks = state.blocks.filter((item) => item.blockedProfileId !== profileId);
+      state.notice = { type: 'success', message: 'Unblocked.' };
+    } catch (error) {
+      state.notice = { type: 'error', message: error.message ?? 'Unblock failed.' };
+    } finally {
+      render();
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!state.token || typeof apiClient.deleteMe !== 'function') {
+      return;
+    }
+
+    state.isLoading = true;
+    render();
+
+    try {
+      await apiClient.deleteMe(state.token);
+      clearSessionState();
+      state.notice = {
+        type: 'success',
+        message: 'Your account and data have been deleted.',
+      };
+      navigate('/', { replace: true });
+    } catch (error) {
+      state.confirmDeleteAccount = false;
+      state.notice = {
+        type: 'error',
+        message: error.message ?? 'Account deletion failed. Email support@hnnt.app and we will do it for you.',
+      };
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
+  function openReport(prefill = {}) {
+    state.report = {
+      ...createEmptyReportDraft(),
+      ...prefill,
+      open: true,
+    };
+    state.activePanel = 'settings';
+    navigate(panelToRoute('settings'));
+  }
+
+  async function handleSubmitReport(form) {
+    if (!state.token || typeof apiClient.createReport !== 'function') {
+      return;
+    }
+
+    const formData = new FormDataCtor(form);
+    const payload = {
+      contentType: formData.get('contentType')?.toString() || 'profile',
+      contentId: formData.get('contentId')?.toString().trim() || '',
+      reportedProfileId: formData.get('reportedProfileId')?.toString().trim() || undefined,
+      reason: formData.get('reason')?.toString() || '',
+      description: formData.get('description')?.toString().trim() || undefined,
+    };
+
+    if (!payload.contentId || !payload.reason) {
+      state.notice = { type: 'error', message: 'Pick what you are reporting and a reason.' };
+      render();
+      return;
+    }
+
+    state.isLoading = true;
+    render();
+
+    try {
+      await apiClient.createReport(state.token, payload);
+      state.report = createEmptyReportDraft();
+      state.notice = {
+        type: 'success',
+        message: 'Report sent. Thank you. We review every report and will not tell them who reported it.',
+      };
+    } catch (error) {
+      state.report = {
+        ...state.report,
+        ...payload,
+        reportedProfileId: payload.reportedProfileId ?? '',
+        description: payload.description ?? '',
+        open: true,
+      };
+      state.notice = { type: 'error', message: error.message ?? 'Report failed to send.' };
+    } finally {
+      state.isLoading = false;
+      render();
+    }
+  }
+
   async function handleLoadPublicVotingSession(form) {
     const formData = new FormDataCtor(form);
     const inviteCode = formData.get('inviteCode')?.toString().trim().toUpperCase() ?? '';
@@ -790,8 +1281,10 @@ export function createApp({
           <p>Rank what you can’t say out loud.</p>
         </div>
         <nav aria-label="Footer">
-          <button class="footer-link" data-action="navigate" data-route="/terms" type="button">Terms</button>
           <button class="footer-link" data-action="navigate" data-route="/privacy" type="button">Privacy</button>
+          <button class="footer-link" data-action="navigate" data-route="/terms" type="button">Terms</button>
+          <button class="footer-link" data-action="navigate" data-route="/support" type="button">Support</button>
+          <button class="footer-link" data-action="navigate" data-route="/data-deletion" type="button">Delete your data</button>
           <button class="footer-link" data-action="navigate" data-route="/blog" type="button">Blog</button>
           <button class="footer-link" data-action="navigate" data-route="/docs" type="button">Guide</button>
         </nav>
@@ -924,18 +1417,43 @@ export function createApp({
     `;
   }
 
+  function renderLegalPage(route) {
+    const page = LEGAL_PAGES[route];
+    ensureLegalDoc(page.kind);
+    const doc = state.legalDocs[page.kind];
+    const staticHref = `/legal/${page.kind}.html`;
+
+    let body;
+    if (doc?.status === 'ready') {
+      body = `<div class="legal-fragment">${doc.html}</div>`;
+    } else if (doc?.status === 'loading') {
+      body = `
+        <div class="eyebrow">${escapeHtml(page.eyebrow)}</div>
+        <h1>${escapeHtml(page.title)}</h1>
+        <p>Loading…</p>
+      `;
+    } else {
+      body = `
+        <div class="eyebrow">${escapeHtml(page.eyebrow)}</div>
+        <h1>${escapeHtml(page.title)}</h1>
+        <p>This page could not be loaded inline. <a class="inline-link" href="${staticHref}">Open the ${escapeHtml(page.title)} page</a> instead.</p>
+      `;
+    }
+
+    return `
+      <main class="shell shell--public">
+        ${renderPublicNav()}
+        <section class="content-page content-page--legal">
+          ${body}
+          <p class="form-hint"><a class="inline-link" href="${staticHref}">Open as a standalone page</a></p>
+        </section>
+        ${renderFooter()}
+      </main>
+    `;
+  }
+
   function renderContentPage(kind) {
     const content = {
-      terms: {
-        eyebrow: 'Legal',
-        title: 'Terms of Service',
-        body: 'This page will host HINTO terms before launch. For now, it marks the route and footer destination for the product site.',
-      },
-      privacy: {
-        eyebrow: 'Legal',
-        title: 'Privacy Policy',
-        body: 'This page will explain account data, friend voting, hnnt coaching data, and privacy controls before public launch.',
-      },
       blog: {
         eyebrow: 'Stories',
         title: 'HINTO Blog',
@@ -1160,6 +1678,17 @@ export function createApp({
                     </div>
                     <p>${escapeHtml(item.ownerProfile?.displayName ?? 'Friend')} · @${escapeHtml(item.ownerProfile?.username ?? '')}</p>
                   </div>
+                  <div class="list-card__actions">
+                    <button
+                      class="ghost-button"
+                      data-action="open-report"
+                      data-content-type="situationship"
+                      data-content-id="${escapeHtml(item.situationship?.situationshipId ?? '')}"
+                      data-reported-profile-id="${escapeHtml(item.ownerProfile?.profileId ?? '')}"
+                      data-context="Feed post by @${escapeHtml(item.ownerProfile?.username ?? '')}: ${escapeHtml(item.situationship?.name ?? '')}"
+                      type="button"
+                    >Report</button>
+                  </div>
                 </article>
               `).join('')}
         </div>
@@ -1290,32 +1819,283 @@ export function createApp({
     `;
   }
 
-  function renderCoachPanel() {
+  function formatMessageTime(value) {
+    if (!value) {
+      return '';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  function conversationLabel(conversation) {
+    if (conversation.title) {
+      return conversation.title;
+    }
+    const started = formatMessageTime(conversation.createdAt);
+    return started ? `Conversation · ${started}` : 'Conversation';
+  }
+
+  function renderCoachUsage() {
+    const usage = state.coach.dailyUsage;
+    if (!usage || typeof usage.limit !== 'number') {
+      return '';
+    }
+    const used = Number(usage.aiMessagesUsed ?? 0);
+    const remaining = Math.max(usage.limit - used, 0);
     return `
-      <section class="panel">
-        <div class="panel-header">
-          <div>
+      <p class="coach-usage" aria-live="polite">
+        ${remaining === 0
+          ? `Daily limit reached (${used}/${usage.limit}). Resets tomorrow.`
+          : `${used}/${usage.limit} messages used today · ${remaining} left`}
+      </p>
+    `;
+  }
+
+  function renderCoachPanel() {
+    if (!coachAvailable()) {
+      return `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
               <div class="eyebrow">hnnt</div>
               <h2>Ask hnnt</h2>
+            </div>
+          </div>
+          <article class="empty-card">
+            <h3>Coach unavailable</h3>
+            <p>hnnt coaching is not enabled for your account yet. Your lists, votes, and friends still work as usual.</p>
+          </article>
+          <p class="crisis-note">${escapeHtml(CRISIS_NOTE)}</p>
+        </section>
+      `;
+    }
+
+    if (!coachClientReady()) {
+      return `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="eyebrow">hnnt</div>
+              <h2>Ask hnnt</h2>
+            </div>
+          </div>
+          <article class="empty-card">
+            <h3>Coach unavailable</h3>
+            <p>This build of the web app cannot reach the coach. Try the iPhone app or come back later.</p>
+          </article>
+          <p class="crisis-note">${escapeHtml(CRISIS_NOTE)}</p>
+        </section>
+      `;
+    }
+
+    const coach = state.coach;
+    const usage = coach.dailyUsage;
+    const quotaReached =
+      usage && typeof usage.limit === 'number' && Number(usage.aiMessagesUsed ?? 0) >= usage.limit;
+    const activeConversation = coach.conversations.find(
+      (item) => item.conversationId === coach.activeConversationId,
+    );
+
+    return `
+      <section class="panel coach">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">hnnt</div>
+            <h2>Ask hnnt</h2>
+          </div>
+          <div class="panel-header__actions">
+            <button class="ghost-button" data-action="refresh-coach" type="button">Refresh</button>
+            <button class="secondary-button" data-action="new-conversation" type="button">New conversation</button>
           </div>
         </div>
 
-        <div class="meta-grid">
-          <article class="meta-card">
-            <div class="eyebrow">Private</div>
-            <h3>Ask for a read</h3>
-            <p>Use coaching for reflection, red flags, next texts, and pattern spotting.</p>
-          </article>
-          <article class="meta-card">
-            <div class="eyebrow">Contextual</div>
-            <h3>Built around your list</h3>
-            <p>Coaching should eventually reference your profile, situationships, and vote results.</p>
-          </article>
-          <article class="meta-card">
-            <div class="eyebrow">Status</div>
-            <h3>Chat UI pending</h3>
-            <p>The API routes exist, and the next pass should wire the full conversation interface here.</p>
-          </article>
+        <div class="coach-layout">
+          <aside class="coach-sidebar" aria-label="Conversations">
+            <div class="eyebrow">Conversations</div>
+            <div class="list-stack">
+              ${coach.conversations.length === 0
+                ? '<article class="empty-card"><h3>No conversations yet</h3><p>Start one and ask for a read on anyone in your list.</p></article>'
+                : coach.conversations.map((item) => `
+                  <article class="list-card list-card--compact ${item.conversationId === coach.activeConversationId ? 'list-card--active' : ''}">
+                    <div class="list-card__body">
+                      <button class="link-button" data-action="open-conversation" data-id="${escapeHtml(item.conversationId)}" type="button">
+                        ${escapeHtml(conversationLabel(item))}
+                      </button>
+                      <p class="form-hint">${escapeHtml(formatMessageTime(item.updatedAt ?? item.createdAt))}</p>
+                    </div>
+                    <div class="list-card__actions">
+                      <button class="ghost-button ghost-button--danger" data-action="delete-conversation" data-id="${escapeHtml(item.conversationId)}" type="button" aria-label="Delete conversation">Delete</button>
+                    </div>
+                  </article>
+                `).join('')}
+            </div>
+          </aside>
+
+          <div class="coach-thread">
+            <div class="coach-thread__header">
+              <h3>${escapeHtml(activeConversation ? conversationLabel(activeConversation) : 'New conversation')}</h3>
+              ${renderCoachUsage()}
+            </div>
+
+            <div class="coach-messages" role="log" aria-live="polite">
+              ${coach.messages.length === 0
+                ? `
+                  <article class="empty-card">
+                    <h3>What's on your mind?</h3>
+                    <p>Ask about a specific person on your list, a text you're not sure how to answer, or a pattern you keep noticing. hnnt keeps it private.</p>
+                  </article>
+                `
+                : coach.messages.map((message) => `
+                  <article class="coach-message ${message.isUser ? 'coach-message--user' : 'coach-message--assistant'}">
+                    <div class="coach-message__meta">
+                      <span>${message.isUser ? 'You' : 'hnnt'}</span>
+                      <time datetime="${escapeHtml(message.createdAt ?? '')}">${escapeHtml(formatMessageTime(message.createdAt))}</time>
+                    </div>
+                    <p>${escapeHtml(message.content)}</p>
+                    ${message.moderationFlagged ? '<p class="form-hint">Flagged by moderation.</p>' : ''}
+                  </article>
+                `).join('')}
+              ${coach.sending
+                ? '<article class="coach-message coach-message--assistant coach-message--pending"><div class="coach-message__meta"><span>hnnt</span></div><p>Thinking…</p></article>'
+                : ''}
+            </div>
+
+            ${coach.error ? `<p class="coach-error" role="alert">${escapeHtml(coach.error)}</p>` : ''}
+
+            <form id="coach-message-form" class="stack-form coach-composer">
+              <label>
+                <span class="visually-hidden">Message hnnt</span>
+                <textarea
+                  name="content"
+                  rows="3"
+                  maxlength="4000"
+                  placeholder="${quotaReached ? 'Daily limit reached. Come back tomorrow.' : 'Ask hnnt…'}"
+                  ${coach.sending || quotaReached ? 'disabled' : ''}
+                  required
+                >${escapeHtml(coach.draft)}</textarea>
+              </label>
+              <div class="coach-composer__actions">
+                <button class="primary-button" type="submit" ${coach.sending || quotaReached ? 'disabled' : ''}>
+                  ${coach.sending ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+            </form>
+
+            <p class="crisis-note">${escapeHtml(CRISIS_NOTE)}</p>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderReportForm() {
+    const report = state.report;
+    if (!report.open) {
+      return '';
+    }
+
+    return `
+      <section class="panel panel--editor" id="report-panel">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Report</div>
+            <h2>Report a user or content</h2>
+          </div>
+          <button class="ghost-button" data-action="cancel-report" type="button">Cancel</button>
+        </div>
+        ${report.context ? `<p class="form-hint">Reporting: ${escapeHtml(report.context)}</p>` : ''}
+        <form id="report-form" class="stack-form">
+          <label>
+            <span>What are you reporting?</span>
+            <select name="contentType" required>
+              ${REPORT_CONTENT_TYPES.map(([value, label]) => `<option value="${value}" ${report.contentType === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+            </select>
+          </label>
+          <label>
+            <span>Content ID</span>
+            <input name="contentId" required value="${escapeHtml(report.contentId)}" placeholder="Paste the ID, or use Report on a post" />
+          </label>
+          <label>
+            <span>Profile ID of the person (optional)</span>
+            <input name="reportedProfileId" value="${escapeHtml(report.reportedProfileId)}" />
+          </label>
+          <label>
+            <span>Reason</span>
+            <select name="reason" required>
+              <option value="" ${report.reason ? '' : 'selected'} disabled>Choose a reason</option>
+              ${REPORT_REASONS.map(([value, label]) => `<option value="${value}" ${report.reason === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+            </select>
+          </label>
+          <label>
+            <span>What happened? (optional)</span>
+            <textarea name="description" rows="4" maxlength="2000">${escapeHtml(report.description)}</textarea>
+          </label>
+          <p class="form-hint">Reports are private. The person you report is not told who reported them. If someone is in immediate danger, contact local emergency services first.</p>
+          <button class="primary-button" type="submit">Send report</button>
+        </form>
+      </section>
+    `;
+  }
+
+  function renderDeleteAccountConfirm() {
+    if (!state.confirmDeleteAccount) {
+      return '';
+    }
+
+    return `
+      <section class="panel panel--editor panel--danger" id="delete-account-panel" role="alertdialog" aria-labelledby="delete-account-title">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Delete account</div>
+            <h2 id="delete-account-title">This cannot be undone</h2>
+          </div>
+        </div>
+        <p>Deleting your account immediately removes your profile, your lists, your votes and voting sessions, feed posts, coach conversations, and every signed-in session. Backups expire within 7 days.</p>
+        <p class="form-hint">Want the details first? Read <button class="link-button" data-action="navigate" data-route="/data-deletion" type="button">how deletion works</button>.</p>
+        <div class="hero-actions">
+          <button class="primary-button primary-button--danger" data-action="confirm-delete-account" type="button">Yes, delete my account</button>
+          <button class="ghost-button" data-action="cancel-delete-account" type="button">Keep my account</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderBlockedUsers() {
+    return `
+      <section class="panel panel--editor">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Safety</div>
+            <h2>Blocked users</h2>
+          </div>
+          <button class="ghost-button" data-action="refresh-blocks" type="button">Refresh</button>
+        </div>
+        <div class="list-stack">
+          ${state.blocks.length === 0
+            ? '<article class="empty-card"><h3>No blocked users</h3><p>People you block cannot see your lists, vote on them, or send you friend requests.</p></article>'
+            : state.blocks.map((block) => `
+              <article class="list-card">
+                <div class="list-card__rank">⛔</div>
+                <div class="list-card__body">
+                  <div class="list-card__title-row">
+                    <h3>${escapeHtml(block.blockedProfile?.displayName ?? block.blockedProfile?.username ?? 'Blocked profile')}</h3>
+                    <span class="pill">${escapeHtml(formatMessageTime(block.createdAt) || 'blocked')}</span>
+                  </div>
+                  <p class="form-hint">${escapeHtml(block.blockedProfile?.username ? `@${block.blockedProfile.username}` : block.blockedProfileId)}${block.reason ? ` · ${escapeHtml(block.reason)}` : ''}</p>
+                </div>
+                <div class="list-card__actions">
+                  <button class="ghost-button" data-action="unblock-profile" data-id="${escapeHtml(block.blockedProfileId)}" type="button">Unblock</button>
+                </div>
+              </article>
+            `).join('')}
         </div>
       </section>
     `;
@@ -1331,24 +2111,45 @@ export function createApp({
           </div>
         </div>
 
+        ${renderDeleteAccountConfirm()}
+        ${renderReportForm()}
+
         <div class="settings-list">
           <button class="settings-row" data-action="set-panel" data-panel="profile" type="button">
             <span>Edit profile</span>
             <small>Username, bio, privacy</small>
           </button>
+          <button class="settings-row" data-action="open-report" type="button">
+            <span>Report a user or content</span>
+            <small>Harassment, impersonation, unwanted content</small>
+          </button>
+          <button class="settings-row" data-action="navigate" data-route="/support" type="button">
+            <span>Support</span>
+            <small>support@hnnt.app</small>
+          </button>
           <button class="settings-row" data-action="navigate" data-route="/privacy" type="button">
             <span>Privacy Policy</span>
-            <small>Public page placeholder</small>
+            <small>Draft, pending legal review</small>
           </button>
           <button class="settings-row" data-action="navigate" data-route="/terms" type="button">
             <span>Terms of Service</span>
-            <small>Public page placeholder</small>
+            <small>Draft, pending legal review</small>
+          </button>
+          <button class="settings-row" data-action="navigate" data-route="/data-deletion" type="button">
+            <span>How deletion works</span>
+            <small>What is removed and when</small>
           </button>
           <button class="settings-row settings-row--danger" data-action="sign-out" type="button">
             <span>Sign out</span>
             <small>Clear this browser session</small>
           </button>
+          <button class="settings-row settings-row--danger" data-action="request-delete-account" type="button">
+            <span>Delete account</span>
+            <small>Permanently remove your account and data</small>
+          </button>
         </div>
+
+        ${renderBlockedUsers()}
       </section>
     `;
   }
@@ -1404,6 +2205,46 @@ export function createApp({
           `).join('')}
         </div>
       </section>
+    `;
+  }
+
+  function renderVoteComments(results) {
+    const comments = Array.isArray(results?.comments) ? results.comments : [];
+    if (comments.length === 0) {
+      return '';
+    }
+
+    const nameFor = (situationshipId) =>
+      results.results?.find((item) => item.situationshipId === situationshipId)?.name ??
+      state.situationships.find((item) => item.situationshipId === situationshipId)?.name ??
+      'your list';
+
+    return `
+      <div class="meta-card">
+        <div class="eyebrow">Comments</div>
+        <h3>${comments.length} comment${comments.length === 1 ? '' : 's'}</h3>
+      </div>
+      <div class="list-stack">
+        ${comments.map((comment) => `
+          <article class="list-card">
+            <div class="list-card__rank">“</div>
+            <div class="list-card__body">
+              <p>${escapeHtml(comment.comment)}</p>
+              <p class="form-hint">${escapeHtml(comment.voterLabel ?? 'Anonymous')} · about ${escapeHtml(nameFor(comment.situationshipId))}</p>
+            </div>
+            <div class="list-card__actions">
+              <button
+                class="ghost-button"
+                data-action="open-report"
+                data-content-type="situationship"
+                data-content-id="${escapeHtml(comment.situationshipId ?? '')}"
+                data-context="Vote comment on ${escapeHtml(results.session?.inviteCode ?? 'session')}: ${escapeHtml(comment.comment ?? '')}"
+                type="button"
+              >Report</button>
+            </div>
+          </article>
+        `).join('')}
+      </div>
     `;
   }
 
@@ -1565,6 +2406,7 @@ export function createApp({
                       </article>
                     `).join('')}
                   </div>
+                  ${renderVoteComments(selectedResults)}
                 `
                 : ''}
             </section>
@@ -1642,6 +2484,8 @@ export function createApp({
             ${state.activePanel === 'situationships' ? renderSituationshipEditor() : renderAppSupportPanel()}
           </aside>
         </section>
+
+        ${renderFooter()}
       </main>
     `;
   }
@@ -1673,11 +2517,8 @@ export function createApp({
     if (state.route === '/signin') {
       return renderAuthOptions('signin');
     }
-    if (state.route === '/terms') {
-      return renderContentPage('terms');
-    }
-    if (state.route === '/privacy') {
-      return renderContentPage('privacy');
+    if (isLegalRoute(state.route)) {
+      return renderLegalPage(state.route);
     }
     if (state.route === '/blog') {
       return renderContentPage('blog');
@@ -1733,23 +2574,95 @@ export function createApp({
         await handleLoadFriendsPanel();
         return;
       }
+      if (state.activePanel === 'coach') {
+        await handleLoadCoachPanel();
+        return;
+      }
+      if (state.activePanel === 'settings') {
+        await handleLoadSettingsPanel();
+        return;
+      }
       render();
       return;
     }
 
     if (action === 'sign-out') {
-      setToken(null);
-      state.me = null;
-      state.situationships = [];
-      resetSocialState();
-      resetVotingState();
-      resetEditor();
+      clearSessionState();
       state.notice = { type: 'success', message: 'Signed out.' };
       navigate('/');
       return;
     }
 
     const id = event.target.closest('[data-id]')?.dataset.id ?? null;
+
+    if (action === 'refresh-coach') {
+      await handleLoadCoachPanel();
+      return;
+    }
+
+    if (action === 'new-conversation') {
+      await handleNewConversation();
+      return;
+    }
+
+    if (action === 'open-conversation' && id) {
+      await handleOpenConversation(id);
+      return;
+    }
+
+    if (action === 'delete-conversation' && id) {
+      await handleDeleteConversation(id);
+      return;
+    }
+
+    if (action === 'request-delete-account') {
+      state.confirmDeleteAccount = true;
+      state.report = createEmptyReportDraft();
+      render();
+      return;
+    }
+
+    if (action === 'cancel-delete-account') {
+      state.confirmDeleteAccount = false;
+      render();
+      return;
+    }
+
+    if (action === 'confirm-delete-account') {
+      await handleDeleteAccount();
+      return;
+    }
+
+    if (action === 'refresh-blocks') {
+      await handleLoadSettingsPanel();
+      return;
+    }
+
+    if (action === 'unblock-profile' && id) {
+      await handleUnblock(id);
+      return;
+    }
+
+    if (action === 'open-report') {
+      const dataset = event.target.closest('[data-action="open-report"]')?.dataset ?? {};
+      state.confirmDeleteAccount = false;
+      openReport({
+        contentType: dataset.contentType || 'profile',
+        contentId: dataset.contentId || '',
+        reportedProfileId: dataset.reportedProfileId || '',
+        context: dataset.context || '',
+      });
+      if (state.blocks.length === 0) {
+        await handleLoadSettingsPanel();
+      }
+      return;
+    }
+
+    if (action === 'cancel-report') {
+      state.report = createEmptyReportDraft();
+      render();
+      return;
+    }
 
     if (action === 'new-situationship') {
       resetEditor();
@@ -1842,6 +2755,16 @@ export function createApp({
       return;
     }
 
+    if (event.target.id === 'coach-message-form') {
+      await handleSendCoachMessage(event.target);
+      return;
+    }
+
+    if (event.target.id === 'report-form') {
+      await handleSubmitReport(event.target);
+      return;
+    }
+
     if (event.target.id === 'public-session-form') {
       await handleLoadPublicVotingSession(event.target);
       return;
@@ -1898,7 +2821,18 @@ export function createApp({
     handleSelectVotingSession,
     handleLoadPublicVotingSession,
     handleSubmitPublicVote,
+    handleLoadCoachPanel,
+    handleNewConversation,
+    handleOpenConversation,
+    handleDeleteConversation,
+    handleSendCoachMessage,
+    handleLoadSettingsPanel,
+    handleUnblock,
+    handleDeleteAccount,
+    handleSubmitReport,
+    openReport,
     setToken,
+    setSession,
     resetEditor,
     resetVotingState,
   };

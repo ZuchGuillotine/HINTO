@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HINTO Terms of Service · hnnt.app</title>
+    <meta name="description" content="The terms that govern your use of HNNT." />
+    <meta name="theme-color" content="#0a0608" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://hnnt.app/terms" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0608'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23FF4275'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #0a0608;
+        --ink-deep: #050204;
+        --surface: #140b10;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f5f5f5;
+        --muted: rgba(245, 245, 245, 0.72);
+        --pink: #ff4275;
+        --pink-soft: #ff7396;
+        --mark: #ffd166;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--text);
+        font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Inter, system-ui, sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a { color: var(--pink-soft); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { color: var(--pink); }
+      .skip {
+        position: absolute; left: -999px; top: 8px; background: var(--pink); color: #fff; padding: 8px 12px; border-radius: 8px;
+      }
+      .skip:focus { left: 16px; }
+      .masthead, .colophon {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+        max-width: 72ch; margin: 0 auto; padding: 20px 16px;
+      }
+      .masthead { border-bottom: 1px solid var(--line); }
+      .colophon { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+      .brand {
+        font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; color: #fafafa; text-decoration: none;
+      }
+      .brand .dot {
+        display: inline-block; width: 0.22em; height: 0.22em; border-radius: 50%; background: var(--pink); margin-left: 0.05em;
+        box-shadow: 0 0 12px var(--pink);
+      }
+      .legal-nav { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+      .legal-nav a { color: var(--muted); text-decoration: none; }
+      .legal-nav a:hover, .legal-nav a[aria-current="page"] { color: var(--pink-soft); }
+      main { max-width: 72ch; margin: 0 auto; padding: 24px 16px 48px; }
+      .banner {
+        border: 1px solid rgba(255, 66, 117, 0.6); border-left: 4px solid var(--pink); background: rgba(255, 66, 117, 0.1);
+        border-radius: 10px; padding: 12px 16px; margin: 0 0 28px; font-weight: 600;
+      }
+      .eyebrow { color: var(--pink); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 8px; }
+      h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 12px; }
+      h2 { font-size: 1.45rem; line-height: 1.25; margin: 40px 0 12px; padding-top: 8px; }
+      h3 { font-size: 1.12rem; line-height: 1.3; margin: 26px 0 8px; color: var(--pink-soft); }
+      p { margin: 0 0 16px; }
+      .meta { color: var(--muted); margin-bottom: 24px; }
+      ul, ol { margin: 0 0 18px; padding-left: 1.4em; }
+      li { margin: 0 0 8px; }
+      li > p { margin: 0; }
+      strong { font-weight: 700; }
+      mark.placeholder {
+        background: var(--mark); color: #241a00; padding: 0 5px; border-radius: 4px; font-weight: 700; white-space: nowrap;
+      }
+      .review-note {
+        border-left: 3px solid rgba(255, 209, 102, 0.75); background: rgba(255, 209, 102, 0.06); color: var(--muted);
+        font-style: italic; padding: 10px 14px; margin: 0 0 18px; border-radius: 0 8px 8px 0;
+      }
+      .callout {
+        border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; font-weight: 700;
+      }
+      address { font-style: normal; line-height: 1.7; margin: 0 0 18px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc { margin: 0 0 32px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc h2 { font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; padding: 0; }
+      .toc ol { margin: 0; padding-left: 1.2em; columns: 2; column-gap: 24px; }
+      .toc li { break-inside: avoid; margin: 0 0 6px; }
+      .toc a { text-decoration: none; }
+      .steps li { margin-bottom: 12px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 0 0 18px; }
+      .card h3 { margin-top: 0; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 4px; }
+      @media (max-width: 640px) {
+        body { font-size: 16px; }
+        .toc ol { columns: 1; }
+        h2 { margin-top: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/">hnnt<span class="dot" aria-hidden="true"></span></a>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html" aria-current="page">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </header>
+    <main id="content">
+      <article class="legal" data-legal-doc="terms">
+        <p class="banner" role="note">Draft. This document is pending legal review and is not yet in effect.</p>
+        <p class="eyebrow">Legal</p>
+        <h1>HINTO Terms of Service</h1>
+        <p class="meta"><em>Effective Date: May 16, 2026</em><br /><em>Last Updated: May 16, 2026</em></p>
+        <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#s1">1. Acceptance of Terms</a></li><li><a href="#s2">2. Eligibility</a></li><li><a href="#s3">3. Accounts and Authentication</a></li><li><a href="#s4">4. The Service</a></li><li><a href="#s5">5. Acceptable Use Policy</a></li><li><a href="#s6">6. User Content</a></li><li><a href="#s7">7. Subscriptions and In-App Purchases</a></li><li><a href="#s8">8. Third-Party Services and Content</a></li><li><a href="#s9">9. HAIDAA Research Platform (Opt-In)</a></li><li><a href="#s10">10. Apple App Store Additional Terms</a></li><li><a href="#s11">11. Intellectual Property</a></li><li><a href="#s12">12. Suspension and Termination</a></li><li><a href="#s13">13. Disclaimers</a></li><li><a href="#s14">14. Limitation of Liability</a></li><li><a href="#s15">15. Indemnification</a></li><li><a href="#s16">16. Binding Arbitration and Class Action Waiver</a></li><li><a href="#s17">17. Governing Law and Venue</a></li><li><a href="#s18">18. Changes to These Terms</a></li><li><a href="#s19">19. Miscellaneous</a></li><li><a href="#s20">20. Contact Us</a></li></ol></nav>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: This is a draft for legal review. Bracketed fields must be completed by counsel before publication. Arbitration and class action waiver provisions are jurisdiction-sensitive.]</aside>
+<p class="callout"><strong>IMPORTANT:</strong> THESE TERMS CONTAIN A BINDING ARBITRATION AGREEMENT AND A WAIVER OF CLASS ACTIONS AND JURY TRIALS (SECTION 16). PLEASE READ CAREFULLY. YOU MAY OPT OUT OF ARBITRATION WITHIN 30 DAYS AS DESCRIBED IN SECTION 16.8.</p>
+<h2 id="s1">1. Acceptance of Terms</h2>
+<p>These Terms of Service (“Terms”) form a binding agreement between you and <mark class="placeholder">[COMPANY LEGAL NAME]</mark> (“HINTO,” “we,” “us,” or “our”) and govern your access to and use of the HINTO mobile application, website, and related services (collectively, the “Service”). By creating an account, downloading the app, or using the Service, you agree to these Terms and to our Privacy Policy, which is incorporated by reference.</p>
+<p>If you do not agree to these Terms, do not use the Service.</p>
+<h2 id="s2">2. Eligibility</h2>
+<p>You must be at least 16 years old to use the Service. By using the Service, you represent that:</p>
+<ul>
+  <li>You are at least 16 years old.</li>
+  <li>You have the legal capacity to enter into these Terms.</li>
+  <li>You are not barred from using the Service under the laws of the United States or any other applicable jurisdiction.</li>
+  <li>You will provide accurate information about yourself, including your age, when creating your account.</li>
+</ul>
+<p>We rely on your representation of age. If we learn that a user is under 16, we will suspend or terminate that account and delete associated data in accordance with our Privacy Policy.</p>
+<h2 id="s3">3. Accounts and Authentication</h2>
+<p>To use most features, you must create an account. You may sign up or sign in using third-party providers, including Apple, Meta (Facebook/Instagram), Google, Snapchat, and TikTok. You are responsible for maintaining the security of your account credentials and for all activity that occurs under your account.</p>
+<p>You agree to:</p>
+<ul>
+  <li>Provide accurate, current, and complete information.</li>
+  <li>Keep your account information up to date.</li>
+  <li>Notify us immediately of any unauthorized use of your account.</li>
+  <li>Not share your account with anyone or allow anyone else to use it.</li>
+</ul>
+<h2 id="s4">4. The Service</h2>
+<p>HINTO allows you to maintain ranked lists of romantic interests (“situationships”), invite friends to vote and comment on them, and chat with an AI relationship coach. The Service may evolve, and we may add, change, or remove features at our discretion.</p>
+<h3 id="s4-1">4.1 AI Coach Disclaimer</h3>
+<p>The AI relationship coach is provided for informational and entertainment purposes only. It does not provide medical, mental health, legal, financial, or other professional advice. Outputs from the AI coach may be inaccurate, incomplete, or otherwise unsuitable for your situation. Do not rely on the AI coach in any situation involving emergency, crisis, safety, or significant personal decisions; instead, contact a qualified professional or, in an emergency, your local emergency services.</p>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: consider adding a dedicated “safety” module pointing users to crisis resources (e.g., 988 Suicide &amp; Crisis Lifeline) given the sensitive nature of relationship content.]</aside>
+<h2 id="s5">5. Acceptable Use Policy</h2>
+<p>You agree not to use the Service for any unlawful or prohibited purpose. In particular, you must not:</p>
+<ul>
+  <li>Harass, threaten, intimidate, defame, or bully any person, including individuals named in your situationships.</li>
+  <li>Stalk, surveil, track, dox, or attempt to identify or locate any person without their consent, or use information obtained on the Service to facilitate offline contact that the subject has not invited.</li>
+  <li>Post sexual content involving any person under 18, content that sexualizes minors, or any non-consensual intimate imagery.</li>
+  <li>Impersonate any person or entity, or misrepresent your affiliation with a person or entity.</li>
+  <li>Upload content you do not have the right to share, including content that infringes intellectual property, privacy, or publicity rights.</li>
+  <li>Submit content that is hateful, discriminatory, or that incites violence against individuals or groups on the basis of protected characteristics.</li>
+  <li>Use the Service to send spam, phishing messages, or unsolicited commercial communications.</li>
+  <li>Attempt to interfere with, probe, or disrupt the Service, including by introducing malware, exploiting vulnerabilities, or scraping data.</li>
+  <li>Reverse engineer, decompile, or attempt to derive source code, except as expressly permitted by applicable law.</li>
+  <li>Use automated means (bots, scripts, crawlers) to access the Service without our written permission.</li>
+  <li>Resell, sublicense, or commercially exploit the Service without our prior written consent.</li>
+</ul>
+<h3 id="s5-1">5.1 Enforcement</h3>
+<p>We reserve the right to investigate suspected violations of these Terms and to take any action we deem appropriate, including issuing warnings, removing content, restricting features, suspending or terminating accounts, reporting to law enforcement, and pursuing legal remedies. We may take these actions with or without notice, and we are not required to provide a reason.</p>
+<h2 id="s6">6. User Content</h2>
+<p>“User Content” means any information you submit to the Service, including profile information, situationships, photos, names, comments, votes, AI coach messages, and feedback.</p>
+<h3 id="s6-1">6.1 Your Ownership</h3>
+<p>You retain all rights in and ownership of your User Content. We do not claim ownership of your User Content.</p>
+<h3 id="s6-2">6.2 License You Grant Us</h3>
+<p>You grant HINTO a worldwide, non-exclusive, royalty-free, sublicensable, and transferable license to host, store, reproduce, modify, create derivative works of, display, and use your User Content solely to operate, secure, improve, and personalize the Service for you, and to provide it to the friends you authorize. This license terminates when you delete the relevant User Content or your account, except (a) to the extent the content has already been shared with friends or other users who retain copies, and (b) for backups, logs, and de-identified data retained as described in our Privacy Policy.</p>
+<h3 id="s6-3">6.3 Responsibility for User Content</h3>
+<p>You are solely responsible for your User Content and for any consequences of submitting it. You represent and warrant that you have all rights necessary to provide your User Content to HINTO and that doing so does not violate any law or any third party’s rights.</p>
+<h3 id="s6-4">6.4 Feedback</h3>
+<p>If you submit suggestions, ideas, or feedback about the Service, you grant HINTO a perpetual, irrevocable, royalty-free license to use them for any purpose without obligation to you.</p>
+<h2 id="s7">7. Subscriptions and In-App Purchases</h2>
+<h3 id="s7-1">7.1 Paid Features</h3>
+<p>Certain features of the Service may be offered as subscriptions or one-time in-app purchases (collectively, “Paid Features”). Pricing, billing frequency, and features are described at the point of purchase.</p>
+<h3 id="s7-2">7.2 Billing</h3>
+<p>Payments for Paid Features purchased through the Apple App Store are processed by Apple and are subject to Apple’s billing terms. Payments made through Google Play are processed by Google. Payments made on the web are processed by our web payment processor. By initiating a purchase, you authorize the relevant processor to charge your selected payment method for the listed price plus any applicable taxes.</p>
+<h3 id="s7-3">7.3 Auto-Renewing Subscriptions</h3>
+<p>Subscriptions automatically renew at the end of each billing cycle (e.g., monthly or annually) at the then-current price unless you cancel before the renewal date. You can manage and cancel subscriptions through:</p>
+<ul>
+  <li>Apple App Store → Settings → your Apple ID → Subscriptions, for App Store subscriptions.</li>
+  <li>Google Play → Subscriptions, for Google Play subscriptions.</li>
+  <li>Your HINTO account billing settings, for web subscriptions.</li>
+</ul>
+<h3 id="s7-4">7.4 Free Trials and Promotions</h3>
+<p>If we offer a free trial or promotional rate, the terms of that offer will be presented at the time you sign up. Unless you cancel before the trial or promotional period ends, you will be charged the standard subscription price at renewal.</p>
+<h3 id="s7-5">7.5 Refunds</h3>
+<p>Except where required by applicable law, all payments are final and non-refundable. Refunds for purchases made through the Apple App Store or Google Play are handled by Apple and Google, respectively. For web purchases, you may request a refund by contacting us at <mark class="placeholder">[LEGAL CONTACT EMAIL]</mark>; refunds, if any, are issued at our discretion. Nothing in these Terms limits your statutory rights, including any consumer rights that cannot be lawfully waived.</p>
+<h3 id="s7-6">7.6 Price and Plan Changes</h3>
+<p>We may change prices or modify the contents of paid plans. We will provide reasonable advance notice (and additional notice where required by law). Price changes take effect at the start of the next billing cycle. If you do not agree, you may cancel before the change takes effect.</p>
+<h2 id="s8">8. Third-Party Services and Content</h2>
+<p>The Service uses third-party services to enable features such as authentication, AI coaching, payments, and analytics, including Apple, Meta, Google, Snap, TikTok, OpenAI, Anthropic, Supabase, and others described in our Privacy Policy. Your use of these third-party services is subject to their own terms and policies. We are not responsible for the practices of third-party services, and incorporating them into the Service does not mean we endorse them.</p>
+<h2 id="s9">9. HAIDAA Research Platform (Opt-In)</h2>
+<p>If you choose to opt in to the HAIDAA research platform, you authorize HINTO to include certain data (as described in the opt-in flow and our Privacy Policy) in HAIDAA research datasets. Participation is voluntary and you may withdraw at any time. Withdrawal stops further inclusion of your data but does not affect research already completed.</p>
+<h2 id="s10">10. Apple App Store Additional Terms</h2>
+<p>If you accessed the Service through the Apple App Store, you acknowledge and agree that:</p>
+<ul>
+  <li>These Terms are between you and HINTO only, not with Apple. HINTO, not Apple, is solely responsible for the Service and its content.</li>
+  <li>Apple has no obligation to provide any maintenance and support services for the Service.</li>
+  <li>In the event of any failure of the Service to conform to any applicable warranty, you may notify Apple, and Apple will refund the applicable purchase price; to the maximum extent permitted by law, Apple will have no other warranty obligation with respect to the Service.</li>
+  <li>HINTO, not Apple, is responsible for addressing any claims by you or any third party relating to the Service, including product liability claims, claims that the Service fails to conform to legal or regulatory requirements, and claims arising under consumer protection or similar legislation, and any intellectual property infringement claims.</li>
+  <li>Apple and its subsidiaries are third-party beneficiaries of these Terms and may enforce them against you.</li>
+</ul>
+<h2 id="s11">11. Intellectual Property</h2>
+<p>The Service, including all software, designs, text, graphics, the “HINTO” and “HAIDAA” names and logos, and all other content not contributed by users, is owned by HINTO or its licensors and is protected by intellectual property laws. We grant you a limited, non-exclusive, non-transferable, revocable license to access and use the Service for your personal, non-commercial use, subject to these Terms.</p>
+<p>We respect intellectual property rights and will respond to valid notices of infringement under applicable law, including the U.S. Digital Millennium Copyright Act (“DMCA”). Notices may be sent to our designated agent at <mark class="placeholder">[LEGAL CONTACT EMAIL]</mark>.</p>
+<h2 id="s12">12. Suspension and Termination</h2>
+<p>You may stop using the Service at any time and delete your account from in-app settings. We may suspend or terminate your access to all or part of the Service, with or without notice, if:</p>
+<ul>
+  <li>We believe you have violated these Terms or our Acceptable Use Policy.</li>
+  <li>We are required to do so by law, regulation, or legal process.</li>
+  <li>Your account has been inactive for an extended period.</li>
+  <li>Providing the Service to you is no longer commercially viable.</li>
+</ul>
+<p>Upon termination, your right to use the Service ends immediately. Sections of these Terms that by their nature should survive termination (including Sections 5, 6, 11, 13, 14, 15, 16, and 17) will survive.</p>
+<h2 id="s13">13. Disclaimers</h2>
+<p>THE SERVICE, INCLUDING THE AI COACH AND ALL CONTENT MADE AVAILABLE THROUGH IT, IS PROVIDED “AS IS” AND “AS AVAILABLE” WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY. TO THE MAXIMUM EXTENT PERMITTED BY LAW, HINTO DISCLAIMS ALL WARRANTIES, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND ANY WARRANTIES ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR FREE OF VIRUSES OR HARMFUL COMPONENTS, OR THAT ANY CONTENT, INCLUDING AI COACH OUTPUTS, IS ACCURATE, COMPLETE, OR RELIABLE.</p>
+<h2 id="s14">14. Limitation of Liability</h2>
+<p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT WILL HINTO, ITS AFFILIATES, OR THEIR RESPECTIVE OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATING TO YOUR USE OF, OR INABILITY TO USE, THE SERVICE, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+<p>OUR TOTAL LIABILITY FOR ALL CLAIMS RELATING TO THE SERVICE IS LIMITED TO THE GREATER OF (A) THE AMOUNT YOU PAID HINTO IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM, OR (B) USD $100. SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS, SO SOME OF THESE LIMITATIONS MAY NOT APPLY TO YOU.</p>
+<h2 id="s15">15. Indemnification</h2>
+<p>To the maximum extent permitted by law, you agree to indemnify, defend, and hold harmless HINTO and its affiliates, officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses (including reasonable attorneys’ fees) arising out of or relating to: (a) your User Content; (b) your use of the Service; (c) your violation of these Terms; (d) your violation of any law or any third party’s rights; or (e) your interactions with other users, including any harassment, stalking, defamation, or privacy claim brought by a person you have named or contacted through the Service.</p>
+<h2 id="s16">16. Binding Arbitration and Class Action Waiver</h2>
+<p class="callout"><strong>PLEASE READ THIS SECTION CAREFULLY. IT REQUIRES YOU AND HINTO TO RESOLVE DISPUTES THROUGH INDIVIDUAL ARBITRATION AND LIMITS THE WAYS YOU CAN SEEK RELIEF FROM US. IT ALSO LIMITS YOUR ABILITY TO PARTICIPATE IN A CLASS, COLLECTIVE, OR REPRESENTATIVE ACTION.</strong></p>
+<h3 id="s16-1">16.1 Informal Resolution</h3>
+<p>Before filing a claim, you agree to first contact us at <mark class="placeholder">[LEGAL CONTACT EMAIL]</mark> and attempt to resolve the dispute informally for at least 60 days. We will do the same before filing a claim against you.</p>
+<h3 id="s16-2">16.2 Agreement to Arbitrate</h3>
+<p>Any dispute, claim, or controversy arising out of or relating to these Terms or the Service that is not resolved informally will be resolved by binding individual arbitration administered by JAMS under its Consumer Arbitration Minimum Standards and applicable rules, except that small-claims court actions and intellectual property injunctive relief actions are excluded as described below. The Federal Arbitration Act governs the interpretation and enforcement of this section.</p>
+<h3 id="s16-3">16.3 Arbitration Procedures</h3>
+<p>Arbitration will be conducted before a single arbitrator. The arbitration will be conducted in English. The seat of arbitration will be King County, Washington, but you may participate by telephone or video, and in-person hearings (if any) will be held in the U.S. county where you reside or another mutually agreed location. The arbitrator’s award is final and binding and may be entered as a judgment in any court of competent jurisdiction.</p>
+<h3 id="s16-4">16.4 Class Action Waiver</h3>
+<p class="callout"><strong>YOU AND HINTO AGREE THAT EACH MAY BRING CLAIMS AGAINST THE OTHER ONLY IN AN INDIVIDUAL CAPACITY, AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS, COLLECTIVE, REPRESENTATIVE, OR CONSOLIDATED ACTION. THE ARBITRATOR MAY NOT CONSOLIDATE OR JOIN MORE THAN ONE PERSON’S CLAIMS AND MAY NOT OTHERWISE PRESIDE OVER ANY FORM OF A REPRESENTATIVE OR CLASS PROCEEDING.</strong></p>
+<h3 id="s16-5">16.5 Jury Trial Waiver</h3>
+<p>If for any reason a dispute proceeds in court rather than in arbitration, you and HINTO each waive any right to a jury trial to the maximum extent permitted by law.</p>
+<h3 id="s16-6">16.6 Exceptions</h3>
+<p>Either party may bring an individual action in small-claims court for disputes that qualify, and either party may seek injunctive or equitable relief in court for actual or threatened infringement, misappropriation, or violation of intellectual property rights.</p>
+<h3 id="s16-7">16.7 Severability</h3>
+<p>If any portion of this Section 16 is found unenforceable, that portion will be severed and the remainder will continue in force, except that if the Class Action Waiver is found unenforceable, this entire Section 16 will be null and void as to the affected claims.</p>
+<h3 id="s16-8">16.8 30-Day Right to Opt Out</h3>
+<p>You may opt out of this arbitration agreement by sending written notice to <mark class="placeholder">[LEGAL CONTACT EMAIL]</mark> within 30 days of first accepting these Terms. The notice must include your name, the email address on your HINTO account, and a clear statement that you do not wish to resolve disputes through arbitration. Opting out will not affect any other part of these Terms.</p>
+<aside class="review-note" role="note">[LEGAL REVIEW NOTE: Counsel: confirm choice of arbitration provider (JAMS vs. AAA), mass-arbitration handling, fee shifting, and California / consumer-rights carve-outs.]</aside>
+<h2 id="s17">17. Governing Law and Venue</h2>
+<p>These Terms are governed by the laws of the State of Washington and applicable U.S. federal law, without regard to conflict-of-law principles. Subject to Section 16, any claims not subject to arbitration must be brought exclusively in the state or federal courts located in King County, Washington, and you and HINTO consent to the personal jurisdiction of those courts. Nothing in this section limits any mandatory consumer protections under the law of your country of residence.</p>
+<h2 id="s18">18. Changes to These Terms</h2>
+<p>We may update these Terms from time to time. We will revise the “Last Updated” date above and, for material changes, provide additional notice through the Service. Your continued use of the Service after the updated Terms become effective constitutes acceptance of the changes. If you do not agree to the updated Terms, you must stop using the Service and may close your account.</p>
+<h2 id="s19">19. Miscellaneous</h2>
+<ul>
+  <li><strong>Entire Agreement:</strong> these Terms, together with the Privacy Policy and any in-product notices and supplemental terms, constitute the entire agreement between you and HINTO regarding the Service.</li>
+  <li><strong>Severability:</strong> if any provision is found unenforceable, the remaining provisions will continue in full force and effect.</li>
+  <li><strong>No Waiver:</strong> our failure to enforce any provision is not a waiver of that provision.</li>
+  <li><strong>Assignment:</strong> you may not assign these Terms without our prior written consent. We may assign these Terms in connection with a merger, acquisition, financing, or sale of assets.</li>
+  <li><strong>Force Majeure:</strong> we are not liable for delays or failures caused by events beyond our reasonable control.</li>
+  <li><strong>Headings:</strong> section headings are for convenience only and do not affect interpretation.</li>
+  <li><strong>Electronic Communications:</strong> you consent to receive electronic communications from us in connection with the Service. Notices to you may be provided by email, in-app message, or by posting in the Service.</li>
+</ul>
+<h2 id="s20">20. Contact Us</h2>
+<p>Questions about these Terms can be directed to:</p>
+<address>
+<mark class="placeholder">[COMPANY LEGAL NAME]</mark>
+<br />Attn: Legal
+<br /><mark class="placeholder">[STREET ADDRESS]</mark>, Seattle, WA <mark class="placeholder">[ZIP]</mark>
+<br />Email: <mark class="placeholder">[LEGAL CONTACT EMAIL]</mark>
+</address>
+      </article>
+    </main>
+    <footer class="colophon">
+      <span>hnnt.app</span>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html" aria-current="page">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </footer>
+  </body>
+</html>

@@ -176,10 +176,12 @@ struct SituationshipListView: View {
                 isLoading = false
             }
         } catch {
-            // Use mock data in dev mode
+            #if DEBUG
+            // Preview Mode (dev-token) has no backend; show sample data.
             if auth.accessToken == "dev-token" {
                 situationships = Self.mockSituationships
             }
+            #endif
             isLoading = false
         }
     }
@@ -198,7 +200,8 @@ struct SituationshipListView: View {
         _ = try? await api.deleteSituationship(token: token, id: id)
     }
 
-    // MARK: - Mock Data
+    #if DEBUG
+    // MARK: - Mock Data (previews and Preview Mode only)
 
     static let mockSituationships: [Situationship] = [
         Situationship(situationshipId: "1", ownerProfileId: "dev", name: "Alex", emoji: "😍", category: "Crush", description: "Met at the coffee shop", rank: 1, status: .active, createdAt: "", updatedAt: ""),
@@ -206,6 +209,7 @@ struct SituationshipListView: View {
         Situationship(situationshipId: "3", ownerProfileId: "dev", name: "Riley", emoji: "😅", category: "Ex", description: nil, rank: 3, status: .active, createdAt: "", updatedAt: ""),
         Situationship(situationshipId: "4", ownerProfileId: "dev", name: "Sam", emoji: "😊", category: "Work", description: nil, rank: 4, status: .active, createdAt: "", updatedAt: ""),
     ]
+    #endif
 }
 
 #Preview {

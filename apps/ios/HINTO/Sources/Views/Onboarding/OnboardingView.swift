@@ -109,7 +109,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.bottom, Spacing.xs)
 
-            ForEach(AuthProvider.allCases) { provider in
+            ForEach(AuthProvider.visibleProviders) { provider in
                 SocialAuthButton(provider: provider) {
                     Task { await handleAuth(provider) }
                 }

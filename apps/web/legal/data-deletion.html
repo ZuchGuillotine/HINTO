@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Delete your data · hnnt.app</title>
+    <meta name="description" content="Step-by-step instructions for deleting your HNNT account and data." />
+    <meta name="theme-color" content="#0a0608" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://hnnt.app/data-deletion" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0608'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23FF4275'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #0a0608;
+        --ink-deep: #050204;
+        --surface: #140b10;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f5f5f5;
+        --muted: rgba(245, 245, 245, 0.72);
+        --pink: #ff4275;
+        --pink-soft: #ff7396;
+        --mark: #ffd166;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--text);
+        font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Inter, system-ui, sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a { color: var(--pink-soft); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { color: var(--pink); }
+      .skip {
+        position: absolute; left: -999px; top: 8px; background: var(--pink); color: #fff; padding: 8px 12px; border-radius: 8px;
+      }
+      .skip:focus { left: 16px; }
+      .masthead, .colophon {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+        max-width: 72ch; margin: 0 auto; padding: 20px 16px;
+      }
+      .masthead { border-bottom: 1px solid var(--line); }
+      .colophon { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+      .brand {
+        font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; color: #fafafa; text-decoration: none;
+      }
+      .brand .dot {
+        display: inline-block; width: 0.22em; height: 0.22em; border-radius: 50%; background: var(--pink); margin-left: 0.05em;
+        box-shadow: 0 0 12px var(--pink);
+      }
+      .legal-nav { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+      .legal-nav a { color: var(--muted); text-decoration: none; }
+      .legal-nav a:hover, .legal-nav a[aria-current="page"] { color: var(--pink-soft); }
+      main { max-width: 72ch; margin: 0 auto; padding: 24px 16px 48px; }
+      .banner {
+        border: 1px solid rgba(255, 66, 117, 0.6); border-left: 4px solid var(--pink); background: rgba(255, 66, 117, 0.1);
+        border-radius: 10px; padding: 12px 16px; margin: 0 0 28px; font-weight: 600;
+      }
+      .eyebrow { color: var(--pink); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 8px; }
+      h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 12px; }
+      h2 { font-size: 1.45rem; line-height: 1.25; margin: 40px 0 12px; padding-top: 8px; }
+      h3 { font-size: 1.12rem; line-height: 1.3; margin: 26px 0 8px; color: var(--pink-soft); }
+      p { margin: 0 0 16px; }
+      .meta { color: var(--muted); margin-bottom: 24px; }
+      ul, ol { margin: 0 0 18px; padding-left: 1.4em; }
+      li { margin: 0 0 8px; }
+      li > p { margin: 0; }
+      strong { font-weight: 700; }
+      mark.placeholder {
+        background: var(--mark); color: #241a00; padding: 0 5px; border-radius: 4px; font-weight: 700; white-space: nowrap;
+      }
+      .review-note {
+        border-left: 3px solid rgba(255, 209, 102, 0.75); background: rgba(255, 209, 102, 0.06); color: var(--muted);
+        font-style: italic; padding: 10px 14px; margin: 0 0 18px; border-radius: 0 8px 8px 0;
+      }
+      .callout {
+        border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; font-weight: 700;
+      }
+      address { font-style: normal; line-height: 1.7; margin: 0 0 18px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc { margin: 0 0 32px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc h2 { font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; padding: 0; }
+      .toc ol { margin: 0; padding-left: 1.2em; columns: 2; column-gap: 24px; }
+      .toc li { break-inside: avoid; margin: 0 0 6px; }
+      .toc a { text-decoration: none; }
+      .steps li { margin-bottom: 12px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 0 0 18px; }
+      .card h3 { margin-top: 0; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 4px; }
+      @media (max-width: 640px) {
+        body { font-size: 16px; }
+        .toc ol { columns: 1; }
+        h2 { margin-top: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/">hnnt<span class="dot" aria-hidden="true"></span></a>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html" aria-current="page">Delete your data</a></nav>
+    </header>
+    <main id="content">
+      <article class="legal" data-legal-doc="data-deletion">
+        <p class="banner" role="note">Draft. This document is pending legal review and is not yet in effect.</p>
+        <p class="eyebrow">Your data</p>
+        <h1>Delete your HNNT account and data</h1>
+        <p class="meta">How to delete your account, what is removed, and how long it takes.</p>
+
+        <h2 id="what">What deletion removes</h2>
+        <p>When you delete your account, the following is removed from our live systems <strong>immediately</strong>:</p>
+        <ul>
+          <li>Your profile: username, display name, bio, avatar, privacy settings, and linked sign-in providers (Apple, Meta, Snapchat, TikTok, email).</li>
+          <li>Your lists: every situationship, its notes, photos, and ranking.</li>
+          <li>Votes and voting sessions you created, and the votes and comments you left on friends' sessions.</li>
+          <li>Feed posts and friend connections.</li>
+          <li>Coach conversations: every message you sent to the coach and every reply.</li>
+          <li>Sessions: all sign-in tokens on every device are revoked, so you are signed out everywhere.</li>
+        </ul>
+        <p>Deleted data is not recoverable. If you sign up again later you start with a new, empty account.</p>
+
+        <h2 id="backups">Backups</h2>
+        <p>Our database keeps automated backups for disaster recovery. Backups are retained for <strong>7 days</strong> and are then discarded, so any copy of your data inside a backup expires within 7 days of deletion. Backups are never used to restore an individual account.</p>
+
+        <h2 id="app">Delete in the app</h2>
+        <ol class="steps">
+          <li>Sign in to HNNT on the web at <a href="https://hnnt.app/">hnnt.app</a> or in the iPhone app.</li>
+          <li>Open <strong>Settings</strong>.</li>
+          <li>Choose <strong>Delete account</strong>.</li>
+          <li>Read the confirmation and choose <strong>Yes, delete my account</strong>.</li>
+          <li>You are signed out and returned to the home page. Your data is gone at that moment.</li>
+        </ol>
+
+        <h2 id="email">Delete by email</h2>
+        <p>If you can no longer sign in, email us instead:</p>
+        <ol class="steps">
+          <li>From the email address on your account, write to <a href="mailto:support@hnnt.app?subject=Delete%20my%20account">support@hnnt.app</a>.</li>
+          <li>Use the subject line <code>Delete my account</code> and include your username.</li>
+          <li>We reply to confirm the request came from you, then delete the account and confirm by email.</li>
+        </ol>
+
+        <h2 id="facebook">Signed in with Facebook or Instagram?</h2>
+        <p>Removing HNNT from your Facebook or Instagram <em>Apps and Websites</em> settings stops HNNT from using that login. To delete the HNNT account itself and its data, use one of the two methods above. Deleting your HNNT account also removes the record that linked it to your Meta account.</p>
+
+        <h2 id="kept">What we may keep</h2>
+        <p>We keep a minimal record of the deletion itself (that an account with this identifier was deleted and when) so we can honor it and answer any follow-up. Reports you filed about other users are kept so we can act on them, with your identity removed. Anything we are legally required to retain, such as billing records, is kept only as long as the law requires. See the <a href="/legal/privacy.html#s10">Data Retention</a> section of the Privacy Policy.</p>
+
+        <h2 id="help">Questions</h2>
+        <p>Email <a href="mailto:support@hnnt.app">support@hnnt.app</a>. See also the <a href="/legal/support.html">support page</a>, the <a href="/legal/privacy.html">Privacy Policy</a>, and the <a href="/legal/terms.html">Terms of Service</a>.</p>
+      </article>
+    </main>
+    <footer class="colophon">
+      <span>hnnt.app</span>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html">Support</a><a href="/legal/data-deletion.html" aria-current="page">Delete your data</a></nav>
+    </footer>
+  </body>
+</html>
