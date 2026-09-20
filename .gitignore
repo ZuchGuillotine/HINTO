@@ -12,6 +12,8 @@ yarn-error.log
 dist/
 web-build/
 *.jks
+AuthKey_*.p8
+AuthKey_U5L7DR4AND.p8
 *.p8
 *.p12
 *.key
@@ -33,7 +35,14 @@ web-build/
 .env.development.local
 .env.test.local
 .env.production.local
+.hinto-media/
 supabase/.temp/
+
+# Local cloud credentials
+*_accessKeys.csv
+*AccessKeys.csv
+*accessKeys.csv
+credentials.csv
 
 # Typescript
 *.tsbuildinfo

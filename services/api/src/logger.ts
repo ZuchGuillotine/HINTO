@@ -55,6 +55,6 @@ export class Logger {
       return;
     }
 
-    console.log(output);
+    process.stdout.write(`${output}\n`);
   }
 }

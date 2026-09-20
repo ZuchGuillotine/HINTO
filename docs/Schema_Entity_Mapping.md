@@ -4,7 +4,7 @@
 
 ## Purpose
 
-This document maps the legacy Amplify GraphQL schema in this repo to the donor Supabase schema that is the current restart baseline.
+This document maps the legacy Amplify GraphQL schema in this repo to the donor Supabase/Postgres schema that informed the restart baseline. It is historical mapping input; production migrations now live under `db/migrations` for AWS RDS PostgreSQL.
 
 It is intended to unblock:
 
@@ -63,7 +63,7 @@ Useful donor function groups:
 
 ## Mapping Table
 
-| Legacy Amplify Entity | Current Shape | Donor Supabase Mapping | Canonical MVP Direction | Notes |
+| Legacy Amplify Entity | Current Shape | Donor Postgres Mapping | Canonical MVP Direction | Notes |
 | --- | --- | --- | --- | --- |
 | `User` | app-owned user/profile document with privacy and subscription fields | `profiles` | `Profile` domain entity backed by `profiles` plus provider-link metadata | Most direct mapping. Legacy `socialLinks` should not stay embedded blindly; provider linkage should likely move to dedicated auth/account-linking records. |
 | `Situationship` | owner-linked ranked item with simple sharing fields | `situationships` | `Situationship` domain entity | Strong mapping. Donor schema is richer and already supports rank/order and validation. |
@@ -86,17 +86,20 @@ Legacy `User` and donor `profiles` are clearly the same product concept, but the
 - authentication identity
 - provider linkage
 
-The donor `profiles` table is a viable storage baseline, but the restart should expect follow-up auth tables such as:
+The donor `profiles` table is viable schema input, but the restart should use platform-auth tables such as:
 
+- `platform_users`
+- `app_users`
 - `auth_identities`
-- `auth_provider_links`
-- optional auth/session audit tables
+- `auth_sessions`
+- `auth_login_events`
 
 Read this alongside `docs/Auth_Model.md`:
 
-- `auth.users` is the canonical auth identity
-- `public.profiles` is the app-facing profile record
-- provider linkage should be modeled in app-owned records such as `public.auth_identities`
+- `platform_users` is the canonical auth identity
+- `app_users` maps platform identities to HINTO product users
+- `profiles` is the app-facing profile record
+- provider linkage should be modeled in platform-owned records such as `auth_identities`
 
 EX-23 should treat provider linkage as an explicit schema and API requirement, not a detail to rediscover during auth implementation.
 
@@ -229,7 +232,7 @@ After EX-22 and EX-23, propose migrations for:
 
 ## Assumptions
 
-- The donor Supabase schema is the best available storage baseline, but not the final contract.
+- The donor Supabase schema is useful history and schema input, but not the production contract.
 - The first vertical slice is profile + situationship CRUD/reorder, not voting or AI.
 - Social provider linkage should be modeled outside the base profile table.
 

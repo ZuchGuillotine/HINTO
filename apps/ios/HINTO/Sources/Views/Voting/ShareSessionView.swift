@@ -8,9 +8,12 @@ struct ShareSessionView: View {
 
     @State private var isCreating = false
     @State private var shareURL: URL?
+    @State private var sharePayload: SharePayload?
+    @State private var shareCopyIndex = 0
     @State private var createdSession: VotingSession?
-    @State private var showShareLink = false
     @State private var errorMessage: String?
+    @State private var showVotePreview = false
+    @State private var showResults = false
 
     var body: some View {
         NavigationStack {
@@ -75,14 +78,67 @@ struct ShareSessionView: View {
                 }
 
                 if let shareURL {
-                    ShareLink(item: shareURL, message: Text("Vote on my situationships! This link expires in 48 hours.")) {
-                        Label("Share Link", systemImage: "square.and.arrow.up")
-                            .font(.hintoButton)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .foregroundStyle(.white)
-                            .background(Color.hintoPink)
+                    VStack(spacing: Spacing.sm) {
+                        if let selectedCopy {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Text(selectedCopy.text)
+                                    .font(.hintoBody)
+                                    .foregroundStyle(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Button {
+                                    cycleShareCopy()
+                                } label: {
+                                    Label("Try another line", systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.hintoCaption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.hintoPink)
+                            }
+                            .padding(Spacing.md)
+                            .background(Color(.secondarySystemBackground))
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        }
+
+                        ShareLink(item: selectedShareText ?? shareURL.absoluteString) {
+                            Label("Share Link", systemImage: "square.and.arrow.up")
+                                .font(.hintoButton)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .foregroundStyle(.white)
+                                .background(Color.hintoPink)
+                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        }
+
+                        if let session = createdSession {
+                            HStack(spacing: Spacing.sm) {
+                                Button {
+                                    showVotePreview = true
+                                } label: {
+                                    Label("Open Vote Preview", systemImage: "hand.tap")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+
+                                Button {
+                                    showResults = true
+                                } label: {
+                                    Label("View Results", systemImage: "chart.bar")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.hintoBlue)
+                            }
+                            .sheet(isPresented: $showVotePreview) {
+                                VotingView(inviteCode: session.inviteCode)
+                                    .environment(api)
+                            }
+                            .sheet(isPresented: $showResults) {
+                                VoteResultsView(votingSessionId: session.votingSessionId)
+                                    .environment(auth)
+                                    .environment(api)
+                            }
+                        }
                     }
                     .padding(.horizontal, Spacing.md)
                 } else {
@@ -145,13 +201,31 @@ struct ShareSessionView: View {
                 )
             )
             createdSession = response.data.session
-            shareURL = URL(string: "https://hinto.app/vote/\(response.data.session.inviteCode)")
+            sharePayload = response.data.share
+            shareCopyIndex = 0
+            shareURL = URL(string: response.data.share.shareUrl)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
+
+    private var selectedCopy: ShareCopyOption? {
+        guard let options = sharePayload?.copyOptions, !options.isEmpty else { return nil }
+        return options[shareCopyIndex % options.count]
+    }
+
+    private var selectedShareText: String? {
+        selectedCopy?.fullText
+    }
+
+    private func cycleShareCopy() {
+        guard let options = sharePayload?.copyOptions, !options.isEmpty else { return }
+        shareCopyIndex = (shareCopyIndex + 1) % options.count
+    }
 }
 
+#if DEBUG
 #Preview {
     ShareSessionView(situationships: SituationshipListView.mockSituationships)
 }
+#endif

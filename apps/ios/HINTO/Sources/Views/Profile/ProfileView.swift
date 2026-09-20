@@ -8,6 +8,8 @@ struct ProfileView: View {
     @State private var isSaving = false
     @State private var showSignOutConfirmation = false
     @State private var showDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var errorMessage: String?
     @State private var selectedPhoto: PhotosPickerItem?
 
     // Form fields
@@ -54,10 +56,18 @@ struct ProfileView: View {
                 titleVisibility: .visible
             ) {
                 Button("Delete Account", role: .destructive) {
-                    auth.signOut()
+                    Task { await deleteAccount() }
                 }
             } message: {
                 Text("This permanently deletes your account and all data. This cannot be undone.")
+            }
+            .alert("Profile", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
     }
@@ -175,7 +185,7 @@ struct ProfileView: View {
                 showSignOutConfirmation = true
             }
 
-            HINTOButton(title: "Delete Account", style: .destructive) {
+            HINTOButton(title: "Delete Account", style: .destructive, isLoading: isDeletingAccount) {
                 showDeleteConfirmation = true
             }
         }
@@ -240,6 +250,7 @@ struct ProfileView: View {
         }
 
         guard let token = auth.accessToken else { return }
+        let imageData = try? await loadJPEGUploadData(from: selectedPhoto)
 
         let update = UpdateProfileRequest(
             username: username.isEmpty ? nil : username,
@@ -249,7 +260,26 @@ struct ProfileView: View {
         )
 
         if let response = try? await api.updateMe(token: token, update: update) {
-            auth.currentUser = response.data
+            auth.updateCurrentUser(response.data)
+        }
+        if let imageData,
+           let uploadResponse = try? await api.uploadProfileAvatar(
+            token: token,
+            imageData: imageData
+           ) {
+            auth.updateCurrentUser(uploadResponse.data.me)
+            selectedPhoto = nil
+        }
+    }
+
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+
+        do {
+            try await auth.deleteAccount()
+        } catch {
+            errorMessage = "We couldn't delete your account. \(error.localizedDescription)"
         }
     }
 }

@@ -10,44 +10,56 @@ type SupabaseResult = { data: unknown; error: unknown };
 interface MockQueryBuilder {
   select: jest.Mock;
   insert: jest.Mock;
+  upsert: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
   eq: jest.Mock;
+  in: jest.Mock;
   order: jest.Mock;
   limit: jest.Mock;
   single: jest.Mock;
+  maybeSingle: jest.Mock;
   // Terminal result — set this to control what the chain resolves to
   _result: SupabaseResult;
+  _results: SupabaseResult[];
 }
 
-function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
+function createQueryBuilder(result?: SupabaseResult, results: SupabaseResult[] = []): MockQueryBuilder {
   const defaultResult: SupabaseResult = result ?? { data: null, error: null };
 
   const builder: MockQueryBuilder = {
     _result: defaultResult,
+    _results: [...results],
     select: jest.fn(),
     insert: jest.fn(),
+    upsert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     eq: jest.fn(),
+    in: jest.fn(),
     order: jest.fn(),
     limit: jest.fn(),
     single: jest.fn(),
+    maybeSingle: jest.fn(),
   };
 
   // Each method returns the builder for chaining, except when used as a
   // thenable (the last call in a chain). We make every method return the
   // builder, and also make the builder thenable so `await` works.
-  for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'limit', 'single'] as const) {
+  for (const method of ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'in', 'order', 'limit', 'single', 'maybeSingle'] as const) {
     builder[method].mockReturnValue(builder);
   }
 
   // Make the builder await-able (thenable)
-  (builder as unknown as { then: Function }).then = function (
+  (builder as unknown as { then: (
+    resolve: (v: SupabaseResult) => void,
+    reject?: (e: unknown) => void,
+  ) => Promise<void> }).then = function (
     resolve: (v: SupabaseResult) => void,
     reject?: (e: unknown) => void,
   ) {
-    return Promise.resolve(builder._result).then(resolve, reject);
+    const result = builder._results.length > 0 ? builder._results.shift()! : builder._result;
+    return Promise.resolve(result).then(resolve, reject);
   };
 
   return builder;
@@ -56,7 +68,13 @@ function createQueryBuilder(result?: SupabaseResult): MockQueryBuilder {
 export interface MockSupabaseClient {
   from: jest.Mock;
   auth: {
+    admin: {
+      createUser: jest.Mock;
+    };
     getUser: jest.Mock;
+    refreshSession: jest.Mock;
+    signInWithOtp: jest.Mock;
+    verifyOtp: jest.Mock;
   };
   _builders: Map<string, MockQueryBuilder>;
   /**
@@ -64,6 +82,7 @@ export interface MockSupabaseClient {
    * Call this before the route handler runs.
    */
   _mockTable(table: string, result: SupabaseResult): MockQueryBuilder;
+  _mockTableSequence(table: string, results: SupabaseResult[]): MockQueryBuilder;
   /**
    * Get (or create) the builder for a table, so you can further customize
    * individual method return values.
@@ -85,14 +104,44 @@ export function createMockSupabaseClient(): MockSupabaseClient {
     }),
 
     auth: {
+      admin: {
+        createUser: jest.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'test-created-user-id',
+              email: 'created@example.com',
+            },
+          },
+          error: null,
+        }),
+      },
       getUser: jest.fn().mockResolvedValue({
         data: { user: null },
         error: { message: 'No token' },
+      }),
+      refreshSession: jest.fn().mockResolvedValue({
+        data: { session: null, user: null },
+        error: { message: 'No refresh token' },
+      }),
+      signInWithOtp: jest.fn().mockResolvedValue({
+        data: {},
+        error: null,
+      }),
+      verifyOtp: jest.fn().mockResolvedValue({
+        data: { session: null, user: null },
+        error: { message: 'Invalid token' },
       }),
     },
 
     _mockTable(table: string, result: SupabaseResult): MockQueryBuilder {
       const builder = createQueryBuilder(result);
+      builders.set(table, builder);
+      return builder;
+    },
+
+    _mockTableSequence(table: string, results: SupabaseResult[]): MockQueryBuilder {
+      const fallback = results[results.length - 1] ?? { data: null, error: null };
+      const builder = createQueryBuilder(fallback, results);
       builders.set(table, builder);
       return builder;
     },

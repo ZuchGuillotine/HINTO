@@ -1,0 +1,16 @@
+.git
+.codegraph
+.expo
+Derived
+HINTO.xcodeproj
+HINTO.xcworkspace
+ios
+node_modules
+web-build
+apps/ios/.build
+services/api/dist
+coverage
+*.log
+.env
+.env.*
+!*.env.example

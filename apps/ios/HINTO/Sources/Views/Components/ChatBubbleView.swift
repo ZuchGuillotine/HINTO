@@ -100,7 +100,7 @@ struct TypingIndicatorView: View {
 
 #Preview {
     VStack {
-        ChatBubbleView(message: .aiMessage("Hi! I'm your AI coach. What's on your mind?"))
+        ChatBubbleView(message: .aiMessage("Hi! I'm HNNT. What's on your mind?"))
         ChatBubbleView(message: .userMessage("Tell me about my situationships"))
         TypingIndicatorView()
     }

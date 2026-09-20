@@ -1,7 +1,7 @@
 # HINTO Execution Backlog
 
 *Created: 2026-03-27*
-*Reviewed: 2026-04-14*
+*Reviewed: 2026-09-20*
 
 ## Purpose
 
@@ -13,9 +13,56 @@ The active target is:
 
 - one canonical repo
 - shared backend that serves both web and native iOS
-- PostgreSQL/Supabase-backed data model
+- RDS PostgreSQL-backed production data model
 - HTTP API and contracts that are clean for both Swift and web clients
-- gradual retirement of AWS Amplify, Cognito, AppSync, and Expo-first assumptions
+- gradual retirement of AWS Amplify, Cognito, AppSync, Supabase production assumptions, and Expo-first assumptions
+
+## Session Focus: 2026-09-20 (launch readiness)
+
+`docs/Launch_Readiness_Audit.md` is the source of truth for what still blocks a live deployment. This table tracks the follow-through.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| LR-01 | Full-repo audit against the AWS stack | Done | `docs/Launch_Readiness_Audit.md` |
+| LR-02 | AI coach on RDS (was Supabase-only, 500 in production) | Done | `services/api/src/repositories/postgres-ai.ts` |
+| LR-03 | `DELETE /v1/me` account deletion (App Store 5.1.1(v)) | Done | Cascades profile + platform user in one transaction |
+| LR-04 | Email OTP on RDS via SES | Done (needs SES identity) | 503 `email_otp_unavailable` until `SES_FROM_EMAIL` is a verified sender |
+| LR-05 | Production config guard, rate limits, server hardening | Done | `assertProductionConfig`, `rate-limit.ts`, SIGTERM drain |
+| LR-06 | Migration runner and CI | Done | `npm run db:migrate`, `.github/workflows/ci.yml`, `deploy-web-staging.yml` |
+| LR-07 | Web: legal pages, coach, delete account, blocks/reports | In Progress | Legal drafts converted from the root `.docx` files; placeholders remain for legal review |
+| LR-08 | iOS: real coach, Keychain, refresh, delete, icon, privacy manifest, ATS split | In Progress | Xcode verification is human-only |
+| LR-09 | Snapchat/TikTok callbacks on RDS; Meta provider | Owner | `routes/auth-providers.ts` still uses Supabase admin APIs |
+| LR-10 | Apply migrations to staging RDS, merge to `main`, SES identity, portals, TestFlight | Human | See audit "Human Testing Required" |
+
+## Session Focus: 2026-05-17
+
+This section is the live tracker for the current product-surface push: sign-in/sign-up split, friends feed, and Snapchat auth end-to-end.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| SX-09 | Split sign-in vs sign-up entry on iOS onboarding | Done | Email auth now carries explicit `sign_in` / `sign_up` intent. Sign-in rejects unknown emails, sign-up rejects existing emails, and iOS sign-up captures username + display name before OTP. |
+| SX-10 | Friends feed: browse situationships shared by friends | Done (first pass) | `GET /v1/me/feed` returns active situationships from accepted `friendships`; web has a Friends panel and iOS has a Friends tab. This intentionally uses accepted friendships as the first `sharedWith` replacement until explicit per-item audience tables are designed. |
+| SX-11 | Wire Snapchat provider into iOS auth flow | Done (local-ready) | iOS uses `ASWebAuthenticationSession` against `POST /v1/auth/providers/snapchat/start` and consumes the backend callback into a HINTO session. Live completion remains blocked on Snap app approval, registered redirect URI, and `AUTH_STATE_SECRET`. |
+| SX-12 | Reconcile Snapchat env vars and add redirect URI | Done (code) / Blocked (portal) | Config now accepts `SNAPCHAT_CLIENT_CONFIDENTIAL` / `SNAPCHAT_CLIENT_ID_PUBLIC` aliases and defaults the local redirect URI to `http://localhost:3000/v1/auth/providers/snapchat/callback` outside production. User still must register the redirect URI in Snap and provide `AUTH_STATE_SECRET`. |
+| SX-13 | Username/display-name capture step on sign-up | Done | Sign-up no longer silently derives all profile data from the email local-part; the backend writes supplied username/display name after OTP verification and the local bypass path uses the same intent-aware payload. |
+| SX-14 | Replace read-only friends feed with feed submissions | Done | RDS migration `005_feed_submissions.sql` adds `feed_submissions` and `feed_submission_votes`; `GET /v1/me/feed` now returns explicit submissions on the Postgres path, and new create/image/vote routes support the iOS Friends `+` flow. |
+| SX-15 | Add local/S3 media pathway for profile, situationship, and feed images | Done | `media_assets` plus the API media route support S3/CloudFront in configured environments and `.hinto-media`/`/media-local/...` for local testing. SwiftUI now compresses selected images before upload. |
+| SX-16 | Finish Rank feed repeated-vote mechanics and displays | Done | `006_feed_multi_votes.sql` removes the per-user unique vote constraint; feed votes are repeatable rows, post buttons show aggregate direction counts, post summary shows total volume plus net signal, and comment badges show the comment author's net vote score. See `docs/Friends_Feed_Voting.md`. |
+
+### 2026-05-17 Execution Notes
+
+- Hardened development auth: `DISABLE_EMAIL_OTP_DELIVERY` and `dev-session:*` tokens now require explicit `ENABLE_DEVELOPMENT_AUTH=true` and are never enabled by default.
+- Removed the checked-in local LAN API base URL from `Project.swift`; the Swift client now relies on `HINTO_API_BASE_URL` or its localhost/debug fallback.
+- Wired TikTok through the same iOS custom-provider flow as Snapchat. Backend config accepts `TIKTOK_CLIENT_ID_PUBLIC` as the local client-key alias and defaults the local callback URI outside production.
+- Meta/Facebook remains blocked at the backend-provider layer. Credentials are present under `META_APP_ID` / `META_CLIENT_SECRET`, but no `/v1/auth/providers/meta|facebook/*` route exists yet and provider app approval remains external.
+- Current temporary landing page/domain state is documented under `infra/aws/staging-resources.md` and `apps/web/landing/README.md`: `hnnt.app` / `www.hnnt.app` route through Route 53 to CloudFront/S3. No AWS deployment was performed in this session.
+- The friends feed submission flow is now: select an existing situationship, add text and/or image, choose an expiry window, submit to `/v1/me/feed/submissions`, optionally upload media to `/v1/me/feed/submissions/:id/image`, and vote through `/v1/me/feed/submissions/:id/votes`.
+- Rank feed voting now treats every vote as one row. A user can cast multiple
+  votes on the same post; post aggregates count all rows, viewer state is kept
+  separate from aggregate display, and comment badges show the comment author's
+  net score on that post.
+- RDS smoke verification through the local SSM tunnel passed for: development session, situationship create, feed submission create, feed image upload, feed vote, and `GET /v1/me/feed`.
+- Verification: `npm run api:build`; `npm run api:test -- --runInBand` at 98/98 across 12 suites; `npm run lint`; `npm run ios`; `xcodebuild -workspace HINTO.xcworkspace -scheme HINTO -destination 'generic/platform=iOS Simulator' build`; local API smoke confirmed `/health` and `/v1` route discovery include the feed submission routes.
 
 ## Session Focus: 2026-04-14
 
@@ -27,17 +74,17 @@ This section is the live execution tracker for the current build-and-verify push
 | SX-02 | Use this backlog as the status source while delivering the next slice | Done | Session goals, build attempts, and remaining blockers have been recorded here during implementation |
 | SX-03 | Harden local backend wiring for shared iOS + web development | Done | API now auto-loads repo `.env`, serves local CORS headers, and exposes `POST /v1/dev/session` with development-token auth support for `/v1/me` and situationship flows |
 | SX-04 | Build `/apps/web` with comparable JS onboarding, profile, and situationship features | Done | `/apps/web` now contains a dependency-light JS shell with local-dev sign-in, profile editing, situationship create/edit/delete/reorder, and honest roadmap panels for voting + AI |
-| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend | In Progress | Local API base URL override, development sign-in, profile contract alignment, and situationship route fixes are in place; simulator build is down to remaining voting/share view compile cleanup |
+| SX-05 | Finish the first-slice SwiftUI wiring against the shared backend | Done | iOS simulator build passes after fixing `EmailSignInView` `ShapeStyle.hintoPink` shorthand; profile, situationship, and voting flows are wired against the live backend |
 | SX-06 | Add Tuist project generation and local build configuration docs | Done | `Project.swift`, `Workspace.swift`, `Tuist/Config.swift`, and `docs/Local_Development.md` added; `tuist generate` succeeded and produced `HINTO.xcworkspace` |
-| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build | In Progress | `npm run api:build` passed, targeted ESLint for new files passed, `tuist generate` passed, and iterative iOS builds were attempted; localhost server smoke tests still need an out-of-sandbox run and the iOS build still has one remaining SwiftUI compile blocker in the staged voting/share shell |
+| SX-07 | Attempt local verification for API, web localhost, Tuist generation, and iOS build | Done | `npm run api:build` passes; `npm run api:test` is at 77/77 across 9 suites; `npm run web:test` is at 5/5; iOS simulator build + XCTest suite (5/5 contract-decode tests) pass via `xcodebuild test`; localhost server smoke remains a manual verification step. |
 | SX-08 | Capture dependency-install signal from the current root package graph | Done | `npm install` completed but confirmed the root dependency graph is still legacy-heavy; warnings were dominated by Expo/AWS/Amplify-era packages rather than the new web/API slice |
-| SX-09 | Implement the restart-era voting backend slice and update the backlog/docs to match branch reality | In Progress | Contracts, domain helpers, API routes, targeted node tests, and `supabase/migrations/011_voting_session_identity_support.sql` are now in tree; remote DB apply, client wiring, and end-to-end verification remain |
+| SX-09 | Implement the restart-era voting backend slice and update the backlog/docs to match branch reality | Done | Voting session, vote submission, results, and public-invite flows have full route-level integration tests in `routes.voting.test.ts` (16 cases) plus the existing pure-helper tests; web Jest covers session/results loading and vote submission. Remote DB apply remains a deployment-time step. |
 
 ## Assumptions
 
-- A Supabase database already exists and at least one migration has already been applied.
-- The most likely current schema source is `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/migrations/`.
-- The current repo now contains the restart-era backend foundation under `/services/api`, shared first-slice packages under `/packages/contracts` and `/packages/domain`, migration `supabase/migrations/010_auth_identities.sql`, and a native SwiftUI app shell under `/apps/ios`.
+- Supabase exists as transition infrastructure and schema history, not the production platform target.
+- The production staging database is AWS RDS PostgreSQL, with production migrations under `db/migrations`.
+- The current repo now contains the restart-era backend foundation under `/services/api`, shared first-slice packages under `/packages/contracts` and `/packages/domain`, production platform identity migration `db/migrations/001_platform_identity.sql`, and a native SwiftUI app shell under `/apps/ios`.
 - The legacy Expo client is still largely coupled to Amplify Auth and GraphQL, while the SwiftUI app contains partial API wiring and placeholder auth/voting/AI behavior.
 - Native iOS and web are both first-class targets, so backend design must be client-agnostic.
 
@@ -92,8 +139,8 @@ Recommended high-signal entry points for this repo:
 
 Known current hotspots from codegraph:
 
-- `apps/hnnt-app/src/hooks/useAuth.tsx` is high-risk and central to current auth coupling.
-- `apps/hnnt-app/src/context/useSituationships.tsx` is high-risk and central to the first product slice.
+- `legacy/hnnt-app/src/hooks/useAuth.tsx` is high-risk historical auth-coupling salvage.
+- `legacy/hnnt-app/src/context/useSituationships.tsx` is high-risk historical product-state salvage.
 
 ## Task Packet Shape
 
@@ -124,7 +171,7 @@ The first agent wave should stay close to Phase A and unblock the first backend 
 | Q2 | EX-22, EX-23 | Define canonical domain model and identify schema gaps for web + Swift | Worker | Yes | Should use EX-21 output as input |
 | Q3 | EX-30, EX-31, EX-32, EX-33, EX-34 | Scaffold `/services/api` with config, error model, logging, and health surface | Worker | Yes | Keep auth implementation out of first scaffold unless needed for structure |
 | Q4 | EX-50, EX-51 | Scaffold `/packages/contracts` and `/packages/domain` for first vertical slice | Worker | Yes | Should align with Q2 and Q3 outputs |
-| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Prioritize active paths under `apps/hnnt-app/src/` and scripts/config |
+| Q5 | EX-80 | Audit AWS/Amplify/Cognito touchpoints in active code paths | Worker | Optional | Legacy client paths now live under `legacy/hnnt-app/src/`; do not treat them as active product targets |
 
 ## Evaluator Responsibilities
 
@@ -149,11 +196,11 @@ Evaluator output should always classify findings as:
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files | Human | In Progress | Likely donor repo: `/Users/benjamincox/Downloads/rork-hnnt--hinto--relationship-ranking-app/supabase/` |
-| EX-01 | Confirm the intended backend stack for the restart | Human | Done | Use Supabase Postgres + Supabase Auth + Supabase Storage + TypeScript API |
+| EX-00 | Identify the source of truth for the existing Supabase migration history and schema files | Human | Done | Remote Supabase migration history records all 11 in-repo migrations, `001` through `011`; donor repo remains a historical input, not a separate source of truth |
+| EX-01 | Confirm the intended backend stack for the restart | Human | Done | Use AWS RDS PostgreSQL + HINTO-owned platform auth + S3/CloudFront + SES + TypeScript API on ECS Express Mode |
 | EX-02 | Confirm the intended web stack | Human | Assumed | Defaulting to Next.js unless changed |
 | EX-03 | Confirm whether the first iOS milestone is native SwiftUI from this repo or a staged bridge from existing React Native flows | Agent | Done | Recommendation: fresh SwiftUI app under `/apps/ios`; current `ios/` is Expo shell only |
-| EX-04 | Capture external service decisions still in scope for MVP | Human | Done | Supabase Auth is the canonical auth/session system. Apple auth is required. Meta/Facebook login is acceptable for the Instagram-discovery use case. Snapchat and TikTok also remain in scope. |
+| EX-04 | Capture external service decisions still in scope for MVP | Human | Done | HINTO-owned platform auth is the production session system. Apple, Meta/Facebook, Snapchat, and TikTok are launch-scope provider flows. |
 
 ### 1. Canonical Product And Architecture Reset
 
@@ -172,7 +219,7 @@ Evaluator output should always classify findings as:
 | EX-21 | Compare current Amplify schema to Supabase schema and produce an entity mapping | Agent | Done | Deliverable is the written mapping table and mismatch notes in `docs/Schema_Entity_Mapping.md` |
 | EX-22 | Define the canonical domain model independent of storage vendor details | Agent | Done | Deliverable is `docs/Canonical_Domain_Model.md`. It separates domain entities from storage tables and accounts for the legacy behavior surface behind `getUserSituationships`, `getSituationshipVotes`, `searchUsers`, and `reorderSituationships`. |
 | EX-23 | Identify schema gaps for web + Swift support | Agent | Done | Gap analysis is captured in `docs/Canonical_Domain_Model.md`. `sharedWith` is treated as both a domain/API gap and an authorization replacement problem because it currently encodes Amplify read-access semantics. |
-| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Migration `010_auth_identities.sql` adds `auth_identities` and `auth_login_events` tables with RLS policies |
+| EX-24 | Create follow-up DB migrations for missing fields or mismatches | Agent | Done | Transition migration `010_auth_identities.sql` exists under `supabase/migrations`; production platform identity baseline now exists at `db/migrations/001_platform_identity.sql` |
 
 ### 3. Backend Foundation
 
@@ -183,10 +230,10 @@ Evaluator output should always classify findings as:
 | EX-32 | Add environment/config management for local and deployed backend | Agent | Done | Config contract added in `services/api/src/config.ts` and documented in `services/api/README.md` |
 | EX-33 | Establish API error model and shared response envelope rules | Agent | Done | Machine-readable error envelope and success envelope scaffolded in `services/api/src/errors.ts`, `services/api/src/http.ts`, and `services/api/README.md` |
 | EX-34 | Add structured logging, request IDs, and health endpoints | Agent | Done | JSON logging, request IDs, `/health`, and `/v1/health` added in the API scaffold |
-| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Bearer token extraction, Supabase Auth user validation, profile lookup in `services/api/src/middleware/auth.ts` |
+| EX-35 | Add auth middleware and session/user resolution | Agent | Done | Current middleware resolves Supabase transition sessions; next production pass should replace it with platform JWT + RDS session resolution |
 | EX-36 | Design the canonical auth model and identity-linking tables | Agent | Done | See `docs/Auth_Model.md` |
-| EX-37 | Implement supported-provider auth flows through Supabase where available | Agent | In Progress | Apple and Meta/Facebook should use Supabase-managed auth where practical; custom-provider backend wiring now exists alongside this work |
-| EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | In Progress | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` now exist; TikTok session bootstrap is wired, Snapchat still needs the provider external ID handshake finalized |
+| EX-37 | Implement provider auth flows through platform auth | Agent | In Progress | Apple, Meta/Facebook, Snapchat, and TikTok should all terminate in backend-owned provider flows and HINTO-issued sessions |
+| EX-38 | Implement custom provider integrations not covered natively by Supabase | Agent | Done (pending creds) | `POST /v1/auth/providers/:provider/start` and `GET /v1/auth/providers/:provider/callback` exist; TikTok and Snapchat (`kit.snapchat.com/v1/me` external_id handshake) session bootstrap are wired. Live verification is blocked on user-supplied client IDs/secrets/redirect URIs (`TIKTOK_*`, `SNAPCHAT_*`, `AUTH_STATE_SECRET`). |
 
 ### 4. Backend Modules
 
@@ -194,11 +241,11 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-40 | Implement profile routes/services | Agent | Done | `GET /v1/me` and `PATCH /v1/me` with MeAggregate responses in `services/api/src/routes/profile.ts` |
 | EX-41 | Implement situationship routes/services | Agent | Done | List, create, update, delete, reorder routes in `services/api/src/routes/situationships.ts` |
-| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` now exist on `restart-plan`; runtime verification against a live Supabase project is still pending |
-| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` now records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; live DB verification is still pending |
-| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` now computes ranked owner-facing results plus comment summaries; client integration and remote verification remain |
-| EX-45 | Implement report/block routes/services | Agent | Todo | Minimal moderation-safe MVP |
-| EX-46 | Implement AI conversation/message routes/services | Agent | Todo | Conversation persistence, moderation hooks, quotas |
+| EX-42 | Implement voting session routes/services | Agent | In Progress | `POST /v1/me/voting-sessions`, `POST /v1/me/voting-sessions/:id/expire`, and `GET /v1/voting-sessions/:inviteCode` exist; RDS-backed live smoke remains |
+| EX-43 | Implement vote submission routes/services | Agent | In Progress | `POST /v1/voting-sessions/:inviteCode/votes` records best/worst submissions with route-level duplicate checks and `voter_identity` migration support; RDS-backed live smoke remains |
+| EX-44 | Implement results aggregation routes/services | Agent | In Progress | `GET /v1/me/voting-sessions/:id/results` computes ranked owner-facing results plus comment summaries; web/client integration exists, but route-level live smoke and presentation polish remain |
+| EX-45 | Implement report/block routes/services | Agent | Done | `POST /v1/reports`, `GET\|POST /v1/me/blocks`, `DELETE /v1/me/blocks/:blockedProfileId` in `services/api/src/routes/moderation.ts`; reuses donor `blocks` and `reports` tables from migration 001 |
+| EX-46 | Implement AI conversation/message routes/services | Agent | Done | Conversations + messages CRUD, OpenAI `gpt-4o-mini` integration with mock fallback, daily quota (30 msgs/user/day), and substring-based safety moderation in `services/api/src/routes/ai.ts` |
 | EX-47 | Implement storage helpers for media/share assets | Agent | Todo | Use backend-compatible storage assumptions |
 
 ### 5. Contracts And Shared Utilities
@@ -207,7 +254,7 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-50 | Create `/packages/contracts` for OpenAPI schemas and DTOs | Agent | Done | Scaffolded under `packages/contracts` for the first slice with `me` and situationship DTOs, aggregates, and reorder/create/update contracts |
 | EX-51 | Create `/packages/domain` for shared business rules and validators | Agent | Done | Scaffolded under `packages/domain` with profile privacy normalization, capability resolution, audience/access types, and reorder invariants |
-| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Todo | Salvage from donor repo if better |
+| EX-52 | Create `/packages/prompts` for AI prompt logic and moderation rules | Agent | Done | `@hinto/prompts` now centralizes the relationship-coach system prompt, prompt assembly, conversation starters, and deterministic crisis/violence safety triggers consumed by `services/api/src/routes/ai.ts` |
 | EX-53 | Generate typed clients or client helpers for web and Swift consumption | Agent | Todo | Web can use generated TS types; Swift can use OpenAPI generation later |
 
 ### 6. Web App Foundation
@@ -218,8 +265,8 @@ Evaluator output should always classify findings as:
 | EX-61 | Implement app shell, auth entry, and session handling | Agent | Done | Web shell now uses `POST /v1/dev/session`, stores the returned access token locally, and loads `/v1/me` plus `/v1/me/situationships` from the new backend |
 | EX-62 | Build profile flow on the new API | Agent | Done | Web profile form now edits username, display name, bio, and privacy through `PATCH /v1/me` |
 | EX-63 | Build situationship list/detail/create/edit flows | Agent | Done | Web shell now supports list, create, edit, delete, and reorder against the shared situationship routes |
-| EX-64 | Build voting session and vote submission flows | Agent | Todo | Public or semi-public share flow |
-| EX-65 | Build results view | Agent | Todo | Owner-facing |
+| EX-64 | Build voting session and vote submission flows | Agent | In Progress | Web shell now supports owner session creation plus a public vote tester against the live backend; production-grade public navigation and polish still remain |
+| EX-65 | Build results view | Agent | In Progress | Web shell now loads owner voting sessions and results from the shared API, but presentation and end-to-end browser verification still remain |
 | EX-66 | Add admin-safe report triage view if needed for MVP | Agent | Todo | Could be deferred if manual ops suffice |
 
 ### 7. Native iOS Foundation
@@ -231,19 +278,19 @@ Evaluator output should always classify findings as:
 | EX-72 | Establish networking layer against the shared API contract | Agent | In Progress | `APIClient.swift` now supports local base URL overrides, development session bootstrap, and the correct situationship reorder route; remaining work is full end-to-end validation after the simulator build is clean |
 | EX-73 | Build auth and onboarding shell | Agent | In Progress | `OnboardingView` now offers `Use Local API` in debug builds and `AuthManager` caches the restored profile/session; real Apple and other provider flows remain staged |
 | EX-74 | Build profile and situationship flows | Agent | In Progress | SwiftUI profile editing now matches the current backend contract more honestly and situationship CRUD/reorder wiring is improved, but simulator verification is still in progress |
-| EX-75 | Build voting and results flows | Agent | In Progress | SwiftUI share-session creation now targets the backend, but vote submission and results still use placeholder calls and need full API integration plus simulator verification |
+| EX-75 | Build voting and results flows | Agent | In Progress | SwiftUI share-session creation, public vote preview, owner session list, and results now target the backend; deeper app navigation and simulator verification still remain |
 | EX-76 | Build AI coach UI against backend API | Agent | In Progress | `ChatView` exists as a native shell, but responses are mocked and no backend AI route is wired yet |
 
 ### 8. Client Migration And De-AWS Work
 
 | ID | Task | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; active blockers are root bootstrap, `useAuth`, `useUserProfile`, `useSituationships`, and AWS storage/upload paths |
+| EX-80 | Audit all AWS/Amplify/Cognito touchpoints in the current repo | Agent | Done | Audit complete in `docs/Legacy_AWS_Audit.md`; legacy Expo client is now quarantined under `legacy/hnnt-app`, and Amplify/lambda backend artifacts have been removed from the active tree |
 | EX-81 | Replace client auth assumptions with backend-neutral interfaces | Agent | Todo | Begin with adapters rather than full deletion |
 | EX-82 | Replace GraphQL/AWS API calls with new service clients | Agent | Todo | Incrementally by feature slice |
 | EX-83 | Remove AWS-specific env/config usage from active app paths | Agent | Todo | Only after replacements exist |
-| EX-84 | Move legacy Expo/Amplify implementation under `/legacy` | Agent | Todo | Only once new structure is ready |
-| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Todo | After archive/move step |
+| EX-84 | Move legacy Expo/Amplify implementation under `/legacy` | Agent | Done | `apps/hnnt-app` moved to `legacy/hnnt-app` as salvage/reference material and excluded from active lint |
+| EX-85 | Delete obsolete AWS scripts, docs, and configs from active paths | Agent | Done | Removed tracked `amplify/` backend artifacts and `lambda/snap-auth`; active lint now passes cleanly |
 
 ### 9. Quality, Testing, And Delivery
 
@@ -251,10 +298,10 @@ Evaluator output should always classify findings as:
 | --- | --- | --- | --- | --- |
 | EX-90 | Add backend test harness | Agent | Done | 44 unit tests covering health, profile, situationship CRUD, reorder, and auth middleware. Jest + ts-jest under `services/api/src/__tests__/`. Run via `npm run api:test`. |
 | EX-91 | Add contract validation in CI | Agent | Todo | Prevent API drift across clients |
-| EX-92 | Add web app smoke tests | Agent | In Progress | Manual localhost smoke testing is partially prepared via `/apps/web/dev-server.mjs`, but the end-to-end browser verification still needs the out-of-sandbox server run to be completed |
-| EX-93 | Add iOS networking/model tests | Agent | Todo | Expand as native app grows |
+| EX-92 | Add web app smoke tests | Agent | Done | Jest smoke coverage now lives under `apps/web/src/app-core.test.js` and covers development sign-in, owner voting-session creation/results loading, public invite-code loading, and vote submission. Manual localhost browser verification remains tracked separately under SX-07. |
+| EX-93 | Add iOS networking/model tests | Agent | Done | XCTest target added in `apps/ios/Package.swift`; contract-decode tests for `MeAggregate`, `VotingSession`, `PublicVotingSessionAggregate`, `APIErrorEnvelope`, and `SubmitVoteRequest` in `apps/ios/HINTO/Tests/ContractDecodingTests.swift`. Run via `xcodebuild test -scheme HINTO -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4'`. |
 | EX-94 | Add migration verification and seed/dev fixtures | Agent | Done | Migration file verification tests in `migration.verify.test.ts`. Dev seed fixtures (3 users, 4 situationships, auth identities) with SQL generator in `seed.fixtures.ts`. |
-| EX-95 | Define deployment path for API and web | Human | Todo | Supabase + Vercel/Hetzner or comparable |
+| EX-95 | Define deployment path for API and web | Agent | Done | Production path documented in `docs/AWS_Infrastructure_Plan.md` and `infra/aws/README.md`: ECS Express Mode API, RDS PostgreSQL, S3/CloudFront web/media, SES, AWS Organizations account separation |
 
 ## Recommended Sequence
 
@@ -275,7 +322,7 @@ This phase is largely complete in the repo:
 
 The first vertical slice should be:
 
-- authenticate user with the canonical Supabase-backed session model
+- authenticate user with the canonical HINTO platform session model
 - fetch or create profile
 - list situationships
 - create/edit/reorder situationships
@@ -300,7 +347,7 @@ If that works on web and the iOS networking layer, the foundation is credible.
 
 - final product scope decisions
 - stack decisions that affect long-term maintenance
-- Supabase project access and secret management
+- AWS account/domain access and provider secret management
 - external provider credentials
 - go/no-go decisions for deletions and archival
 
@@ -325,14 +372,49 @@ If that works on web and the iOS networking layer, the foundation is credible.
 ## Immediate Next Actions
 
 1. ~~Normalize the first auth migration around `auth_identities` and related audit tables.~~ - Done (PR #1)
-2. Verify Supabase connectivity and confirm the current remote project/env contract.
+2. ~~Verify Supabase connectivity and confirm the current remote project/env contract.~~ - Done 2026-04-28. Remote migration history has `001` through `011`; PostgREST service-role reads and pooler `psql` row counts both work. Direct DB host in `SUPABASE_CONNECTION_STRING` does not resolve locally; use the pooler URL for DB admin scripts.
 3. ~~Implement `GET /v1/me`, `PATCH /v1/me`, and situationship CRUD/reorder as the first backend slice.~~ - Done (PR #1)
 4. ~~Add auth/session middleware that resolves authenticated owners, authorized viewers, and public-session access.~~ - Done (PR #1)
-5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main). Voting routes still need broader verification.
-6. Add provider-start and provider-callback flows after the canonical session path is wired.
-7. Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes (EX-64, EX-65, EX-75).
-8. Replace active legacy AWS client calls with backend-neutral service clients (EX-82, EX-83).
-9. Align the existing SwiftUI app shell with the live backend contracts and replace remaining placeholder auth/voting/session behavior.
+5. ~~Add backend route tests and DB connectivity checks for the first slice.~~ - Done (EX-90, EX-94 merged to main).
+6. ~~Add provider-start and provider-callback flows after the canonical session path is wired.~~ - Done for transition implementation (EX-37/38). Production verification still needs provider credentials, callback URLs, and platform-session replacement work.
+7. ~~Wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes.~~ - Done for profile/situationship/voting; AI coach + moderation UI still pending in both clients.
+8. Replace any future revived legacy AWS client calls with backend-neutral service clients (EX-82, EX-83). The old Expo client has moved under `/legacy` (EX-84).
+9. ~~Align the existing SwiftUI app shell with the live backend contracts.~~ - Done via SX-05 + EX-93 contract-decode tests. AI chat view still uses mocked responses at the view layer.
+
+## 2026-04-17 Session Delta
+
+This session closed out the remaining Phase C items and shipped the first iOS test surface:
+
+- **EX-37/38** — Snapchat `kit.snapchat.com/v1/me` external_id handshake wired in `services/api/src/routes/auth-providers.ts`, completing the custom-provider session bootstrap path.
+- **EX-42/43/44** — 16 route-level integration tests added in `services/api/src/__tests__/routes.voting.test.ts` covering owner session CRUD, public invite loads, vote submission with expiry/duplicate handling, and owner results aggregation.
+- **EX-45** — `services/api/src/routes/moderation.ts` added with `POST /v1/reports`, `GET|POST /v1/me/blocks`, `DELETE /v1/me/blocks/:blockedProfileId` against the donor-schema `blocks` / `reports` tables.
+- **EX-46** — `services/api/src/routes/ai.ts` added with conversations CRUD, messaging with OpenAI `gpt-4o-mini` (mock fallback when key unset), substring moderation, and `daily_usage`-backed 30-msg/day quota. 9 new Jest suites.
+- **EX-93** — XCTest target added in `apps/ios/Package.swift`; `apps/ios/HINTO/Tests/ContractDecodingTests.swift` exercises `MeAggregate`, `VotingSession`, `PublicVotingSessionAggregate`, `APIErrorEnvelope`, and `SubmitVoteRequest`.
+- **SX-05/SX-07** — iOS simulator build is green after fixing `ShapeStyle.hintoPink` shorthand in `EmailSignInView.swift`; 77 API + 5 web + 5 iOS tests all pass.
+
+## 2026-04-28 Session Delta
+
+This session closed the shared prompt-package gap:
+
+- **EX-52** — `packages/prompts` added with the HINTO relationship-coach system prompt, prompt assembly helpers, conversation starter helpers, and crisis/violence safety trigger detection.
+- **EX-46 follow-up** — `services/api/src/routes/ai.ts` now consumes the prompt package instead of owning inline prompt/moderation logic. Crisis and active-violence inputs return deterministic safety guidance without calling OpenAI.
+- Verification: `npm run api:build` passes, `npm run api:test -- routes.ai.test.ts` passes at 10/10, and the full API suite passes at 82/82 across 10 suites.
+
+## 2026-04-28 Supabase Verification
+
+Historical note: this closed the transition-era Supabase connectivity blocker. Supabase is no longer the production platform target.
+
+- `supabase_migrations.schema_migrations` records all 11 migrations in `supabase/migrations`, `001` through `011`.
+- PostgREST service-role calls return successful responses for `profiles`, `situationships`, `votes`, `voting_sessions`, `auth_identities`, `auth_login_events`, `images`, `friendships`, `contacts`, `friend_groups`, and `friend_group_members`.
+- Pooler `psql` at `aws-0-us-west-2.pooler.supabase.com:6543` returns row counts: `profiles=4`, `situationships=3`, `voting_sessions=2`, `votes=2`, `auth_identities=0`.
+- The direct DB host in `SUPABASE_CONNECTION_STRING` does not resolve from this machine. Any future DB admin script should use the transaction pooler URL instead. Current source code does not read `SUPABASE_CONNECTION_STRING`.
+- `auth_identities=0`, so provider-linkage still needs live exercise after provider credentials are configured.
+
+### Remaining human-owned follow-ups
+
+- Configure Apple, Meta/Facebook, TikTok, and Snapchat OAuth callback URLs for the HINTO platform auth flow.
+- Provision provider secrets in AWS Secrets Manager for staging/production.
+- Continue AWS staging deployment from `infra/aws/staging-resources.md` and `.github/workflows/deploy-api-staging.yml`.
 
 ## Current Orchestrator Guidance
 
@@ -341,19 +423,19 @@ Use the following sequencing constraints while agents are active:
 - ~~Do not start EX-24 until EX-21 through EX-23 are reviewed.~~ - EX-24 is complete.
 - ~~Do not let EX-35 through EX-38 sprawl into full provider implementation before EX-30 through EX-34 and EX-50 through EX-51 stabilize.~~ - EX-35 is complete; EX-37/EX-38 remain scoped.
 - ~~Prefer profile and situationship contracts as the first shared slice before voting or AI routes.~~ - First slice is complete.
-- Treat `apps/hnnt-app/src/hooks/useAuth.tsx` and `apps/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
+- Treat `legacy/hnnt-app/src/hooks/useAuth.tsx` and `legacy/hnnt-app/src/context/useSituationships.tsx` as salvage references, not migration targets.
 - Treat `apps/ios` as the current native baseline, but do not mistake its placeholder auth, vote submission, or AI responses for end-to-end integration.
 - Do not model `sharedWith` as a plain field migration. Replace its audience and read-authorization behavior explicitly in the domain model and API/auth design.
 - ~~Do not start voting/AI routes until backend route tests (EX-90) confirm the first slice is stable.~~ - EX-90 is complete; voting/AI routes are now unblocked.
 - Voting backend routes now exist in-tree, but still need broader route and DB-backed verification before the voting stack should be treated as production-ready.
-- Provider auth (EX-37, EX-38) should proceed only after Supabase connectivity is verified end-to-end.
+- Provider auth (EX-37, EX-38) should proceed against the HINTO platform auth model, with Supabase code treated as transition implementation only.
 
 ## Completed Agent Packets
 
 The following packets were delivered and merged in PR #1 (2026-03-28):
 
 - **Packet A (EX-50, EX-51)**: contracts and domain packages scaffolded
-- **Packet B (EX-35)**: auth middleware with Supabase JWT session resolution
+- **Packet B (EX-35)**: transition auth middleware with Supabase JWT session resolution
 - **Packet C (EX-40)**: profile routes with MeAggregate responses
 - **Packet D (EX-41)**: situationship CRUD, reorder, and delete routes
 
@@ -381,17 +463,16 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
 
 ### Packet F: EX-37, EX-38
 
-- Goal: implement provider auth flows (Apple, Meta/Facebook via Supabase; Snapchat, TikTok via custom backend)
+- Goal: replace provider auth flows with HINTO platform-owned sessions for Apple, Meta/Facebook, Snapchat, and TikTok
 - Inputs:
   - `docs/Auth_Model.md`
   - `services/api/src/middleware/auth.ts`
 - Deliverables:
   - provider-start and provider-callback routes
   - identity-linking flow against `auth_identities`
-  - Supabase session bootstrap after custom-provider callback success
+  - HINTO access/refresh session creation after provider callback success
 - Guardrails:
-  - Apple and Meta/Facebook should use Supabase-managed auth where supported
-  - Snapchat and TikTok require custom backend OAuth flows
+  - all social providers should terminate in backend-owned platform auth
   - do not recreate Cognito-shaped client state
 
 ### Packet G: EX-42, EX-43, EX-44 follow-up
@@ -403,7 +484,7 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
   - `docs/Canonical_Domain_Model.md`
 - Deliverables:
   - DB-backed verification for create/expire/retrieve routes
-  - duplicate-vote and migration validation against a live Supabase project
+  - duplicate-vote and migration validation against RDS/Postgres
   - client-facing integration notes for web and Swift shells
 - Guardrails:
   - reuse donor DB functions where applicable
@@ -417,7 +498,7 @@ The current branch also includes a native SwiftUI app baseline under `/apps/ios`
   - `services/api` routes
 - Deliverables:
   - Next.js app under `/apps/web`
-  - auth entry and session handling against Supabase
+  - auth entry and session handling against HINTO platform auth
   - profile and situationship flows consuming the new API
 - Guardrails:
   - must target new backend, not Amplify
@@ -470,7 +551,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 | Queue | Backlog IDs | Goal | Primary Inputs | Deliverable |
 | --- | --- | --- | --- | --- |
 | ~~Q9~~ | ~~EX-90, EX-94~~ | ~~Add backend route tests, migration verification, and DB connectivity checks for the first slice~~ | — | **Done** (merged to main 2026-04-07) |
-| Q10 | EX-37, EX-38 | Implement provider auth flows (Supabase-managed and custom backend OAuth) | `docs/Auth_Model.md`, `services/api/src/middleware/auth.ts`, `supabase/migrations/010_auth_identities.sql` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
+| Q10 | EX-37, EX-38 | Implement provider auth flows with HINTO platform sessions | `docs/Auth_Model.md`, `db/migrations/001_platform_identity.sql`, `services/api/src/middleware/auth.ts` | provider-start/callback routes, identity-linking flow, and completion of provider-specific handshakes still pending |
 | Q11 | EX-42, EX-43, EX-44 | Verify and integrate voting session, vote submission, and results aggregation routes | `packages/contracts`, `packages/domain`, donor voting functions, `services/api/src/routes/voting.ts` | DB verification, client integration, and follow-up hardening for voting routes |
 | Q12 | EX-82, EX-83 | Replace active client GraphQL/AWS API paths with backend-neutral service clients | `docs/Legacy_AWS_Audit.md`, first-slice contracts, backend routes | adapter layer or service client replacement for `useUserProfile` and `useSituationships` |
 | Q13 | EX-60, EX-61, EX-62, EX-63 | Scaffold web app and build first vertical slice | `packages/contracts`, `services/api` routes | Next.js app with auth, profile, and situationship flows |
@@ -479,7 +560,7 @@ These are the next preferred bounded tasks after the accepted outputs above.
 Queue constraints:
 
 - ~~Q9 should complete before starting Q10 or Q11, to confirm the first slice is stable.~~ - Q9 is complete; Q10 and Q11 are unblocked.
-- Q10 should use Supabase-managed auth for Apple/Meta and custom flows for Snapchat/TikTok only; TikTok backend callback/session bootstrap is already in place, while Snapchat still needs the external-id completion step finalized.
+- Q10 should replace Supabase-managed auth assumptions with backend-owned platform auth for Apple/Meta/Snapchat/TikTok.
 - Q11 should focus on DB verification, client wiring, and duplicate-vote hardening only; AI integration remains deferred.
 - Q13 can run in parallel with Q10/Q11 once Q9 passes.
 - Q14 should avoid over-integrating voting or AI before Q11 exists; profile and situationship wiring should come first.
@@ -510,5 +591,4 @@ The donor schema is strong enough to use as the initial baseline, but it should 
 - `images` and image attachments may be useful, but should be validated against the new web + Swift share flow
 - DB functions for invite-code generation, vote stats, and results ranking are useful patterns
 - tRPC/Hono implementation details in the donor repo should not become the contract by default; the restart should still prefer a clean HTTP API and OpenAPI contract
-- the donor auth/client implementation should be treated as reference only; social auth needs to be rebuilt around Supabase-compatible backend flows
-- the donor auth/client implementation should be treated as reference only; use Supabase-managed auth where supported and custom backend-owned provider integration where not supported
+- the donor auth/client implementation should be treated as reference only; social auth needs to be rebuilt around HINTO platform-owned backend flows

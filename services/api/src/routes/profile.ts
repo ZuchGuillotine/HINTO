@@ -4,28 +4,46 @@ import { AppConfig, RequestContext } from '../types.js';
 import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
+import { shouldUsePostgres } from '../db.js';
+import { deletePostgresAccount } from '../repositories/postgres-auth.js';
+
+const MIN_AGE = 16;
+const MAX_AGE = 120;
+import {
+  getProfileById,
+  listAuthIdentities,
+  updateProfile,
+} from '../repositories/postgres-core.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
 
 export interface ProfileRow {
   id: string;
-  username: string;
-  name: string;
+  platform_user_id?: string | null;
+  username: string | null;
+  name: string | null;
+  display_name?: string | null;
   email: string | null;
+  bio?: string | null;
   avatar_url: string | null;
-  is_public: boolean;
-  mutuals_only: boolean;
+  privacy?: string | null;
+  is_public?: boolean | null;
+  mutuals_only?: boolean | null;
   subscription_tier: string | null;
   age: number | null;
-  age_verified: boolean;
+  age_verified?: boolean | null;
   profile_image_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-function derivePrivacy(isPublic: boolean, mutualsOnly: boolean): 'public' | 'private' | 'mutuals_only' {
-  if (mutualsOnly) return 'mutuals_only';
-  if (isPublic) return 'public';
+function derivePrivacy(row: Pick<ProfileRow, 'privacy' | 'is_public' | 'mutuals_only'>): 'public' | 'private' | 'mutuals_only' {
+  if (row.privacy === 'public' || row.privacy === 'private' || row.privacy === 'mutuals_only') {
+    return row.privacy;
+  }
+
+  if (row.mutuals_only) return 'mutuals_only';
+  if (row.is_public) return 'public';
   return 'private';
 }
 
@@ -40,13 +58,14 @@ export function toProfileDto(row: ProfileRow) {
   return {
     profileId: row.id,
     username: row.username ?? row.id,
-    displayName: row.name ?? '',
+    displayName: row.name ?? row.display_name ?? '',
     email: row.email,
+    bio: row.bio ?? null,
     avatarUrl: row.avatar_url,
-    privacy: derivePrivacy(row.is_public, row.mutuals_only),
+    privacy: derivePrivacy(row),
     subscriptionTier: normalizeTier(row.subscription_tier),
     age: row.age,
-    ageVerified: row.age_verified,
+    ageVerified: Boolean(row.age_verified),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -71,6 +90,7 @@ export interface MeAggregate {
 export function buildMeAggregate(
   row: ProfileRow,
   auth: { authUserId: string; profileId: string },
+  config?: AppConfig,
 ): MeAggregate {
   const profile = toProfileDto(row);
 
@@ -86,7 +106,9 @@ export function buildMeAggregate(
     capabilities: {
       canEditProfile: true,
       canCreateSituationship: true,
-      canUseAiCoach: false,
+      // Clients hide the coach tab when this is false; the routes still work
+      // without a key (they answer with a "not configured" message).
+      canUseAiCoach: Boolean(config?.openAiApiKey),
     },
   };
 }
@@ -96,6 +118,29 @@ export async function fetchMeAggregateForProfileId(
   authUserId: string,
   config: AppConfig,
 ): Promise<MeAggregate> {
+  if (shouldUsePostgres(config)) {
+    const row = await getProfileById(config, profileId);
+    if (!row) {
+      throw new AppError('profile_not_found', 'Profile not found', 404);
+    }
+
+    const aggregate = buildMeAggregate(row, { authUserId, profileId }, config);
+    const identities = await listAuthIdentities(config, row.platform_user_id);
+
+    if (identities.length > 0) {
+      aggregate.auth.linkedProviders = identities.map((identity) => identity.provider);
+      const primary = identities.find((identity) => identity.is_primary);
+      if (primary) {
+        aggregate.auth.primaryProvider = primary.provider;
+      }
+    } else {
+      aggregate.auth.primaryProvider = 'development';
+      aggregate.auth.linkedProviders = ['development'];
+    }
+
+    return aggregate;
+  }
+
   const supabase = getServiceClient(config);
   const { data: row, error } = await supabase
     .from('profiles')
@@ -107,7 +152,7 @@ export async function fetchMeAggregateForProfileId(
     throw new AppError('profile_not_found', 'Profile not found', 404);
   }
 
-  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId });
+  const aggregate = buildMeAggregate(row as ProfileRow, { authUserId, profileId }, config);
   const { data: identities } = await supabase
     .from('auth_identities')
     .select('provider, is_primary')
@@ -155,18 +200,54 @@ export async function handlePatchMe(
   const body = await readJsonBody(request);
 
   const updateFields: Record<string, unknown> = {};
+  const postgresUpdate: {
+    username?: string;
+    name?: string;
+    bio?: string | null;
+    avatarUrl?: string | null;
+    privacy?: 'public' | 'private' | 'mutuals_only';
+    age?: number;
+  } = {};
+
+  if (body.age !== undefined) {
+    if (typeof body.age !== 'number' || !Number.isInteger(body.age)) {
+      throw new AppError('validation_error', 'age must be an integer', 400);
+    }
+    if (body.age < MIN_AGE) {
+      throw new AppError('age_requirement_not_met', `You must be at least ${MIN_AGE} to use HINTO`, 403);
+    }
+    if (body.age > MAX_AGE) {
+      throw new AppError('validation_error', 'age is out of range', 400);
+    }
+    updateFields.age = body.age;
+    updateFields.age_verified = true;
+    postgresUpdate.age = body.age;
+  }
 
   if (body.username !== undefined) {
     if (typeof body.username !== 'string' || (body.username as string).trim().length === 0) {
       throw new AppError('validation_error', 'username must be a non-empty string', 400);
     }
     updateFields.username = (body.username as string).trim().toLowerCase();
+    postgresUpdate.username = updateFields.username as string;
   }
   if (body.displayName !== undefined) {
+    if (typeof body.displayName !== 'string') {
+      throw new AppError('validation_error', 'displayName must be a string', 400);
+    }
     updateFields.name = body.displayName;
+    postgresUpdate.name = body.displayName;
+  }
+  if (body.bio !== undefined) {
+    if (body.bio !== null && typeof body.bio !== 'string') {
+      throw new AppError('validation_error', 'bio must be a string or null', 400);
+    }
+    updateFields.bio = body.bio;
+    postgresUpdate.bio = body.bio as string | null;
   }
   if (body.avatarUrl !== undefined) {
     updateFields.avatar_url = body.avatarUrl;
+    postgresUpdate.avatarUrl = body.avatarUrl as string | null;
   }
   if (body.privacy !== undefined) {
     const validPrivacy = ['public', 'private', 'mutuals_only'];
@@ -183,6 +264,7 @@ export async function handlePatchMe(
       updateFields.is_public = false;
       updateFields.mutuals_only = false;
     }
+    postgresUpdate.privacy = body.privacy as 'public' | 'private' | 'mutuals_only';
   }
 
   if (Object.keys(updateFields).length === 0) {
@@ -190,6 +272,17 @@ export async function handlePatchMe(
   }
 
   updateFields.updated_at = new Date().toISOString();
+
+  if (shouldUsePostgres(config)) {
+    await updateProfile(config, authCtx.user.profileId, postgresUpdate);
+    const aggregate = await fetchMeAggregateForProfileId(
+      authCtx.user.profileId,
+      authCtx.user.authUserId,
+      config,
+    );
+    sendJsonSuccess(response, 200, context.requestId, aggregate);
+    return;
+  }
 
   const supabase = getServiceClient(config);
 
@@ -210,4 +303,54 @@ export async function handlePatchMe(
     config,
   );
   sendJsonSuccess(response, 200, context.requestId, aggregate);
+}
+
+/**
+ * DELETE /v1/me - Permanently deletes the current account and all its data.
+ * Required by App Store Review Guideline 5.1.1(v) and by Meta's data-deletion
+ * policy. The client should discard its tokens after a 200.
+ */
+export async function handleDeleteMe(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+
+  if (shouldUsePostgres(config)) {
+    // Development sessions carry the profile id in both slots; treat a
+    // platform id that equals the profile id as "no platform user".
+    const platformUserId =
+      authCtx.user.authUserId && authCtx.user.authUserId !== authCtx.user.profileId
+        ? authCtx.user.authUserId
+        : null;
+    const result = await deletePostgresAccount(config, {
+      profileId: authCtx.user.profileId,
+      platformUserId,
+    });
+    if (!result.deletedProfile) {
+      throw new AppError('profile_not_found', 'Profile not found', 404);
+    }
+    sendJsonSuccess(response, 200, context.requestId, {
+      deleted: true,
+      profileId: authCtx.user.profileId,
+    });
+    return;
+  }
+
+  const supabase = getServiceClient(config);
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', authCtx.user.profileId);
+  if (profileError) {
+    throw new AppError('delete_failed', 'Failed to delete account', 500);
+  }
+  await supabase.auth.admin.deleteUser(authCtx.user.authUserId);
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    deleted: true,
+    profileId: authCtx.user.profileId,
+  });
 }

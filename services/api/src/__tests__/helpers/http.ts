@@ -60,17 +60,14 @@ export function createMockResponse(): ServerResponse & {
   res._chunks = [];
 
   // Intercept write/end to capture output
-  const originalWrite = res.write.bind(res);
-  const originalEnd = res.end.bind(res);
-
-  res.write = function (chunk: unknown, ...args: unknown[]): boolean {
+  res.write = function (chunk: unknown, ..._args: unknown[]): boolean {
     if (chunk) {
       res._chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
     }
     return true;
   } as typeof res.write;
 
-  res.end = function (chunk?: unknown, ...args: unknown[]): ServerResponse {
+  res.end = function (chunk?: unknown, ..._args: unknown[]): ServerResponse {
     if (chunk) {
       res._chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
     }

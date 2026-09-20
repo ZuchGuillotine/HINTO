@@ -10,6 +10,7 @@ import * as path from 'node:path';
  */
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../supabase/migrations');
+const RDS_MIGRATIONS_DIR = path.resolve(__dirname, '../../../../db/migrations');
 
 describe('Supabase migration files', () => {
   let migrationFiles: string[];
@@ -100,5 +101,72 @@ describe('Supabase migration files', () => {
     expect(content).toContain('idx_auth_identities_user_provider');
     // Global uniqueness: one provider account per HINTO user
     expect(content).toContain('idx_auth_identities_provider_uid');
+  });
+});
+
+describe('RDS production migration files', () => {
+  let migrationFiles: string[];
+
+  beforeAll(() => {
+    if (!fs.existsSync(RDS_MIGRATIONS_DIR)) {
+      migrationFiles = [];
+      return;
+    }
+    migrationFiles = fs
+      .readdirSync(RDS_MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
+  });
+
+  test('migrations directory exists', () => {
+    expect(fs.existsSync(RDS_MIGRATIONS_DIR)).toBe(true);
+  });
+
+  test('migration files follow numeric prefix convention', () => {
+    for (const file of migrationFiles) {
+      expect(file).toMatch(/^\d{3}_[a-z0-9_]+\.sql$/);
+    }
+  });
+
+  test('001_platform_identity.sql creates shared platform identity tables', () => {
+    const migration = migrationFiles.find((f) => f === '001_platform_identity.sql');
+    expect(migration).toBeDefined();
+
+    const content = fs.readFileSync(path.join(RDS_MIGRATIONS_DIR, migration!), 'utf-8');
+    const requiredTables = [
+      'platform_users',
+      'app_users',
+      'auth_identities',
+      'auth_sessions',
+      'auth_login_events',
+      'oauth_states',
+      'email_magic_links',
+      'user_consents',
+      'data_sharing_grants',
+    ];
+
+    for (const table of requiredTables) {
+      expect(content).toContain(table);
+    }
+  });
+
+  test('007_friends_invites_discovery.sql creates friend discovery and share invite tables', () => {
+    const migration = migrationFiles.find((f) => f === '007_friends_invites_discovery.sql');
+    expect(migration).toBeDefined();
+
+    const content = fs.readFileSync(path.join(RDS_MIGRATIONS_DIR, migration!), 'utf-8');
+    const requiredTables = [
+      'profile_discovery_settings',
+      'profile_contact_points',
+      'contact_import_batches',
+      'friend_suggestions',
+      'share_invites',
+    ];
+
+    for (const table of requiredTables) {
+      expect(content).toContain(table);
+    }
+    expect(content).toContain('idx_friendships_unique_pair_active');
+    expect(content).toContain('generate_share_invite_token');
   });
 });

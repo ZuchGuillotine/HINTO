@@ -61,8 +61,11 @@ The repo now contains restart-era work that moves toward that target:
 - `/services/api` with auth, profile, and situationship routes
 - `/packages/contracts` and `/packages/domain` for the first shared slice
 - `/apps/ios` with a native SwiftUI app shell and feature views
+- `/legacy/hnnt-app` as quarantined Expo/Amplify salvage material
 
-What remains true is that the active legacy runtime under `apps/hnnt-app/src/` is still Amplify-shaped and has not yet been retired.
+The old Amplify backend artifacts and custom Snap lambda have been removed from
+the active tree. The remaining Expo/Amplify client code is kept only under
+`/legacy` for reference.
 
 ### 2.3 Reuse is possible, but selective
 
@@ -78,8 +81,8 @@ The codebase should not be "resumed" as-is. It should be treated as a salvage op
 From `HINTO`:
 
 - PRD and sprint docs as product-history input only
-- domain vocabulary in [schema.graphql](/Users/benjamincox/Downloads/HINTO/amplify/backend/api/hinto/schema.graphql)
-- some screen/component concepts in `apps/hnnt-app/src/`
+- domain vocabulary already captured in `docs/Schema_Entity_Mapping.md` and `docs/Canonical_Domain_Model.md`
+- some screen/component concepts in `legacy/hnnt-app/src/`
 - existing iOS project shell in `ios/` for reference only
 
 From `rork-hnnt--hinto--relationship-ranking-app`:
@@ -99,7 +102,7 @@ From `rork-hnnt--hinto--relationship-ranking-app`:
 
 ### 3.3 Low-value or discard candidates
 
-- Amplify-generated infrastructure under `amplify/`
+- historical Amplify-generated infrastructure, now removed from the active tree
 - Cognito redirect scripts and AWS environment metadata
 - Expo-specific build flow, EAS assumptions, and Expo Router structure
 - RORK-specific package naming and project artifacts
@@ -167,25 +170,31 @@ Current state in the repo:
 - `/services/api` exists
 - `/packages/contracts` exists
 - `/packages/domain` exists
-- `/packages/prompts` and `/legacy` do not yet exist
+- `/packages/prompts` now exists; `/legacy` does not yet exist
 
 ### 4.3 Backend decision
 
 Recommended MVP backend:
 
 - PostgreSQL as the source of truth
-- Supabase for DB/Auth/Storage in MVP
+- AWS RDS PostgreSQL for production data
+- HINTO-owned platform auth for production sessions and provider linkage
+- S3 + CloudFront for media/share assets
+- ECS Express Mode on Fargate for the API container
+- SES for transactional email
 - small TypeScript API service for AI calls, moderation, admin tasks, and webhooks
-- deploy API/web on Hetzner if desired
+- S3 + CloudFront for the static web app
 
 Why this is the best default:
 
-- it is the fastest path from the current repos to a working MVP
-- the Supabase repo already contains reusable schema and voting logic
+- it avoids the App Runner maintenance path while keeping low-ops container deployment
+- it uses the existing AWS billing organization while separating HINTO production into its own workload account
+- the Supabase repo still contains reusable schema and voting logic as history/input
 - it avoids reviving Amplify/Cognito/AppSync complexity
 - it keeps future self-hosting possible because the core data model remains Postgres
+- it creates early platform identity and consent primitives for future wellness apps without forcing shared product schemas
 
-If vendor minimization becomes more important than speed, a later phase can replace Supabase Auth/Storage with self-hosted equivalents on Hetzner. That should not be the first move.
+Supabase remains transition infrastructure and schema history. New production-facing backend work should not deepen Supabase Auth, Supabase Storage, or direct client-to-Supabase coupling.
 
 ### 4.4 API style decision
 
@@ -227,12 +236,12 @@ Reason:
 
 Start with:
 
-- Supabase Auth as the canonical user/session system
+- HINTO-owned platform auth as the canonical user/session system
 - Sign in with Apple
 - Meta/Facebook login to cover the Instagram-discovery use case
 - email magic link or other passwordless fallback
 
-Then layer in:
+Also support:
 
 - Snapchat login
 - TikTok login
@@ -242,8 +251,7 @@ Clarification:
 - We do not need Instagram data access as part of MVP.
 - We need a low-friction path for users who discover HINTO via Instagram.
 - Meta/Facebook-backed login is acceptable for that requirement.
-- Supabase can manage auth directly where it has provider support.
-- For providers without built-in support, HINTO should own the provider integration and map the result into the canonical app identity model.
+- HINTO should own provider integration and map the result into the canonical platform identity plus HINTO app-user model.
 
 ## 6. Repo Unification Plan
 
@@ -304,20 +312,21 @@ What is now settled:
 
 What remains immediately in front of implementation:
 
-- confirm remote Supabase connectivity and current environment contract
-- add backend tests, DB verification, and repeatable migration/dev workflows
-- implement provider auth flows on top of the new auth identity model
+- continue AWS staging deployment and RDS migration workflow
+- replace transition Supabase persistence/session code with RDS repositories and HINTO platform auth
+- implement provider auth flows on top of the platform identity model
 - wire `/apps/web` and `/apps/ios` voting/results shells to the new backend routes
 - align the existing SwiftUI app shell with the live backend contracts and replace remaining placeholder auth/voting/AI behavior incrementally
 
 ## 8. Current Risks
 
 - The active app bootstrap still depends on legacy Amplify/Cognito paths, so the current client runtime is not yet backend-neutral.
-- The repo-local environment and Supabase metadata are not yet confirmed as a complete end-to-end setup for remote DB verification, so connectivity work is still blocked pending a verified URL/key set or linked project workflow.
-- There is no repo-local Supabase project config yet, so migration and connectivity workflows still need to be normalized.
-- Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against a live Supabase environment.
+- Transition-era API routes still use Supabase client access in places; production needs RDS/Postgres repositories and HINTO platform session validation.
+- RDS exists in staging, but migrations still need to be applied from inside the VPC.
+- The GitHub-to-ECR workflow exists, but the first image push and ECS service creation are still pending.
+- Backend route tests and DB verification are still only partial, so the backend slice now includes voting routes but is not yet verified end-to-end against RDS.
 - The native iOS app currently mixes real API-facing structure with placeholder behavior: auth stores a temporary token locally, vote submission is mocked, and AI chat uses canned responses.
-- The repo shape is still only partially converged because `/packages/prompts` and `/legacy` have not been created yet.
+- The repo shape is still only partially converged because `/legacy` has not been created yet.
 
 ## 9. Recommended Data Model Baseline
 
@@ -342,16 +351,17 @@ Optional later entities:
 
 ## 10. Immediate Next Steps
 
-### Next step A: verify the backend slice against a real Supabase environment
+### Next step A: finish AWS staging deployment
 
-- confirm working `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
-- verify migration `010_auth_identities.sql`
-- add route tests and DB connectivity checks for `/v1/me` and situationships
+- run the GitHub Actions staging workflow to push the first API image to ECR
+- create the ECS service/ALB target group/listener
+- apply `db/migrations` to RDS from inside the VPC
 
 ### Next step B: continue backend completion from the current baseline
 
+- replace Supabase session/data access with HINTO platform auth and RDS repositories
 - implement provider auth flows
-- verify the new voting session, vote submission, and results routes against a live Supabase project
+- verify the new voting session, vote submission, and results routes against RDS
 - keep AI routes behind the prompt/moderation package boundary
 
 ### Next step C: turn the existing clients into real consumers of the shared backend

@@ -20,6 +20,7 @@ struct SituationshipDetailView: View {
     @State private var description = ""
     @State private var isSaving = false
     @State private var showDeleteConfirmation = false
+    @State private var errorMessage: String?
     @State private var selectedPhoto: PhotosPickerItem?
 
     @FocusState private var nameFieldFocused: Bool
@@ -74,6 +75,14 @@ struct SituationshipDetailView: View {
             } message: {
                 Text("This can't be undone. Are you sure?")
             }
+            .alert("Situationship", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "")
+            }
         }
     }
 
@@ -83,7 +92,7 @@ struct SituationshipDetailView: View {
         VStack(spacing: Spacing.sm) {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 AvatarView(
-                    url: nil,
+                    url: existingSituationship?.avatarUrl,
                     emoji: emoji,
                     size: 120,
                     showEditOverlay: true
@@ -192,7 +201,11 @@ struct SituationshipDetailView: View {
                 let response = try await api.updateSituationship(
                     token: token, id: existing.id, input: request
                 )
-                onSave?(response.data.situationship)
+                let saved = try await uploadSelectedPhotoIfNeeded(
+                    token: token,
+                    situationship: response.data.situationship
+                )
+                onSave?(saved)
             } else {
                 let request = CreateSituationshipRequest(
                     name: name.trimmingCharacters(in: .whitespaces),
@@ -203,11 +216,16 @@ struct SituationshipDetailView: View {
                 let response = try await api.createSituationship(
                     token: token, input: request
                 )
-                onSave?(response.data.situationship)
+                let saved = try await uploadSelectedPhotoIfNeeded(
+                    token: token,
+                    situationship: response.data.situationship
+                )
+                onSave?(saved)
             }
             dismiss()
         } catch {
-            // In dev mode, create a mock
+            #if DEBUG
+            // Preview Mode (dev-token) has no backend; fabricate the item locally.
             if auth.accessToken == "dev-token" {
                 let mock = Situationship(
                     situationshipId: UUID().uuidString,
@@ -223,7 +241,10 @@ struct SituationshipDetailView: View {
                 )
                 onSave?(mock)
                 dismiss()
+                return
             }
+            #endif
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -232,6 +253,23 @@ struct SituationshipDetailView: View {
               let token = auth.accessToken else { return }
         _ = try? await api.deleteSituationship(token: token, id: existing.id)
         dismiss()
+    }
+
+    private func uploadSelectedPhotoIfNeeded(
+        token: String,
+        situationship: Situationship
+    ) async throws -> Situationship {
+        guard let imageData = try await loadJPEGUploadData(from: selectedPhoto) else {
+            return situationship
+        }
+
+        let response = try await api.uploadSituationshipImage(
+            token: token,
+            id: situationship.id,
+            imageData: imageData
+        )
+        selectedPhoto = nil
+        return response.data.situationship
     }
 }
 

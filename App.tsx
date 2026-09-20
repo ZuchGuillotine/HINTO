@@ -21,14 +21,14 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { Amplify } from '@aws-amplify/core';
 
 // Import navigators
-import AuthNavigator from './apps/hnnt-app/src/navigation/AuthNavigator';
-import AppNavigator from './apps/hnnt-app/src/navigation/AppNavigator';
+import AuthNavigator from './legacy/hnnt-app/src/navigation/AuthNavigator';
+import AppNavigator from './legacy/hnnt-app/src/navigation/AppNavigator';
 
 // Import auth context
-import { AuthProvider, useAuth } from './apps/hnnt-app/src/hooks/useAuth';
+import { AuthProvider, useAuth } from './legacy/hnnt-app/src/hooks/useAuth';
 
 // Configure Amplify at app startup with v6 format
-import amplifyconfig from './apps/hnnt-app/amplifyconfiguration.json';
+import amplifyconfig from './legacy/hnnt-app/amplifyconfiguration.json';
 
 // Convert legacy format to Amplify v6 format
 const amplifyV6Config = {
@@ -46,14 +46,6 @@ const amplifyV6Config = {
   // Force Amplify to work even with network detection issues
   ssr: false
 };
-
-console.log('🚀 Configuring Amplify v6 at app startup:', {
-  userPoolId: amplifyV6Config.Auth.Cognito.userPoolId,
-  clientId: amplifyV6Config.Auth.Cognito.userPoolClientId,
-  region: amplifyconfig.aws_project_region,
-  usernameAttributes: amplifyconfig.aws_cognito_username_attributes,
-  loginWith: amplifyV6Config.Auth.Cognito.loginWith
-});
 
 Amplify.configure(amplifyV6Config); 
 

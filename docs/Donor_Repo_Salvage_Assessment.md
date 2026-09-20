@@ -16,9 +16,9 @@ This is a restart aid, not a mandate to merge the donor repo wholesale.
 
 ## High-Value Salvage
 
-### 1. Supabase schema and migrations
+### 1. Supabase/Postgres schema and migrations
 
-Keep as the main backend baseline for analysis and likely import:
+Keep as schema history and normalization input:
 
 - `supabase/migrations/001_initial_schema.sql`
 - `supabase/migrations/002_ai_functions.sql`
@@ -33,7 +33,7 @@ Keep as the main backend baseline for analysis and likely import:
 Why:
 
 - It already models the main restart entities more closely than the Amplify schema.
-- It is Postgres/Supabase-centered, which matches the restart direction.
+- It is Postgres-centered, which still matches the RDS production direction.
 - It contains useful database functions for invite codes, vote stats, usage tracking, and maintenance.
 
 Use with caution:
@@ -152,7 +152,7 @@ Why:
 
 ## Recommended Salvage Order
 
-1. Import or reference the donor Supabase migrations as the schema baseline.
+1. Import or reference the donor Supabase migrations as schema history and RDS normalization input.
 2. Extract entity mapping from donor schema to restart backlog.
 3. Port AI prompt logic into a shared prompts package.
 4. Port domain logic from `lib/api/situationships.ts` and `lib/api/voting.ts` into backend service modules.

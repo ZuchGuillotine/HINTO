@@ -3,9 +3,14 @@ import Observation
 
 @Observable
 final class APIClient {
+    /// Session owner used to refresh an expired access token. Wired by
+    /// `HINTOApp`; when nil a 401 is surfaced as `APIError.unauthorized`.
+    @ObservationIgnored weak var authManager: AuthManager?
+
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let refreshCoordinator = SessionRefreshCoordinator()
 
     var baseURL: URL {
         URL(string: Configuration.apiBaseURL)!
@@ -13,21 +18,44 @@ final class APIClient {
 
     init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 10
+        config.waitsForConnectivity = false
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+
+        #if DEBUG
+        print("[HINTO API] baseURL=\(Configuration.apiBaseURL)")
+        #endif
     }
 
     // MARK: - Generic Request
 
+    /// Sends a request. For authenticated requests (`token != nil`) a 401
+    /// triggers a single refresh through `POST /v1/auth/refresh` followed by
+    /// one retry with the new access token.
     func request<T: Decodable>(
         _ method: HTTPMethod,
         path: String,
         body: (any Encodable)? = nil,
         token: String? = nil
+    ) async throws -> T {
+        try await performRequest(
+            method,
+            path: path,
+            body: body,
+            token: token,
+            allowRefresh: token != nil
+        )
+    }
+
+    private func performRequest<T: Decodable>(
+        _ method: HTTPMethod,
+        path: String,
+        body: (any Encodable)?,
+        token: String?,
+        allowRefresh: Bool
     ) async throws -> T {
         let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
         let url = baseURL.appendingPathComponent(normalizedPath)
@@ -44,14 +72,44 @@ final class APIClient {
             request.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
-        let (data, response) = try await session.data(for: request)
+        #if DEBUG
+        print("[HINTO API] request \(method.rawValue) \(url.absoluteString)")
+        #endif
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            #if DEBUG
+            print("[HINTO API] transport_error \(method.rawValue) \(url.absoluteString): \(error.localizedDescription)")
+            #endif
+            throw APIError.network(message: "Cannot reach HINTO API at \(baseURL.absoluteString)")
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
 
+        #if DEBUG
+        print("[HINTO API] response \(method.rawValue) \(url.absoluteString) status=\(httpResponse.statusCode)")
+        #endif
+
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 {
+                if allowRefresh, let token, let authManager {
+                    let refreshedToken = try await refreshAccessToken(
+                        staleToken: token,
+                        authManager: authManager
+                    )
+                    return try await performRequest(
+                        method,
+                        path: path,
+                        body: body,
+                        token: refreshedToken,
+                        allowRefresh: false
+                    )
+                }
                 throw APIError.unauthorized
             }
             if let errorEnvelope = try? decoder.decode(APIErrorEnvelope.self, from: data) {
@@ -67,6 +125,50 @@ final class APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    // MARK: - Session Refresh
+
+    /// Refreshes the session once per stale token, coalescing concurrent 401s.
+    /// A rejected refresh clears the session through `AuthManager`; a network
+    /// failure is rethrown without touching the session.
+    private func refreshAccessToken(
+        staleToken: String,
+        authManager: AuthManager
+    ) async throws -> String {
+        do {
+            return try await refreshCoordinator.refresh(staleToken: staleToken) {
+                guard let refreshToken = authManager.refreshToken else {
+                    throw APIError.unauthorized
+                }
+                let response: APIResponse<AuthSessionData> = try await self.performRequest(
+                    .post,
+                    path: "/v1/auth/refresh",
+                    body: RefreshTokenRequest(refreshToken: refreshToken),
+                    token: nil,
+                    allowRefresh: false
+                )
+                await MainActor.run {
+                    authManager.setSession(
+                        token: response.data.accessToken,
+                        refreshToken: response.data.refreshToken,
+                        user: response.data.me
+                    )
+                }
+                return response.data.accessToken
+            }
+        } catch let error as APIError {
+            if case .network = error {
+                throw error
+            }
+            #if DEBUG
+            print("[HINTO API] refresh_rejected: \(error.localizedDescription)")
+            #endif
+            await MainActor.run {
+                authManager.handleSessionExpired()
+            }
+            throw APIError.unauthorized
+        }
+    }
+
     // MARK: - Profile
 
     func getMe(token: String) async throws -> APIResponse<MeAggregate> {
@@ -77,28 +179,208 @@ final class APIClient {
         try await request(.patch, path: "/v1/me", body: update, token: token)
     }
 
+    func deleteMe(token: String) async throws -> APIResponse<DeleteMeData> {
+        try await request(.delete, path: "/v1/me", token: token)
+    }
+
+    func uploadProfileAvatar(
+        token: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<ProfileAvatarUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/avatar",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
+    }
+
     func createDevelopmentSession(input: DevelopmentSessionRequest) async throws -> APIResponse<DevelopmentSessionData> {
         try await request(.post, path: "/v1/dev/session", body: input)
     }
 
     // MARK: - Auth
 
-    func sendEmailOtp(email: String) async throws -> APIResponse<EmailOtpResponse> {
-        try await request(.post, path: "/v1/auth/email/otp", body: EmailOtpRequest(email: email))
+    func sendEmailOtp(
+        email: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws -> APIResponse<EmailOtpResponse> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/otp",
+            body: EmailOtpRequest(
+                email: email,
+                intent: intent.apiValue,
+                username: username,
+                displayName: displayName
+            )
+        )
     }
 
-    func verifyEmailOtp(email: String, code: String) async throws -> APIResponse<AuthSessionData> {
-        try await request(.post, path: "/v1/auth/email/verify", body: EmailVerifyRequest(email: email, token: code))
+    func verifyEmailOtp(
+        email: String,
+        code: String,
+        intent: AuthIntent,
+        username: String? = nil,
+        displayName: String? = nil
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/verify",
+            body: EmailVerifyRequest(
+                email: email,
+                token: code,
+                intent: intent.apiValue,
+                username: username,
+                displayName: displayName
+            )
+        )
+    }
+
+    func signUpWithEmailPassword(
+        email: String,
+        password: String,
+        username: String,
+        displayName: String
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/password/sign-up",
+            body: EmailPasswordSignUpRequest(
+                email: email,
+                password: password,
+                username: username,
+                displayName: displayName
+            )
+        )
+    }
+
+    func signInWithEmailPassword(
+        email: String,
+        password: String
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/email/password/sign-in",
+            body: EmailPasswordSignInRequest(email: email, password: password)
+        )
+    }
+
+    func signInWithNativeApple(
+        identityToken: String,
+        email: String?,
+        displayName: String?
+    ) async throws -> APIResponse<AuthSessionData> {
+        try await request(
+            .post,
+            path: "/v1/auth/apple/native",
+            body: NativeAppleSignInRequest(
+                identityToken: identityToken,
+                email: email,
+                displayName: displayName
+            )
+        )
     }
 
     func refreshSession(refreshToken: String) async throws -> APIResponse<AuthSessionData> {
         try await request(.post, path: "/v1/auth/refresh", body: RefreshTokenRequest(refreshToken: refreshToken))
     }
 
+    func startProviderAuth(
+        provider: AuthProvider,
+        clientRedirectUri: String
+    ) async throws -> APIResponse<ProviderAuthStartData> {
+        try await request(
+            .post,
+            path: "/v1/auth/providers/\(provider.rawValue)/start",
+            body: ProviderAuthStartRequest(
+                clientRedirectUri: clientRedirectUri,
+                platform: "mobile"
+            )
+        )
+    }
+
     // MARK: - Situationships
 
     func getSituationships(token: String) async throws -> APIResponse<SituationshipListAggregate> {
         try await request(.get, path: "/v1/me/situationships", token: token)
+    }
+
+    func getFriendsFeed(token: String) async throws -> APIResponse<FriendsFeedAggregate> {
+        try await request(.get, path: "/v1/me/feed", token: token)
+    }
+
+    func getFriends(token: String) async throws -> APIResponse<FriendsAggregate> {
+        try await request(.get, path: "/v1/me/friends", token: token)
+    }
+
+    func createFriendRequest(token: String, input: CreateFriendRequestRequest) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests", body: input, token: token)
+    }
+
+    func acceptFriendRequest(token: String, friendshipId: String) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests/\(friendshipId)/accept", token: token)
+    }
+
+    func declineFriendRequest(token: String, friendshipId: String) async throws -> APIResponse<FriendRequestMutationData> {
+        try await request(.post, path: "/v1/me/friend-requests/\(friendshipId)/decline", token: token)
+    }
+
+    func removeFriend(token: String, profileId: String) async throws -> APIResponse<DeleteFriendData> {
+        try await request(.delete, path: "/v1/me/friends/\(profileId)", token: token)
+    }
+
+    func getFriendSuggestions(token: String) async throws -> APIResponse<FriendSuggestionsData> {
+        try await request(.get, path: "/v1/me/friend-suggestions", token: token)
+    }
+
+    func dismissFriendSuggestion(token: String, suggestionId: String) async throws -> APIResponse<DismissFriendSuggestionData> {
+        try await request(.post, path: "/v1/me/friend-suggestions/\(suggestionId)/dismiss", token: token)
+    }
+
+    func createFeedSubmission(token: String, input: CreateFeedSubmissionRequest) async throws -> APIResponse<FeedSubmissionMutationData> {
+        try await request(.post, path: "/v1/me/feed/submissions", body: input, token: token)
+    }
+
+    func uploadFeedSubmissionImage(
+        token: String,
+        submissionId: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<FeedSubmissionImageUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/image",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
+    }
+
+    func voteOnFeedSubmission(token: String, submissionId: String, input: VoteOnFeedSubmissionRequest) async throws -> APIResponse<FeedSubmissionVoteData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/votes",
+            body: input,
+            token: token
+        )
+    }
+
+    func commentOnFeedSubmission(token: String, submissionId: String, input: CreateFeedSubmissionCommentRequest) async throws -> APIResponse<FeedSubmissionCommentData> {
+        try await request(
+            .post,
+            path: "/v1/me/feed/submissions/\(submissionId)/comments",
+            body: input,
+            token: token
+        )
     }
 
     func createSituationship(token: String, input: CreateSituationshipRequest) async throws -> APIResponse<SituationshipMutationData> {
@@ -109,6 +391,23 @@ final class APIClient {
         try await request(.patch, path: "/v1/me/situationships/\(id)", body: input, token: token)
     }
 
+    func uploadSituationshipImage(
+        token: String,
+        id: String,
+        imageData: Data,
+        contentType: String = "image/jpeg"
+    ) async throws -> APIResponse<SituationshipImageUploadData> {
+        try await request(
+            .post,
+            path: "/v1/me/situationships/\(id)/image",
+            body: ImageUploadRequest(
+                contentType: contentType,
+                dataBase64: imageData.base64EncodedString()
+            ),
+            token: token
+        )
+    }
+
     func deleteSituationship(token: String, id: String) async throws -> APIResponse<DeletedData> {
         try await request(.delete, path: "/v1/me/situationships/\(id)", token: token)
     }
@@ -117,10 +416,52 @@ final class APIClient {
         try await request(.put, path: "/v1/me/situationships/order", body: order, token: token)
     }
 
+    // MARK: - AI Coach Conversations
+
+    func listConversations(token: String) async throws -> APIResponse<ConversationListData> {
+        try await request(.get, path: "/v1/me/conversations", token: token)
+    }
+
+    func createConversation(
+        token: String,
+        input: CreateConversationRequest = CreateConversationRequest()
+    ) async throws -> APIResponse<ConversationMutationData> {
+        try await request(.post, path: "/v1/me/conversations", body: input, token: token)
+    }
+
+    func getConversation(token: String, conversationId: String) async throws -> APIResponse<ConversationDetailData> {
+        try await request(.get, path: "/v1/me/conversations/\(conversationId)", token: token)
+    }
+
+    func deleteConversation(token: String, conversationId: String) async throws -> APIResponse<DeleteConversationData> {
+        try await request(.delete, path: "/v1/me/conversations/\(conversationId)", token: token)
+    }
+
+    func sendConversationMessage(
+        token: String,
+        conversationId: String,
+        content: String
+    ) async throws -> APIResponse<SendConversationMessageData> {
+        try await request(
+            .post,
+            path: "/v1/me/conversations/\(conversationId)/messages",
+            body: SendConversationMessageRequest(content: content),
+            token: token
+        )
+    }
+
     // MARK: - Voting
 
     func createVotingSession(token: String, input: CreateVotingSessionRequest = CreateVotingSessionRequest()) async throws -> APIResponse<CreateVotingSessionData> {
         try await request(.post, path: "/v1/me/voting-sessions", body: input, token: token)
+    }
+
+    func createShareInvite(token: String, input: CreateShareInviteRequest) async throws -> APIResponse<CreateShareInviteData> {
+        try await request(.post, path: "/v1/me/share-invites", body: input, token: token)
+    }
+
+    func getVotingSessions(token: String) async throws -> APIResponse<OwnerVotingSessionsData> {
+        try await request(.get, path: "/v1/me/voting-sessions", token: token)
     }
 
     func expireVotingSession(token: String, votingSessionId: String) async throws -> APIResponse<VotingSessionMutationData> {
@@ -158,9 +499,76 @@ struct SituationshipMutationData: Decodable {
     let situationship: Situationship
 }
 
+struct FeedSubmissionMutationData: Decodable {
+    let submission: FeedSubmissionMutation
+}
+
+struct FeedSubmissionMutation: Decodable {
+    let submissionId: String
+    let situationshipId: String
+    let body: String?
+    let imageUrl: String?
+    let expiresAt: String
+    let status: FeedSubmissionStatus
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct MediaAsset: Decodable {
+    let mediaId: String
+    let url: String
+    let contentType: String
+    let byteSize: Int
+    let createdAt: String
+}
+
+struct ImageUploadRequest: Encodable {
+    let contentType: String
+    let dataBase64: String
+}
+
+struct ProfileAvatarUploadData: Decodable {
+    let media: MediaAsset
+    let me: MeAggregate
+}
+
+struct SituationshipImageUploadData: Decodable {
+    let media: MediaAsset
+    let situationship: Situationship
+}
+
+struct FeedSubmissionImageUploadData: Decodable {
+    let media: MediaAsset
+    let submission: FeedSubmissionMutation
+}
+
+struct FeedSubmissionVoteData: Decodable {
+    let vote: FeedSubmissionVote
+}
+
+struct FeedSubmissionCommentData: Decodable {
+    let comment: FeedSubmissionComment
+}
+
+struct FeedSubmissionVote: Decodable {
+    let voteId: String
+    let submissionId: String
+    let voterProfileId: String
+    let voteType: FeedVoteType
+    let voterVoteCount: Int
+    let votesCast: Int
+    let comment: String?
+    let createdAt: String
+}
+
 struct DeletedData: Decodable {
     let situationshipId: String
     let deleted: Bool
+}
+
+struct DeleteMeData: Decodable {
+    let deleted: Bool
+    let profileId: String
 }
 
 struct ReorderResponseData: Decodable {
@@ -186,16 +594,42 @@ struct DevelopmentSessionData: Decodable {
 
 struct EmailOtpRequest: Encodable {
     let email: String
+    let intent: String
+    let username: String?
+    let displayName: String?
 }
 
 struct EmailOtpResponse: Decodable {
     let sent: Bool
     let email: String
+    let deliveryDisabled: Bool?
+    let developmentCode: String?
 }
 
 struct EmailVerifyRequest: Encodable {
     let email: String
     let token: String
+    let intent: String
+    let username: String?
+    let displayName: String?
+}
+
+struct EmailPasswordSignUpRequest: Encodable {
+    let email: String
+    let password: String
+    let username: String
+    let displayName: String
+}
+
+struct EmailPasswordSignInRequest: Encodable {
+    let email: String
+    let password: String
+}
+
+struct NativeAppleSignInRequest: Encodable {
+    let identityToken: String
+    let email: String?
+    let displayName: String?
 }
 
 struct AuthSessionData: Decodable {
@@ -207,6 +641,18 @@ struct AuthSessionData: Decodable {
 
 struct RefreshTokenRequest: Encodable {
     let refreshToken: String
+}
+
+struct ProviderAuthStartRequest: Encodable {
+    let clientRedirectUri: String
+    let platform: String
+}
+
+struct ProviderAuthStartData: Decodable {
+    let provider: String
+    let authorizationUrl: String
+    let expiresAt: String
+    let platform: String
 }
 
 struct APIErrorEnvelope: Decodable {
@@ -224,6 +670,7 @@ enum APIError: LocalizedError {
     case httpError(statusCode: Int)
     case server(code: String, message: String, statusCode: Int)
     case unauthorized
+    case network(message: String)
 
     var errorDescription: String? {
         switch self {
@@ -231,7 +678,38 @@ enum APIError: LocalizedError {
         case .httpError(let code): "Request failed (\(code))"
         case .server(_, let message, _): message
         case .unauthorized: "Please sign in again"
+        case .network(let message): message
         }
+    }
+}
+
+/// Serializes token refreshes so concurrent 401s share one `/v1/auth/refresh`
+/// call. A refresh that already replaced `staleToken` is reused instead of
+/// being repeated.
+actor SessionRefreshCoordinator {
+    private var inFlight: Task<String, Error>?
+    private var lastStaleToken: String?
+    private var lastRefreshedToken: String?
+
+    func refresh(
+        staleToken: String,
+        operation: @escaping @Sendable () async throws -> String
+    ) async throws -> String {
+        if let inFlight {
+            return try await inFlight.value
+        }
+        if lastStaleToken == staleToken, let lastRefreshedToken {
+            return lastRefreshedToken
+        }
+
+        let task = Task { try await operation() }
+        inFlight = task
+        defer { inFlight = nil }
+
+        let refreshed = try await task.value
+        lastStaleToken = staleToken
+        lastRefreshedToken = refreshed
+        return refreshed
     }
 }
 
@@ -248,6 +726,8 @@ struct AnyEncodable: Encodable {
 }
 
 enum Configuration {
+    /// Resolution order: `HINTO_API_BASE_URL` process environment (Xcode scheme)
+    /// -> `HINTOAPIBaseURL` Info.plist key (build-setting driven) -> production.
     static var apiBaseURL: String {
         if let environmentValue = ProcessInfo.processInfo.environment["HINTO_API_BASE_URL"],
            !environmentValue.isEmpty {
@@ -260,9 +740,13 @@ enum Configuration {
         }
 
         #if DEBUG
+        #if targetEnvironment(simulator)
         return "http://127.0.0.1:3000"
         #else
-        return "https://api.hinto.app"
+        return "http://Benjamins-MacBook-Pro-2.local:3000"
+        #endif
+        #else
+        return "https://api.hnnt.app"
         #endif
     }
 }

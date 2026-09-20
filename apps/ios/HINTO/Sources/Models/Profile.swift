@@ -52,6 +52,8 @@ struct Profile: Codable, Identifiable, Equatable {
     var subscriptionTier: SubscriptionTier
     let createdAt: String
     var updatedAt: String
+    var age: Int? = nil
+    var ageVerified: Bool? = nil
 
     var id: String { profileId }
 }
@@ -82,4 +84,5 @@ struct UpdateProfileRequest: Codable {
     var bio: String?
     var avatarUrl: String?
     var privacy: ProfilePrivacy?
+    var age: Int?
 }

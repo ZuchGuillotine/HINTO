@@ -17,5 +17,10 @@ let package = Package(
             name: "HINTO",
             path: "HINTO/Sources"
         ),
+        .testTarget(
+            name: "HINTOTests",
+            dependencies: ["HINTO"],
+            path: "HINTO/Tests"
+        ),
     ]
 )

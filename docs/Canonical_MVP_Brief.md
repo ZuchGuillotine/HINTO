@@ -59,12 +59,13 @@ Android is not part of the initial MVP.
 
 The MVP backend should be:
 
-- Supabase Postgres for primary data storage
-- Supabase Auth as the canonical auth/session system where provider support exists
-- Supabase Storage for media and share assets
+- AWS RDS PostgreSQL for production data storage
+- HINTO-owned platform auth as the canonical auth/session system
+- S3 + CloudFront for media and share assets
 - a TypeScript API service as the application boundary for both iOS and web
 
 The old Amplify, Cognito, AppSync, and Expo-first architecture is legacy and should not be extended.
+Supabase remains useful as transition schema history, but should not be expanded as the production platform.
 
 ## MVP Scope
 
@@ -85,7 +86,7 @@ The MVP must include:
 
 The MVP auth approach is:
 
-- Supabase Auth as the canonical user/session layer
+- HINTO-owned platform auth as the canonical user/session layer
 - Sign in with Apple
 - Meta/Facebook login for the Instagram-discovery use case
 - email magic link or comparable passwordless fallback
@@ -108,6 +109,7 @@ The MVP should not depend on:
 
 - AWS Amplify
 - Cognito-specific flows
+- Supabase Auth as the production session issuer
 - AppSync/GraphQL as the primary contract layer
 - Expo as the long-term client runtime
 - direct client-to-database business logic as the default pattern

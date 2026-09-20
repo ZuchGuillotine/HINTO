@@ -34,6 +34,7 @@ struct Situationship: Codable, Identifiable, Equatable, Hashable {
     var emoji: String?
     var category: String?
     var description: String?
+    var avatarUrl: String? = nil
     var rank: Int
     var status: SituationshipStatus
     let createdAt: String
@@ -57,7 +58,7 @@ enum ViewerMode: String, Codable {
     case publicSessionViewer = "public_session_viewer"
 }
 
-struct ViewerContext: Codable {
+struct ViewerContext: Codable, Equatable, Hashable {
     let mode: ViewerMode
     let viewerProfileId: String?
 }
@@ -74,6 +75,80 @@ struct SituationshipListAggregate: Codable {
     let items: [Situationship]
     let ordering: Ordering
     let capabilities: SituationshipCapabilities
+}
+
+struct FriendsFeedAggregate: Codable {
+    let viewerProfileId: String
+    let items: [FeedItem]
+}
+
+struct FeedItem: Codable, Identifiable, Equatable, Hashable {
+    let feedItemId: String
+    let submissionId: String?
+    let ownerProfile: FeedOwnerProfile
+    let viewerContext: ViewerContext
+    let situationship: Situationship
+    let submission: FeedSubmission?
+    let voteSummary: FeedVoteSummary?
+    let viewerVote: FeedVoteType?
+    let viewerVoteCount: Int?
+    let viewerVoteSummary: FeedVoteSummary?
+    let comments: [FeedSubmissionComment]?
+
+    var id: String { feedItemId }
+}
+
+struct FeedSubmission: Codable, Equatable, Hashable {
+    let body: String?
+    let imageUrl: String?
+    let expiresAt: String
+    let status: FeedSubmissionStatus
+    let createdAt: String
+    let updatedAt: String
+}
+
+enum FeedSubmissionStatus: String, Codable {
+    case active
+    case concluded
+}
+
+struct FeedVoteSummary: Codable, Equatable, Hashable {
+    let bestFitCount: Int
+    let notTheOneCount: Int
+    let totalCount: Int
+}
+
+enum FeedVoteType: String, Codable, CaseIterable, Identifiable {
+    case bestFit = "best_fit"
+    case notTheOne = "not_the_one"
+
+    var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .bestFit: "Best fit"
+        case .notTheOne: "Not it"
+        }
+    }
+}
+
+struct FeedOwnerProfile: Codable, Equatable, Hashable {
+    let profileId: String
+    let username: String
+    let displayName: String
+    let avatarUrl: String?
+}
+
+struct FeedSubmissionComment: Codable, Identifiable, Equatable, Hashable {
+    let commentId: String
+    let parentCommentId: String?
+    let voterProfile: FeedOwnerProfile
+    let voteType: FeedVoteType?
+    let voterVoteCount: Int
+    let comment: String
+    let createdAt: String
+
+    var id: String { commentId }
 }
 
 struct OwnerProfileSummary: Codable {
@@ -103,4 +178,21 @@ struct UpdateSituationshipRequest: Codable {
 
 struct ReorderRequest: Codable {
     let orderedSituationshipIds: [String]
+}
+
+struct CreateFeedSubmissionRequest: Codable {
+    let situationshipId: String
+    let body: String?
+    let expiresInHours: Int
+}
+
+struct VoteOnFeedSubmissionRequest: Codable {
+    let voteType: FeedVoteType
+    let comment: String?
+    let count: Int
+}
+
+struct CreateFeedSubmissionCommentRequest: Codable {
+    let comment: String
+    let parentCommentId: String?
 }

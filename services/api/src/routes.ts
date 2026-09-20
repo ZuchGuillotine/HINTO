@@ -8,9 +8,23 @@ import {
   handleCustomProviderStart,
   matchCustomAuthProvider,
 } from './routes/auth-providers.js';
-import { handleEmailOtp, handleEmailVerify, handleRefreshToken } from './routes/auth.js';
+import {
+  handleEmailOtp,
+  handleEmailPasswordSignIn,
+  handleEmailPasswordSignUp,
+  handleEmailVerify,
+  handleNativeAppleSignIn,
+  handleRefreshToken,
+} from './routes/auth.js';
 import { handleCreateDevelopmentSession } from './routes/dev.js';
-import { handleGetMe, handlePatchMe } from './routes/profile.js';
+import { handleDeleteMe, handleGetMe, handlePatchMe } from './routes/profile.js';
+import {
+  AI_MESSAGE_RATE_LIMIT,
+  AUTH_RATE_LIMIT,
+  PUBLIC_VOTE_RATE_LIMIT,
+  clientIpFromRequest,
+  enforceRateLimit,
+} from './rate-limit.js';
 import {
   handleListSituationships,
   handleCreateSituationship,
@@ -19,12 +33,49 @@ import {
   handleReorderSituationships,
 } from './routes/situationships.js';
 import {
+  handleCreateFeedSubmissionComment,
+  handleCreateFeedSubmission,
+  handleGetFriendsFeed,
+  handleUploadFeedSubmissionImage,
+  handleVoteOnFeedSubmission,
+} from './routes/feed.js';
+import {
+  handleAcceptFriendRequest,
+  handleCreateFriendRequest,
+  handleDeclineFriendRequest,
+  handleDeleteFriend,
+  handleDismissFriendSuggestion,
+  handleListFriendRequests,
+  handleListFriends,
+  handleListFriendSuggestions,
+} from './routes/friends.js';
+import {
+  handleListOwnerVotingSessions,
   handleCreateVotingSession,
   handleExpireVotingSession,
   handleGetPublicVotingSession,
   handleGetVotingResults,
   handleSubmitVote,
 } from './routes/voting.js';
+import {
+  handleCreateBlock,
+  handleCreateReport,
+  handleDeleteBlock,
+  handleListBlocks,
+} from './routes/moderation.js';
+import { handleCreateShareInvite } from './routes/share.js';
+import {
+  handleLocalMedia,
+  handleUploadProfileAvatar,
+  handleUploadSituationshipImage,
+} from './routes/media.js';
+import {
+  handleCreateConversation,
+  handleDeleteConversation,
+  handleGetConversation,
+  handleListConversations,
+  handleSendMessage,
+} from './routes/ai.js';
 
 /**
  * Extracts a path parameter from a pattern like /v1/me/situationships/:id.
@@ -32,6 +83,26 @@ import {
  */
 function matchSituationshipId(path: string): string | null {
   const match = path.match(/^\/v1\/me\/situationships\/([a-f0-9-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchSituationshipImage(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/situationships\/([a-f0-9-]+)\/image$/);
+  return match ? match[1] : null;
+}
+
+function matchFeedSubmissionImage(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/image$/);
+  return match ? match[1] : null;
+}
+
+function matchFeedSubmissionVotes(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/votes$/);
+  return match ? match[1] : null;
+}
+
+function matchFeedSubmissionComments(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/feed\/submissions\/([a-f0-9-]+)\/comments$/);
   return match ? match[1] : null;
 }
 
@@ -45,6 +116,52 @@ function matchOwnerVotingAction(path: string): { votingSessionId: string; action
     votingSessionId: match[1],
     action: match[2] as 'expire' | 'results',
   };
+}
+
+function matchBlockProfileId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/blocks\/([0-9a-f-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchFriendProfileId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/friends\/([0-9a-f-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchFriendRequestAction(
+  path: string,
+): { friendshipId: string; action: 'accept' | 'decline' } | null {
+  const match = path.match(/^\/v1\/me\/friend-requests\/([0-9a-f-]+)\/(accept|decline)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    friendshipId: match[1],
+    action: match[2] as 'accept' | 'decline',
+  };
+}
+
+function matchFriendSuggestionAction(
+  path: string,
+): { suggestionId: string; action: 'dismiss' } | null {
+  const match = path.match(/^\/v1\/me\/friend-suggestions\/([0-9a-f-]+)\/(dismiss)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    suggestionId: match[1],
+    action: 'dismiss',
+  };
+}
+
+function matchConversationId(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/conversations\/([a-f0-9-]+)$/);
+  return match ? match[1] : null;
+}
+
+function matchConversationMessages(path: string): string | null {
+  const match = path.match(/^\/v1\/me\/conversations\/([a-f0-9-]+)\/messages$/);
+  return match ? match[1] : null;
 }
 
 function matchPublicVotingPath(path: string): { inviteCode: string; action: 'session' | 'votes' } | null {
@@ -98,6 +215,11 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'GET' && path.startsWith('/media-local/')) {
+    await handleLocalMedia(request, response);
+    return true;
+  }
+
   if (method === 'GET' && path === '/v1') {
     sendJsonSuccess(response, 200, context.requestId, {
       api: 'v1',
@@ -105,22 +227,52 @@ async function routeAsync(
       routes: [
         'POST /v1/auth/email/otp',
         'POST /v1/auth/email/verify',
+        'POST /v1/auth/email/password/sign-up',
+        'POST /v1/auth/email/password/sign-in',
+        'POST /v1/auth/apple/native',
         'POST /v1/auth/refresh',
         'POST /v1/auth/providers/:provider/start',
         'GET  /v1/auth/providers/:provider/callback',
         'GET  /v1/me',
         'PATCH /v1/me',
+        'DELETE /v1/me',
+        'POST /v1/me/avatar',
         'POST /v1/dev/session',
+        'GET  /v1/me/feed',
+        'POST /v1/me/feed/submissions',
+        'POST /v1/me/feed/submissions/:id/image',
+        'POST /v1/me/feed/submissions/:id/votes',
+        'POST /v1/me/feed/submissions/:id/comments',
+        'POST /v1/me/share-invites',
+        'GET  /v1/me/friends',
+        'DELETE /v1/me/friends/:profileId',
+        'GET  /v1/me/friend-requests',
+        'POST /v1/me/friend-requests',
+        'POST /v1/me/friend-requests/:id/accept',
+        'POST /v1/me/friend-requests/:id/decline',
+        'GET  /v1/me/friend-suggestions',
+        'POST /v1/me/friend-suggestions/:id/dismiss',
         'GET  /v1/me/situationships',
         'POST /v1/me/situationships',
         'PATCH /v1/me/situationships/:id',
+        'POST /v1/me/situationships/:id/image',
         'DELETE /v1/me/situationships/:id',
         'PUT  /v1/me/situationships/order',
+        'GET  /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions',
         'POST /v1/me/voting-sessions/:id/expire',
         'GET  /v1/me/voting-sessions/:id/results',
         'GET  /v1/voting-sessions/:inviteCode',
         'POST /v1/voting-sessions/:inviteCode/votes',
+        'GET  /v1/me/blocks',
+        'POST /v1/me/blocks',
+        'DELETE /v1/me/blocks/:blockedProfileId',
+        'POST /v1/reports',
+        'GET  /v1/me/conversations',
+        'POST /v1/me/conversations',
+        'GET  /v1/me/conversations/:id',
+        'DELETE /v1/me/conversations/:id',
+        'POST /v1/me/conversations/:id/messages',
       ],
     });
     return true;
@@ -134,16 +286,37 @@ async function routeAsync(
   // ── Auth routes (no bearer token required) ──────────────────
 
   if (method === 'POST' && path === '/v1/auth/email/otp') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailOtp(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/email/verify') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailVerify(request, response, context, config);
     return true;
   }
 
+  if (method === 'POST' && path === '/v1/auth/email/password/sign-up') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
+    await handleEmailPasswordSignUp(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/email/password/sign-in') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
+    await handleEmailPasswordSignIn(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/auth/apple/native') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
+    await handleNativeAppleSignIn(request, response, context, config);
+    return true;
+  }
+
   if (method === 'POST' && path === '/v1/auth/refresh') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleRefreshToken(request, response, context, config);
     return true;
   }
@@ -185,6 +358,128 @@ async function routeAsync(
     return true;
   }
 
+  if (method === 'DELETE' && path === '/v1/me') {
+    await handleDeleteMe(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/avatar') {
+    await handleUploadProfileAvatar(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/feed') {
+    await handleGetFriendsFeed(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/share-invites') {
+    await handleCreateShareInvite(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friends') {
+    await handleListFriends(request, response, context, config);
+    return true;
+  }
+
+  const friendProfileId = matchFriendProfileId(path);
+  if (method === 'DELETE' && friendProfileId) {
+    await handleDeleteFriend(request, response, context, config, friendProfileId);
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friend-requests') {
+    await handleListFriendRequests(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/friend-requests') {
+    await handleCreateFriendRequest(request, response, context, config);
+    return true;
+  }
+
+  const friendRequestAction = matchFriendRequestAction(path);
+  if (method === 'POST' && friendRequestAction?.action === 'accept') {
+    await handleAcceptFriendRequest(
+      request,
+      response,
+      context,
+      config,
+      friendRequestAction.friendshipId,
+    );
+    return true;
+  }
+
+  if (method === 'POST' && friendRequestAction?.action === 'decline') {
+    await handleDeclineFriendRequest(
+      request,
+      response,
+      context,
+      config,
+      friendRequestAction.friendshipId,
+    );
+    return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/friend-suggestions') {
+    await handleListFriendSuggestions(request, response, context, config);
+    return true;
+  }
+
+  const friendSuggestionAction = matchFriendSuggestionAction(path);
+  if (method === 'POST' && friendSuggestionAction?.action === 'dismiss') {
+    await handleDismissFriendSuggestion(
+      request,
+      response,
+      context,
+      config,
+      friendSuggestionAction.suggestionId,
+    );
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/feed/submissions') {
+    await handleCreateFeedSubmission(request, response, context, config);
+    return true;
+  }
+
+  const feedSubmissionImageId = matchFeedSubmissionImage(path);
+  if (method === 'POST' && feedSubmissionImageId) {
+    await handleUploadFeedSubmissionImage(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionImageId,
+    );
+    return true;
+  }
+
+  const feedSubmissionVotesId = matchFeedSubmissionVotes(path);
+  if (method === 'POST' && feedSubmissionVotesId) {
+    await handleVoteOnFeedSubmission(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionVotesId,
+    );
+    return true;
+  }
+
+  const feedSubmissionCommentsId = matchFeedSubmissionComments(path);
+  if (method === 'POST' && feedSubmissionCommentsId) {
+    await handleCreateFeedSubmissionComment(
+      request,
+      response,
+      context,
+      config,
+      feedSubmissionCommentsId,
+    );
+    return true;
+  }
+
   // ── Situationship routes (authenticated) ───────────────────
 
   if (method === 'GET' && path === '/v1/me/situationships') {
@@ -202,9 +497,80 @@ async function routeAsync(
     return true;
   }
 
+  const situationshipImageId = matchSituationshipImage(path);
+  if (method === 'POST' && situationshipImageId) {
+    await handleUploadSituationshipImage(
+      request,
+      response,
+      context,
+      config,
+      situationshipImageId,
+    );
+    return true;
+  }
+
   if (method === 'POST' && path === '/v1/me/voting-sessions') {
     await handleCreateVotingSession(request, response, context, config);
     return true;
+  }
+
+  if (method === 'GET' && path === '/v1/me/voting-sessions') {
+    await handleListOwnerVotingSessions(request, response, context, config);
+    return true;
+  }
+
+  // ── Moderation routes (authenticated) ──────────────────────
+
+  if (method === 'GET' && path === '/v1/me/blocks') {
+    await handleListBlocks(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/blocks') {
+    await handleCreateBlock(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/reports') {
+    await handleCreateReport(request, response, context, config);
+    return true;
+  }
+
+  const blockedProfileId = matchBlockProfileId(path);
+  if (blockedProfileId && method === 'DELETE') {
+    await handleDeleteBlock(request, response, context, config, blockedProfileId);
+    return true;
+  }
+
+  // ── AI conversation routes (authenticated) ─────────────────
+
+  if (method === 'GET' && path === '/v1/me/conversations') {
+    await handleListConversations(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'POST' && path === '/v1/me/conversations') {
+    await handleCreateConversation(request, response, context, config);
+    return true;
+  }
+
+  const conversationMessagesId = matchConversationMessages(path);
+  if (conversationMessagesId && method === 'POST') {
+    enforceRateLimit(AI_MESSAGE_RATE_LIMIT, clientIpFromRequest(request));
+    await handleSendMessage(request, response, context, config, conversationMessagesId);
+    return true;
+  }
+
+  const conversationId = matchConversationId(path);
+  if (conversationId) {
+    if (method === 'GET') {
+      await handleGetConversation(request, response, context, config, conversationId);
+      return true;
+    }
+    if (method === 'DELETE') {
+      await handleDeleteConversation(request, response, context, config, conversationId);
+      return true;
+    }
   }
 
   // Parameterized: /v1/me/situationships/:id
@@ -259,6 +625,7 @@ async function routeAsync(
     }
 
     if (method === 'POST' && publicVotingPath.action === 'votes') {
+      enforceRateLimit(PUBLIC_VOTE_RATE_LIMIT, clientIpFromRequest(request));
       await handleSubmitVote(
         request,
         response,

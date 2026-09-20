@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Support · hnnt.app</title>
+    <meta name="description" content="Contact HNNT support, report a user, or delete your account." />
+    <meta name="theme-color" content="#0a0608" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://hnnt.app/support" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0608'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23FF4275'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #0a0608;
+        --ink-deep: #050204;
+        --surface: #140b10;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f5f5f5;
+        --muted: rgba(245, 245, 245, 0.72);
+        --pink: #ff4275;
+        --pink-soft: #ff7396;
+        --mark: #ffd166;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--text);
+        font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Inter, system-ui, sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a { color: var(--pink-soft); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { color: var(--pink); }
+      .skip {
+        position: absolute; left: -999px; top: 8px; background: var(--pink); color: #fff; padding: 8px 12px; border-radius: 8px;
+      }
+      .skip:focus { left: 16px; }
+      .masthead, .colophon {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+        max-width: 72ch; margin: 0 auto; padding: 20px 16px;
+      }
+      .masthead { border-bottom: 1px solid var(--line); }
+      .colophon { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+      .brand {
+        font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; color: #fafafa; text-decoration: none;
+      }
+      .brand .dot {
+        display: inline-block; width: 0.22em; height: 0.22em; border-radius: 50%; background: var(--pink); margin-left: 0.05em;
+        box-shadow: 0 0 12px var(--pink);
+      }
+      .legal-nav { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+      .legal-nav a { color: var(--muted); text-decoration: none; }
+      .legal-nav a:hover, .legal-nav a[aria-current="page"] { color: var(--pink-soft); }
+      main { max-width: 72ch; margin: 0 auto; padding: 24px 16px 48px; }
+      .banner {
+        border: 1px solid rgba(255, 66, 117, 0.6); border-left: 4px solid var(--pink); background: rgba(255, 66, 117, 0.1);
+        border-radius: 10px; padding: 12px 16px; margin: 0 0 28px; font-weight: 600;
+      }
+      .eyebrow { color: var(--pink); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 8px; }
+      h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 12px; }
+      h2 { font-size: 1.45rem; line-height: 1.25; margin: 40px 0 12px; padding-top: 8px; }
+      h3 { font-size: 1.12rem; line-height: 1.3; margin: 26px 0 8px; color: var(--pink-soft); }
+      p { margin: 0 0 16px; }
+      .meta { color: var(--muted); margin-bottom: 24px; }
+      ul, ol { margin: 0 0 18px; padding-left: 1.4em; }
+      li { margin: 0 0 8px; }
+      li > p { margin: 0; }
+      strong { font-weight: 700; }
+      mark.placeholder {
+        background: var(--mark); color: #241a00; padding: 0 5px; border-radius: 4px; font-weight: 700; white-space: nowrap;
+      }
+      .review-note {
+        border-left: 3px solid rgba(255, 209, 102, 0.75); background: rgba(255, 209, 102, 0.06); color: var(--muted);
+        font-style: italic; padding: 10px 14px; margin: 0 0 18px; border-radius: 0 8px 8px 0;
+      }
+      .callout {
+        border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; font-weight: 700;
+      }
+      address { font-style: normal; line-height: 1.7; margin: 0 0 18px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc { margin: 0 0 32px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+      .toc h2 { font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; padding: 0; }
+      .toc ol { margin: 0; padding-left: 1.2em; columns: 2; column-gap: 24px; }
+      .toc li { break-inside: avoid; margin: 0 0 6px; }
+      .toc a { text-decoration: none; }
+      .steps li { margin-bottom: 12px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 0 0 18px; }
+      .card h3 { margin-top: 0; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 4px; }
+      @media (max-width: 640px) {
+        body { font-size: 16px; }
+        .toc ol { columns: 1; }
+        h2 { margin-top: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/">hnnt<span class="dot" aria-hidden="true"></span></a>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html" aria-current="page">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </header>
+    <main id="content">
+      <article class="legal" data-legal-doc="support">
+        <p class="banner" role="note">Draft. This document is pending legal review and is not yet in effect.</p>
+        <p class="eyebrow">Support</p>
+        <h1>HNNT Support</h1>
+        <p class="meta">How to reach us, report a problem, and manage your account.</p>
+
+        <h2 id="contact">Contact support</h2>
+        <p>Email <a href="mailto:support@hnnt.app">support@hnnt.app</a> from the email address on your account. To help us respond quickly, include:</p>
+        <ul>
+          <li>Your HNNT username.</li>
+          <li>Whether you are using the iPhone app or the web app, and the version if you know it.</li>
+          <li>What you were trying to do, what happened instead, and a screenshot if you have one.</li>
+        </ul>
+        <p>We read every message. Account, safety, and deletion requests are handled first.</p>
+
+        <h2 id="report">Report a user or content</h2>
+        <p>If someone is harassing you, impersonating someone, posting content about a person without their consent, or otherwise breaking the <a href="/legal/terms.html#s5">Acceptable Use Policy</a>, you can report it:</p>
+        <ol class="steps">
+          <li><strong>In the app:</strong> open <strong>Settings</strong> and choose <strong>Report a user or content</strong>. On the web, feed posts and vote comments also have a <strong>Report</strong> button that fills the form in for you.</li>
+          <li>Pick what you are reporting, choose a reason, and add any detail that helps us understand what happened.</li>
+          <li>Submit. Reports are private. The person you report is not told who reported them.</li>
+        </ol>
+        <p>You can also email <a href="mailto:support@hnnt.app?subject=Report">support@hnnt.app</a> with the username of the person and a description of what happened.</p>
+        <p>To stop someone from interacting with you, block them. Blocked users are listed under <strong>Settings &rarr; Blocked users</strong>, where you can unblock them at any time.</p>
+
+        <h2 id="delete">Delete your account</h2>
+        <p>You can delete your account and data at any time. Deletion is immediate and cannot be undone.</p>
+        <ul>
+          <li><strong>In the app:</strong> <strong>Settings &rarr; Delete account</strong>, then confirm.</li>
+          <li><strong>By email:</strong> send a message from the email address on your account to <a href="mailto:support@hnnt.app?subject=Delete%20my%20account">support@hnnt.app</a> with the subject line <code>Delete my account</code> and your username.</li>
+        </ul>
+        <p>Step-by-step instructions and a description of exactly what is removed are on the <a href="/legal/data-deletion.html">data deletion page</a>.</p>
+
+        <h2 id="age">Minimum age</h2>
+        <p>HNNT is for people who are <strong>16 or older</strong>. We do not knowingly keep an account or personal information for anyone under 16. If you believe someone under 16 has an account, email <a href="mailto:support@hnnt.app?subject=Underage%20account">support@hnnt.app</a> and we will investigate and delete it.</p>
+
+        <h2 id="safety">If you are in danger</h2>
+        <p>HNNT and its coach are not an emergency service. If you are in danger, call your local emergency number. In the US you can call or text <strong>988</strong> (Suicide &amp; Crisis Lifeline) at any time.</p>
+
+        <h2 id="legal">Legal</h2>
+        <ul>
+          <li><a href="/legal/privacy.html">Privacy Policy</a></li>
+          <li><a href="/legal/terms.html">Terms of Service</a></li>
+          <li><a href="/legal/data-deletion.html">Delete your data</a></li>
+        </ul>
+      </article>
+    </main>
+    <footer class="colophon">
+      <span>hnnt.app</span>
+      <nav class="legal-nav" aria-label="Legal pages"><a href="/">Home</a><a href="/legal/privacy.html">Privacy Policy</a><a href="/legal/terms.html">Terms of Service</a><a href="/legal/support.html" aria-current="page">Support</a><a href="/legal/data-deletion.html">Delete your data</a></nav>
+    </footer>
+  </body>
+</html>
