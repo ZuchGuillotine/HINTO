@@ -74,6 +74,8 @@ export function resetRateLimits(): void {
 }
 
 export const AUTH_RATE_LIMIT: RateLimitRule = { name: 'auth', limit: 20, windowMs: 15 * 60_000 };
+/** Refresh is separate so brute-force sign-in attempts from a shared IP cannot lock out existing sessions. */
+export const REFRESH_RATE_LIMIT: RateLimitRule = { name: 'refresh', limit: 60, windowMs: 15 * 60_000 };
 export const PUBLIC_VOTE_RATE_LIMIT: RateLimitRule = {
   name: 'public_vote',
   limit: 30,

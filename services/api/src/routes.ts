@@ -22,6 +22,7 @@ import {
   AI_MESSAGE_RATE_LIMIT,
   AUTH_RATE_LIMIT,
   PUBLIC_VOTE_RATE_LIMIT,
+  REFRESH_RATE_LIMIT,
   clientIpFromRequest,
   enforceRateLimit,
 } from './rate-limit.js';
@@ -316,7 +317,7 @@ async function routeAsync(
   }
 
   if (method === 'POST' && path === '/v1/auth/refresh') {
-    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
+    enforceRateLimit(REFRESH_RATE_LIMIT, clientIpFromRequest(request));
     await handleRefreshToken(request, response, context, config);
     return true;
   }
