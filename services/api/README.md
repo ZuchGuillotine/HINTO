@@ -54,7 +54,8 @@ This intentionally avoids:
 - `GET /v1/health`
 - `GET /v1`
 - `GET /v1/me`
-- `PATCH /v1/me`
+- `PATCH /v1/me` (also accepts `age`, minimum 16)
+- `DELETE /v1/me` (permanent account deletion; App Store 5.1.1(v))
 - `POST /v1/me/avatar`
 - `POST /v1/dev/session`
 - `GET /v1/me/feed`
@@ -135,6 +136,20 @@ Supported environment variables:
 - `SNAPCHAT_REDIRECT_URI`
 - `SNAPCHAT_SCOPES`
 
+Production boot validation (`assertProductionConfig` in `config.ts`) refuses to
+start with `NODE_ENV=production` unless `DATABASE_URL`, `JWT_ACCESS_TOKEN_SECRET`,
+and `REFRESH_TOKEN_PEPPER` are set, `API_HOST=0.0.0.0`, CORS lists explicit
+origins, and neither development flag is enabled. See `/.env.example`.
+
+Email OTP on the RDS path sends a six digit code through SES (`SES_FROM_EMAIL`
+must be a verified identity) and stores it hashed in `email_magic_links`. When
+`SES_FROM_EMAIL` is unset the OTP route returns `503 email_otp_unavailable` so
+clients can fall back to password or Apple sign-in.
+
+Rate limits (per task, per client IP): 20 auth calls per 15 minutes, 30 public
+votes per 10 minutes, 10 coach messages per minute. Responses use
+`429 rate_limited` with `retryAfterSeconds`.
+
 The active AWS path uses `DATABASE_URL` for platform sessions, profile,
 situationship, media, feed submission, feed vote, and core voting persistence.
 Supabase settings remain only for transition fallback paths that have not yet
@@ -173,6 +188,17 @@ Feed submission flow:
 When `S3_MEDIA_BUCKET` is configured, uploads are written to S3 and public URLs
 prefer `CLOUDFRONT_MEDIA_DOMAIN`. Without S3 configuration, local development
 uploads are written to `.hinto-media/` and served through `GET /media-local/...`.
+
+## Database Migrations
+
+```bash
+DATABASE_URL=... npm run db:migrate          # apply pending db/migrations/*.sql
+DATABASE_URL=... npm run db:migrate:status   # show applied / pending / drift
+```
+
+The runner records each file in `schema_migrations` with a checksum and wraps
+each migration in a transaction. Run it from inside the VPC (SSM tunnel or a
+one-shot ECS task using the API image: `node db/migrate.mjs`).
 
 ## Container Use
 

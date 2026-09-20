@@ -6,6 +6,19 @@ import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { getServiceClient } from '../supabase.js';
 import { readJsonBody } from '../body.js';
+import { shouldUsePostgres } from '../db.js';
+import {
+  createConversation as pgCreateConversation,
+  deleteConversationForProfile as pgDeleteConversation,
+  getAiMessagesUsedToday as pgGetAiMessagesUsedToday,
+  getConversationForProfile as pgGetConversation,
+  incrementAiMessagesUsedToday as pgIncrementAiMessagesUsedToday,
+  insertMessage as pgInsertMessage,
+  listConversationsForProfile as pgListConversations,
+  listMessagesForConversation as pgListMessages,
+  listRecentMessagesForConversation as pgListRecentMessages,
+  touchConversation as pgTouchConversation,
+} from '../repositories/postgres-ai.js';
 import {
   HINTO_AI_MODEL,
   buildCoachMessages,
@@ -91,6 +104,14 @@ async function getConversationForUser(
   conversationId: string,
   userId: string,
 ): Promise<ConversationRow> {
+  if (shouldUsePostgres(config)) {
+    const row = await pgGetConversation(config, userId, conversationId);
+    if (!row) {
+      throw new AppError('not_found', 'Conversation not found', 404);
+    }
+    return row;
+  }
+
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
     .from('ai_conversations')
@@ -182,6 +203,15 @@ export async function handleListConversations(
   config: AppConfig,
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
+
+  if (shouldUsePostgres(config)) {
+    const rows = await pgListConversations(config, authCtx.user.profileId);
+    sendJsonSuccess(response, 200, context.requestId, {
+      conversations: rows.map((row) => toConversationDto(row)),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
 
   const { data, error } = await supabase
@@ -218,6 +248,20 @@ export async function handleCreateConversation(
 
   const title =
     typeof body.title === 'string' && body.title.trim().length > 0 ? body.title.trim() : null;
+
+  if (shouldUsePostgres(config)) {
+    const row = await pgCreateConversation(config, authCtx.user.profileId, {
+      situationshipId,
+      title,
+    });
+    if (!row) {
+      throw new AppError('create_failed', 'Failed to create conversation', 500);
+    }
+    sendJsonSuccess(response, 201, context.requestId, {
+      conversation: toConversationDto(row),
+    });
+    return;
+  }
 
   const supabase = getServiceClient(config);
   const { data, error } = await supabase
@@ -256,6 +300,15 @@ export async function handleGetConversation(
     authCtx.user.profileId,
   );
 
+  if (shouldUsePostgres(config)) {
+    const rows = await pgListMessages(config, conversation.id);
+    sendJsonSuccess(response, 200, context.requestId, {
+      conversation: toConversationDto(conversation, rows.length),
+      messages: rows.map(toMessageDto),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
   const { data: messages, error } = await supabase
     .from('ai_messages')
@@ -287,6 +340,15 @@ export async function handleDeleteConversation(
 ): Promise<void> {
   const authCtx = await resolveAuthenticatedUser(request, context, config);
   await getConversationForUser(config, conversationId, authCtx.user.profileId);
+
+  if (shouldUsePostgres(config)) {
+    await pgDeleteConversation(config, authCtx.user.profileId, conversationId);
+    sendJsonSuccess(response, 200, context.requestId, {
+      conversationId,
+      deleted: true,
+    });
+    return;
+  }
 
   const supabase = getServiceClient(config);
   const { error } = await supabase
@@ -333,6 +395,11 @@ export async function handleSendMessage(
   const userId = authCtx.user.profileId;
 
   await getConversationForUser(config, conversationId, userId);
+
+  if (shouldUsePostgres(config)) {
+    await handleSendMessagePostgres(response, context, config, conversationId, userId, content);
+    return;
+  }
 
   const supabase = getServiceClient(config);
   const today = todayDateString();
@@ -487,6 +554,103 @@ export async function handleSendMessage(
     assistantMessage: toMessageDto(assistantMessage),
     dailyUsage: {
       aiMessagesUsed: currentUsage + 1,
+      limit: DAILY_AI_MESSAGE_LIMIT,
+    },
+  });
+}
+
+/**
+ * RDS path for POST /v1/me/conversations/:id/messages. Same behaviour as the
+ * Supabase transition path: quota check, moderation, model call, persistence,
+ * usage increment.
+ */
+async function handleSendMessagePostgres(
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+  conversationId: string,
+  userId: string,
+  content: string,
+): Promise<void> {
+  const currentUsage = await pgGetAiMessagesUsedToday(config, userId);
+  if (currentUsage >= DAILY_AI_MESSAGE_LIMIT) {
+    throw new AppError(
+      'quota_exceeded',
+      `Daily AI message limit of ${DAILY_AI_MESSAGE_LIMIT} reached`,
+      429,
+    );
+  }
+
+  const moderation = moderateCoachInput(content);
+  const userMessage = await pgInsertMessage(config, {
+    conversationId,
+    content,
+    isUser: true,
+    tokensUsed: 0,
+    moderationFlagged: moderation.flagged,
+  });
+  if (!userMessage) {
+    throw new AppError('create_failed', 'Failed to store user message', 500);
+  }
+
+  if (moderation.flagged) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        message: 'ai_moderation_flagged',
+        requestId: context.requestId,
+        conversationId,
+        userId,
+        reason: moderation.reason,
+        category: moderation.category,
+      }),
+    );
+  }
+
+  let assistantContent: string;
+  let assistantTokens = 0;
+
+  if (moderation.emergencyResponse) {
+    assistantContent = moderation.emergencyResponse;
+  } else {
+    const historyRows = await pgListRecentMessages(config, conversationId, MAX_HISTORY_MESSAGES + 1);
+    const history: CoachMessage[] = historyRows
+      .filter((row) => row.id !== userMessage.id)
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map((row) => ({
+        role: row.is_user ? ('user' as const) : ('assistant' as const),
+        content: row.content,
+      }));
+
+    if (config.openAiApiKey) {
+      const result = await callOpenAi(config.openAiApiKey, content, history);
+      assistantContent = result.content;
+      assistantTokens = result.tokensUsed;
+    } else {
+      assistantContent = MOCK_ASSISTANT_REPLY;
+    }
+  }
+
+  const assistantMessage = await pgInsertMessage(config, {
+    conversationId,
+    content: assistantContent,
+    isUser: false,
+    tokensUsed: assistantTokens,
+    moderationFlagged: false,
+  });
+  if (!assistantMessage) {
+    throw new AppError('create_failed', 'Failed to store assistant message', 500);
+  }
+
+  const used = await pgIncrementAiMessagesUsedToday(config, userId);
+  await pgTouchConversation(config, userId, conversationId, content.slice(0, 60));
+
+  sendJsonSuccess(response, 201, context.requestId, {
+    userMessage: toMessageDto(userMessage),
+    assistantMessage: toMessageDto(assistantMessage),
+    dailyUsage: {
+      aiMessagesUsed: used,
       limit: DAILY_AI_MESSAGE_LIMIT,
     },
   });

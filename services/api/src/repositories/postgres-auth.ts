@@ -587,3 +587,201 @@ export async function refreshPostgresAuthSession(
     platformUserId: existing.platform_user_id,
   };
 }
+
+/**
+ * Permanently deletes an account. Removing the profile cascades every product
+ * row (situationships, votes, feed, conversations, blocks, media metadata) and
+ * removing the platform user cascades sessions, identities, and credentials.
+ * Both happen in one transaction so a half-deleted account cannot exist.
+ */
+export async function deletePostgresAccount(
+  config: AppConfig,
+  input: { profileId: string; platformUserId: string | null },
+): Promise<{ deletedProfile: boolean; deletedPlatformUser: boolean }> {
+  return withTransaction(config, async (client) => {
+    await client.query(
+      `INSERT INTO auth_login_events (platform_user_id, provider, event_type, success)
+       VALUES ($1, 'account', 'account_deleted', true)`,
+      [input.platformUserId],
+    );
+
+    const profileResult = await client.query(
+      'DELETE FROM profiles WHERE id = $1 RETURNING id',
+      [input.profileId],
+    );
+
+    let deletedPlatformUser = false;
+    if (input.platformUserId) {
+      const platformResult = await client.query(
+        'DELETE FROM platform_users WHERE id = $1 RETURNING id',
+        [input.platformUserId],
+      );
+      deletedPlatformUser = (platformResult.rowCount ?? 0) > 0;
+    }
+
+    return {
+      deletedProfile: (profileResult.rowCount ?? 0) > 0,
+      deletedPlatformUser,
+    };
+  });
+}
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS_PER_WINDOW = 5;
+
+function generateOtpCode(): string {
+  // Six digits, uniformly distributed, never leading with a shorter string.
+  const value = randomBytes(4).readUInt32BE(0) % 1_000_000;
+  return value.toString().padStart(6, '0');
+}
+
+function hashOtp(config: AppConfig, email: string, code: string): string {
+  return hashToken(config, `${normalizeEmail(email)}:${code}`);
+}
+
+export async function findAuthProfileByEmail(
+  config: AppConfig,
+  email: string,
+): Promise<AuthProfileRow | null> {
+  return queryOne<AuthProfileRow>(
+    config,
+    `SELECT p.id AS profile_id, p.platform_user_id, p.email
+       FROM profiles p
+      WHERE lower(p.email) = lower($1)
+        AND p.platform_user_id IS NOT NULL
+      LIMIT 1`,
+    [normalizeEmail(email)],
+  );
+}
+
+/**
+ * Creates a one-time code for `email`, invalidating any earlier unconsumed
+ * codes, and returns the plaintext code for delivery. Throws 429 when the
+ * address has requested too many codes in the current window.
+ */
+export async function createEmailOtpChallenge(
+  config: AppConfig,
+  email: string,
+): Promise<{ code: string; expiresAt: Date }> {
+  const normalized = normalizeEmail(email);
+  const recent = await queryOne<{ count: string }>(
+    config,
+    `SELECT COUNT(*)::text AS count
+       FROM email_magic_links
+      WHERE lower(email) = $1
+        AND created_at > now() - interval '15 minutes'`,
+    [normalized],
+  );
+  if (Number.parseInt(recent?.count ?? '0', 10) >= OTP_MAX_ATTEMPTS_PER_WINDOW) {
+    throw new AppError('rate_limited', 'Too many codes requested. Try again later.', 429);
+  }
+
+  const code = generateOtpCode();
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+
+  await withTransaction(config, async (client) => {
+    await client.query(
+      `UPDATE email_magic_links
+          SET consumed_at = now()
+        WHERE lower(email) = $1
+          AND consumed_at IS NULL`,
+      [normalized],
+    );
+    await client.query(
+      `INSERT INTO email_magic_links (email, app_key, token_hash, purpose, expires_at)
+       VALUES ($1, 'hinto', $2, 'sign_in', $3)`,
+      [normalized, hashOtp(config, normalized, code), expiresAt],
+    );
+  });
+
+  return { code, expiresAt };
+}
+
+/**
+ * Consumes a code. Returns false when the code is wrong, expired, or already used.
+ */
+export async function consumeEmailOtpChallenge(
+  config: AppConfig,
+  email: string,
+  code: string,
+): Promise<boolean> {
+  const normalized = normalizeEmail(email);
+  const row = await queryOne<{ id: string }>(
+    config,
+    `UPDATE email_magic_links
+        SET consumed_at = now()
+      WHERE lower(email) = $1
+        AND token_hash = $2
+        AND consumed_at IS NULL
+        AND expires_at > now()
+      RETURNING id`,
+    [normalized, hashOtp(config, normalized, code.trim())],
+  );
+  return Boolean(row);
+}
+
+/**
+ * Creates an account that signs in by email code only (no password). The
+ * user can add a password later through the password sign-up route.
+ */
+export async function createEmailOtpAccount(
+  config: AppConfig,
+  input: { email: string; username: string; displayName: string },
+): Promise<AuthProfileRow> {
+  const email = normalizeEmail(input.email);
+  const username = normalizeUsername(input.username);
+  const displayName = input.displayName.trim() || displayNameFromUsername(username);
+
+  return withTransaction(config, async (client) => {
+    const existingAccount = await client.query(
+      'SELECT 1 FROM profiles WHERE lower(email) = lower($1) LIMIT 1',
+      [email],
+    );
+    if (existingAccount.rows[0]) {
+      throw new AppError(
+        'account_exists',
+        'A HINTO account already exists for this email. Use sign in instead.',
+        409,
+      );
+    }
+    const existingUsername = await client.query(
+      'SELECT 1 FROM profiles WHERE lower(username) = lower($1) LIMIT 1',
+      [username],
+    );
+    if (existingUsername.rows[0]) {
+      throw new AppError('username_taken', 'That username is already taken', 409);
+    }
+
+    const platformUser = await client.query<{ id: string }>(
+      `INSERT INTO platform_users(primary_email, display_name)
+       VALUES ($1, $2)
+       RETURNING id`,
+      [email, displayName],
+    );
+    const platformUserId = platformUser.rows[0].id;
+
+    const profile = await client.query<Pick<ProfileRow, 'id' | 'email'>>(
+      `INSERT INTO profiles(
+         platform_user_id, email, username, name, display_name, privacy, is_public, mutuals_only
+       )
+       VALUES ($1, $2, $3, $4, $4, 'private', false, false)
+       RETURNING id, email`,
+      [platformUserId, email, username, displayName],
+    );
+
+    await client.query(
+      `INSERT INTO auth_identities(
+         platform_user_id, provider, provider_user_id, provider_email,
+         provider_email_verified, provider_username, provider_display_name, is_primary, last_used_at
+       )
+       VALUES ($1, 'email', $2, $2, true, $3, $4, true, now())`,
+      [platformUserId, email, username, displayName],
+    );
+
+    return {
+      profile_id: profile.rows[0].id,
+      platform_user_id: platformUserId,
+      email: profile.rows[0].email,
+    };
+  });
+}

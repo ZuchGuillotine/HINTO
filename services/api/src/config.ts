@@ -200,3 +200,53 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     ]),
   };
 }
+
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+/**
+ * Refuses to serve production traffic with a configuration that would either
+ * fall back to the Supabase transition path or run with development-only
+ * escape hatches. Called once at boot by server.ts.
+ */
+export function assertProductionConfig(config: AppConfig): void {
+  if (config.nodeEnv !== 'production') {
+    return;
+  }
+
+  const problems: string[] = [];
+
+  if (!config.databaseUrl) {
+    problems.push('DATABASE_URL is required (RDS Postgres is the production data store)');
+  }
+  if (!config.refreshTokenPepper) {
+    problems.push('REFRESH_TOKEN_PEPPER is required so session tokens are not hashed with the local default');
+  }
+  if (!config.jwtAccessTokenSecret) {
+    problems.push('JWT_ACCESS_TOKEN_SECRET is required');
+  }
+  if (config.developmentAuthEnabled) {
+    problems.push('ENABLE_DEVELOPMENT_AUTH must not be true in production');
+  }
+  if (config.emailOtpDeliveryDisabled) {
+    problems.push('DISABLE_EMAIL_OTP_DELIVERY must not be true in production');
+  }
+  if (config.corsAllowOrigin === '*') {
+    problems.push('API_CORS_ALLOW_ORIGIN must list explicit origins in production');
+  }
+  if (config.host !== '0.0.0.0') {
+    problems.push('API_HOST must be 0.0.0.0 inside the container so the ALB can reach the task');
+  }
+  const hasCustomProvider = Boolean(config.tiktokClientKey || config.snapchatClientId || config.metaClientId);
+  if (hasCustomProvider && !config.authStateSecret) {
+    problems.push('AUTH_STATE_SECRET is required when any OAuth provider is configured');
+  }
+
+  if (problems.length > 0) {
+    throw new ConfigError(`Refusing to start in production:\n- ${problems.join('\n- ')}`);
+  }
+}

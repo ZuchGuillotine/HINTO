@@ -46,3 +46,37 @@ describe('loadConfig', () => {
     expect(config.corsAllowOrigin).toBe('https://hnnt.app,https://app.hnnt.app');
   });
 });
+
+import { assertProductionConfig } from '../config';
+import { createTestConfig } from './helpers/config';
+
+describe('assertProductionConfig', () => {
+  const productionBase = () =>
+    createTestConfig({
+      nodeEnv: 'production',
+      host: '0.0.0.0',
+      corsAllowOrigin: 'https://hnnt.app',
+      developmentAuthEnabled: false,
+      emailOtpDeliveryDisabled: false,
+    });
+
+  test('accepts a complete production configuration', () => {
+    expect(() => assertProductionConfig(productionBase())).not.toThrow();
+  });
+
+  test('is a no-op outside production', () => {
+    expect(() => assertProductionConfig(createTestConfig({ databaseUrl: undefined }))).not.toThrow();
+  });
+
+  test('refuses production without DATABASE_URL or the token pepper', () => {
+    expect(() => assertProductionConfig({ ...productionBase(), databaseUrl: undefined })).toThrow(/DATABASE_URL/);
+    expect(() => assertProductionConfig({ ...productionBase(), refreshTokenPepper: undefined })).toThrow(/REFRESH_TOKEN_PEPPER/);
+  });
+
+  test('refuses development escape hatches and wildcard CORS in production', () => {
+    expect(() => assertProductionConfig({ ...productionBase(), developmentAuthEnabled: true })).toThrow(/ENABLE_DEVELOPMENT_AUTH/);
+    expect(() => assertProductionConfig({ ...productionBase(), emailOtpDeliveryDisabled: true })).toThrow(/DISABLE_EMAIL_OTP_DELIVERY/);
+    expect(() => assertProductionConfig({ ...productionBase(), corsAllowOrigin: '*' })).toThrow(/API_CORS_ALLOW_ORIGIN/);
+    expect(() => assertProductionConfig({ ...productionBase(), host: '127.0.0.1' })).toThrow(/API_HOST/);
+  });
+});

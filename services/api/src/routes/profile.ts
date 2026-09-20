@@ -5,6 +5,10 @@ import { AppError } from '../errors.js';
 import { sendJsonSuccess } from '../http.js';
 import { resolveAuthenticatedUser } from '../middleware/auth.js';
 import { shouldUsePostgres } from '../db.js';
+import { deletePostgresAccount } from '../repositories/postgres-auth.js';
+
+const MIN_AGE = 16;
+const MAX_AGE = 120;
 import {
   getProfileById,
   listAuthIdentities,
@@ -199,7 +203,23 @@ export async function handlePatchMe(
     bio?: string | null;
     avatarUrl?: string | null;
     privacy?: 'public' | 'private' | 'mutuals_only';
+    age?: number;
   } = {};
+
+  if (body.age !== undefined) {
+    if (typeof body.age !== 'number' || !Number.isInteger(body.age)) {
+      throw new AppError('validation_error', 'age must be an integer', 400);
+    }
+    if (body.age < MIN_AGE) {
+      throw new AppError('age_requirement_not_met', `You must be at least ${MIN_AGE} to use HINTO`, 403);
+    }
+    if (body.age > MAX_AGE) {
+      throw new AppError('validation_error', 'age is out of range', 400);
+    }
+    updateFields.age = body.age;
+    updateFields.age_verified = true;
+    postgresUpdate.age = body.age;
+  }
 
   if (body.username !== undefined) {
     if (typeof body.username !== 'string' || (body.username as string).trim().length === 0) {
@@ -280,4 +300,54 @@ export async function handlePatchMe(
     config,
   );
   sendJsonSuccess(response, 200, context.requestId, aggregate);
+}
+
+/**
+ * DELETE /v1/me - Permanently deletes the current account and all its data.
+ * Required by App Store Review Guideline 5.1.1(v) and by Meta's data-deletion
+ * policy. The client should discard its tokens after a 200.
+ */
+export async function handleDeleteMe(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: RequestContext,
+  config: AppConfig,
+): Promise<void> {
+  const authCtx = await resolveAuthenticatedUser(request, context, config);
+
+  if (shouldUsePostgres(config)) {
+    // Development sessions carry the profile id in both slots; treat a
+    // platform id that equals the profile id as "no platform user".
+    const platformUserId =
+      authCtx.user.authUserId && authCtx.user.authUserId !== authCtx.user.profileId
+        ? authCtx.user.authUserId
+        : null;
+    const result = await deletePostgresAccount(config, {
+      profileId: authCtx.user.profileId,
+      platformUserId,
+    });
+    if (!result.deletedProfile) {
+      throw new AppError('profile_not_found', 'Profile not found', 404);
+    }
+    sendJsonSuccess(response, 200, context.requestId, {
+      deleted: true,
+      profileId: authCtx.user.profileId,
+    });
+    return;
+  }
+
+  const supabase = getServiceClient(config);
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', authCtx.user.profileId);
+  if (profileError) {
+    throw new AppError('delete_failed', 'Failed to delete account', 500);
+  }
+  await supabase.auth.admin.deleteUser(authCtx.user.authUserId);
+
+  sendJsonSuccess(response, 200, context.requestId, {
+    deleted: true,
+    profileId: authCtx.user.profileId,
+  });
 }

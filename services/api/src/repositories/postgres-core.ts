@@ -256,12 +256,13 @@ export async function updateProfile(
     bio?: string | null;
     avatarUrl?: string | null;
     privacy?: 'public' | 'private' | 'mutuals_only';
+    age?: number;
   },
 ): Promise<ProfileRow> {
   const assignments: string[] = [];
-  const params: Array<string | boolean | null> = [];
+  const params: Array<string | number | boolean | null> = [];
 
-  function set(column: string, value: string | boolean | null): void {
+  function set(column: string, value: string | number | boolean | null): void {
     params.push(value);
     assignments.push(`${column} = $${params.length}`);
   }
@@ -273,6 +274,10 @@ export async function updateProfile(
   }
   if (input.bio !== undefined) set('bio', input.bio);
   if (input.avatarUrl !== undefined) set('avatar_url', input.avatarUrl);
+  if (input.age !== undefined) {
+    set('age', input.age);
+    set('age_verified', true);
+  }
   if (input.privacy !== undefined) {
     const booleans = privacyBooleans(input.privacy);
     set('privacy', input.privacy);

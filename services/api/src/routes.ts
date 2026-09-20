@@ -17,7 +17,14 @@ import {
   handleRefreshToken,
 } from './routes/auth.js';
 import { handleCreateDevelopmentSession } from './routes/dev.js';
-import { handleGetMe, handlePatchMe } from './routes/profile.js';
+import { handleDeleteMe, handleGetMe, handlePatchMe } from './routes/profile.js';
+import {
+  AI_MESSAGE_RATE_LIMIT,
+  AUTH_RATE_LIMIT,
+  PUBLIC_VOTE_RATE_LIMIT,
+  clientIpFromRequest,
+  enforceRateLimit,
+} from './rate-limit.js';
 import {
   handleListSituationships,
   handleCreateSituationship,
@@ -228,6 +235,7 @@ async function routeAsync(
         'GET  /v1/auth/providers/:provider/callback',
         'GET  /v1/me',
         'PATCH /v1/me',
+        'DELETE /v1/me',
         'POST /v1/me/avatar',
         'POST /v1/dev/session',
         'GET  /v1/me/feed',
@@ -278,31 +286,37 @@ async function routeAsync(
   // ── Auth routes (no bearer token required) ──────────────────
 
   if (method === 'POST' && path === '/v1/auth/email/otp') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailOtp(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/email/verify') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailVerify(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/email/password/sign-up') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailPasswordSignUp(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/email/password/sign-in') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleEmailPasswordSignIn(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/apple/native') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleNativeAppleSignIn(request, response, context, config);
     return true;
   }
 
   if (method === 'POST' && path === '/v1/auth/refresh') {
+    enforceRateLimit(AUTH_RATE_LIMIT, clientIpFromRequest(request));
     await handleRefreshToken(request, response, context, config);
     return true;
   }
@@ -341,6 +355,11 @@ async function routeAsync(
 
   if (method === 'PATCH' && path === '/v1/me') {
     await handlePatchMe(request, response, context, config);
+    return true;
+  }
+
+  if (method === 'DELETE' && path === '/v1/me') {
+    await handleDeleteMe(request, response, context, config);
     return true;
   }
 
@@ -537,6 +556,7 @@ async function routeAsync(
 
   const conversationMessagesId = matchConversationMessages(path);
   if (conversationMessagesId && method === 'POST') {
+    enforceRateLimit(AI_MESSAGE_RATE_LIMIT, clientIpFromRequest(request));
     await handleSendMessage(request, response, context, config, conversationMessagesId);
     return true;
   }
@@ -605,6 +625,7 @@ async function routeAsync(
     }
 
     if (method === 'POST' && publicVotingPath.action === 'votes') {
+      enforceRateLimit(PUBLIC_VOTE_RATE_LIMIT, clientIpFromRequest(request));
       await handleSubmitVote(
         request,
         response,

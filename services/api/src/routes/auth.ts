@@ -6,12 +6,17 @@ import { sendJsonSuccess } from '../http.js';
 import { readJsonBody } from '../body.js';
 import { verifyAppleIdentityToken } from '../apple.js';
 import { shouldUsePostgres } from '../db.js';
+import { buildOtpEmail, isEmailDeliveryConfigured, sendEmail } from '../email.js';
 import {
   assertPasswordAllowed,
   authenticateEmailPassword,
-  createOrLoadAppleAccount,
+  consumeEmailOtpChallenge,
+  createEmailOtpAccount,
+  createEmailOtpChallenge,
   createEmailPasswordAccount,
+  createOrLoadAppleAccount,
   createPostgresAuthSession,
+  findAuthProfileByEmail,
   refreshPostgresAuthSession,
 } from '../repositories/postgres-auth.js';
 import { getServiceClient } from '../supabase.js';
@@ -105,6 +110,11 @@ async function ensureEmailIdentity(
 }
 
 async function findProfileIdByEmail(email: string, config: AppConfig): Promise<string | null> {
+  if (shouldUsePostgres(config)) {
+    const row = await findAuthProfileByEmail(config, email);
+    return row?.profile_id ?? null;
+  }
+
   const supabase = getServiceClient(config);
   const { data: existingProfile, error: profileLookupError } = await supabase
     .from('profiles')
@@ -287,6 +297,24 @@ export async function handleEmailOtp(
     return;
   }
 
+  if (shouldUsePostgres(config)) {
+    if (!isEmailDeliveryConfigured(config)) {
+      throw new AppError(
+        'email_otp_unavailable',
+        'Email codes are not available yet. Sign in with your password or Apple.',
+        503,
+      );
+    }
+    const challenge = await createEmailOtpChallenge(config, email);
+    await sendEmail(config, buildOtpEmail(email, challenge.code, 10));
+    sendJsonSuccess(response, 200, context.requestId, {
+      sent: true,
+      email,
+      expiresAt: challenge.expiresAt.toISOString(),
+    });
+    return;
+  }
+
   const supabase = getServiceClient(config);
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -350,6 +378,46 @@ export async function handleEmailVerify(
       displayName,
     });
     sendJsonSuccess(response, 200, context.requestId, session);
+    return;
+  }
+
+  if (shouldUsePostgres(config)) {
+    const accepted = await consumeEmailOtpChallenge(config, email, token);
+    if (!accepted) {
+      throw new AppError('verification_failed', 'Invalid or expired verification code', 401);
+    }
+
+    let authProfile = await findAuthProfileByEmail(config, email);
+    if (intent === 'sign_in' && !authProfile) {
+      throw new AppError(
+        'account_not_found',
+        'No HINTO account exists for this email. Use sign up first.',
+        404,
+      );
+    }
+    if (intent === 'sign_up' && authProfile) {
+      throw new AppError(
+        'account_exists',
+        'A HINTO account already exists for this email. Use sign in instead.',
+        409,
+      );
+    }
+    if (!authProfile) {
+      authProfile = await createEmailOtpAccount(config, {
+        email,
+        username: username ?? usernameFromEmail(email),
+        displayName: displayName ?? username ?? usernameFromEmail(email),
+      });
+    }
+
+    const session = await createPostgresAuthSession(config, request, authProfile);
+    const me = await fetchMeAggregateForProfileId(session.profileId, session.platformUserId, config);
+    sendJsonSuccess(response, 200, context.requestId, {
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAt: session.expiresAt,
+      me,
+    });
     return;
   }
 

@@ -1,0 +1,64 @@
+name: Deploy Web Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to publish to the hnnt.app bucket"
+        type: choice
+        default: landing
+        options: [landing, app]
+  push:
+    branches: [main]
+    paths:
+      - apps/web/**
+      - .github/workflows/deploy-web-staging.yml
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  WEB_BUCKET: hinto-staging-web-881490119784-us-west-2
+  CLOUDFRONT_DISTRIBUTION_ID: E2B8ASG16MNZ4F
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::881490119784:role/hinto-staging-github-deploy-role
+          role-session-name: hinto-staging-web-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build
+        run: |
+          set -euo pipefail
+          TARGET="${{ github.event.inputs.target || 'landing' }}"
+          if [ "$TARGET" = "app" ]; then
+            npm run web:build:staging
+            echo "SOURCE_DIR=apps/web/dist" >> "$GITHUB_ENV"
+          else
+            echo "SOURCE_DIR=apps/web/landing" >> "$GITHUB_ENV"
+          fi
+          # Legal pages are published with either target.
+          mkdir -p publish && cp -R "$([ "$TARGET" = "app" ] && echo apps/web/dist || echo apps/web/landing)"/. publish/
+          if [ -d apps/web/legal ]; then cp -R apps/web/legal publish/legal; fi
+      - name: Sync to S3
+        run: |
+          aws s3 sync publish/ "s3://$WEB_BUCKET/" --delete \
+            --cache-control "public, max-age=300" \
+            --exclude "index.html" --exclude "config.js"
+          aws s3 cp publish/index.html "s3://$WEB_BUCKET/index.html" --cache-control "no-cache"
+          if [ -f publish/config.js ]; then aws s3 cp publish/config.js "s3://$WEB_BUCKET/config.js" --cache-control "no-cache"; fi
+      - name: Invalidate CloudFront
+        run: aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
