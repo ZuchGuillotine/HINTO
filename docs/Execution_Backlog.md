@@ -1,7 +1,7 @@
 # HINTO Execution Backlog
 
 *Created: 2026-03-27*
-*Reviewed: 2026-04-15*
+*Reviewed: 2026-09-20*
 
 ## Purpose
 
@@ -16,6 +16,23 @@ The active target is:
 - RDS PostgreSQL-backed production data model
 - HTTP API and contracts that are clean for both Swift and web clients
 - gradual retirement of AWS Amplify, Cognito, AppSync, Supabase production assumptions, and Expo-first assumptions
+
+## Session Focus: 2026-09-20 (launch readiness)
+
+`docs/Launch_Readiness_Audit.md` is the source of truth for what still blocks a live deployment. This table tracks the follow-through.
+
+| ID | Goal | Status | Notes |
+| --- | --- | --- | --- |
+| LR-01 | Full-repo audit against the AWS stack | Done | `docs/Launch_Readiness_Audit.md` |
+| LR-02 | AI coach on RDS (was Supabase-only, 500 in production) | Done | `services/api/src/repositories/postgres-ai.ts` |
+| LR-03 | `DELETE /v1/me` account deletion (App Store 5.1.1(v)) | Done | Cascades profile + platform user in one transaction |
+| LR-04 | Email OTP on RDS via SES | Done (needs SES identity) | 503 `email_otp_unavailable` until `SES_FROM_EMAIL` is a verified sender |
+| LR-05 | Production config guard, rate limits, server hardening | Done | `assertProductionConfig`, `rate-limit.ts`, SIGTERM drain |
+| LR-06 | Migration runner and CI | Done | `npm run db:migrate`, `.github/workflows/ci.yml`, `deploy-web-staging.yml` |
+| LR-07 | Web: legal pages, coach, delete account, blocks/reports | In Progress | Legal drafts converted from the root `.docx` files; placeholders remain for legal review |
+| LR-08 | iOS: real coach, Keychain, refresh, delete, icon, privacy manifest, ATS split | In Progress | Xcode verification is human-only |
+| LR-09 | Snapchat/TikTok callbacks on RDS; Meta provider | Owner | `routes/auth-providers.ts` still uses Supabase admin APIs |
+| LR-10 | Apply migrations to staging RDS, merge to `main`, SES identity, portals, TestFlight | Human | See audit "Human Testing Required" |
 
 ## Session Focus: 2026-05-17
 

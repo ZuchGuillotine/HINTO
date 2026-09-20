@@ -252,4 +252,4 @@ The API should own passwordless/session issuance for production.
 
 ## Recommended Next Step
 
-Apply [`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql), then wire the API auth middleware against `platform_users`, `app_users`, `auth_identities`, and `auth_sessions`.
+Apply [`db/migrations/001_platform_identity.sql`](/db/migrations/001_platform_identity.sql), then wire the API auth middleware against `platform_users`, `app_users`, `auth_identities`, and `auth_sessions`.

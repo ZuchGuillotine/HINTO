@@ -15,7 +15,7 @@ Credential profile used:
 - `HNNT`
 
 Access rules, GitHub OIDC behavior, and credential hygiene are documented in
-[`access-and-workflows.md`](/Users/benjamincox/Downloads/HINTO/infra/aws/access-and-workflows.md).
+[`access-and-workflows.md`](/infra/aws/access-and-workflows.md).
 
 ## Network
 

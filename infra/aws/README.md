@@ -56,7 +56,7 @@ AWS role:
 This avoids long-lived AWS access keys in GitHub and does not require CodeBuild or CodePipeline. The main recurring cost is GitHub Actions minutes plus ECR image storage.
 
 Access and credential-handling rules are documented in
-[`access-and-workflows.md`](/Users/benjamincox/Downloads/HINTO/infra/aws/access-and-workflows.md).
+[`access-and-workflows.md`](/infra/aws/access-and-workflows.md).
 
 ## ECS Express Mode Inputs
 

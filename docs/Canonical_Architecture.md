@@ -165,10 +165,10 @@ tables in addition to the legacy/public voting-session tables:
 - `feed_submission_comments`
 
 That path is documented in
-[`docs/Friends_Feed_Voting.md`](/Users/benjamincox/Downloads/HINTO/docs/Friends_Feed_Voting.md).
+[`docs/Friends_Feed_Voting.md`](/docs/Friends_Feed_Voting.md).
 
 Shared platform identity tables are now tracked separately in
-[`db/migrations/001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql):
+[`db/migrations/001_platform_identity.sql`](/db/migrations/001_platform_identity.sql):
 
 - `platform_users`
 - `app_users`
@@ -182,7 +182,7 @@ Shared platform identity tables are now tracked separately in
 
 ## AWS Distribution
 
-Use the AWS plan in [`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md) as the production deployment source of truth.
+Use the AWS plan in [`docs/AWS_Infrastructure_Plan.md`](/docs/AWS_Infrastructure_Plan.md) as the production deployment source of truth.
 
 Production distribution:
 

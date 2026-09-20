@@ -4,7 +4,7 @@ This document covers the current restart-era local development path for the shar
 
 For the collaborator checklist that separates local testing requirements,
 pre-distribution hardening, and environment/secret status, see
-[`docs/Operational_Readiness_Checklist.md`](/Users/benjamincox/Downloads/HINTO/docs/Operational_Readiness_Checklist.md).
+[`docs/Operational_Readiness_Checklist.md`](/docs/Operational_Readiness_Checklist.md).
 
 ## Current Local Slice
 
@@ -100,7 +100,7 @@ the browser/OAuth leg can complete.
 
 Current AWS/RDS status:
 
-- production-oriented migrations live in [`db/migrations`](/Users/benjamincox/Downloads/HINTO/db/migrations)
+- production-oriented migrations live in [`db/migrations`](/db/migrations)
 - migrations `001` through `005` cover platform identity, product core, email/password auth, media assets, and friends feed submissions/votes
 - local device testing can point `DATABASE_URL` at the RDS endpoint through the SSM tunnel on `127.0.0.1:15432`
 - product routes should prefer the RDS repository path whenever `DATABASE_URL` is configured
@@ -109,13 +109,13 @@ Production infrastructure direction:
 
 - Supabase remains a transition/local verification surface, not the production platform target.
 - Production should use AWS RDS PostgreSQL through `DATABASE_URL`.
-- Production deployment guidance lives in [`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md).
+- Production deployment guidance lives in [`docs/AWS_Infrastructure_Plan.md`](/docs/AWS_Infrastructure_Plan.md).
 - RDS migrations currently include:
-  - [`001_platform_identity.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql)
-  - [`002_hinto_product_core.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/002_hinto_product_core.sql)
-  - [`003_email_password_auth.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/003_email_password_auth.sql)
-  - [`004_media_assets.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/004_media_assets.sql)
-  - [`005_feed_submissions.sql`](/Users/benjamincox/Downloads/HINTO/db/migrations/005_feed_submissions.sql)
+  - [`001_platform_identity.sql`](/db/migrations/001_platform_identity.sql)
+  - [`002_hinto_product_core.sql`](/db/migrations/002_hinto_product_core.sql)
+  - [`003_email_password_auth.sql`](/db/migrations/003_email_password_auth.sql)
+  - [`004_media_assets.sql`](/db/migrations/004_media_assets.sql)
+  - [`005_feed_submissions.sql`](/db/migrations/005_feed_submissions.sql)
 
 ## Media And Feed Submission Path
 

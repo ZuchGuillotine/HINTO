@@ -219,8 +219,8 @@ docker run --rm -p 3000:3000 \
 ```
 
 Production deployment guidance lives in
-[`docs/AWS_Infrastructure_Plan.md`](/Users/benjamincox/Downloads/HINTO/docs/AWS_Infrastructure_Plan.md)
-and [`infra/aws/README.md`](/Users/benjamincox/Downloads/HINTO/infra/aws/README.md).
+[`docs/AWS_Infrastructure_Plan.md`](/docs/AWS_Infrastructure_Plan.md)
+and [`infra/aws/README.md`](/infra/aws/README.md).
 
 ## Error Envelope
 

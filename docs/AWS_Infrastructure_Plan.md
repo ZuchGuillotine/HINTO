@@ -21,7 +21,7 @@ App Runner is not a target service. AWS moved App Runner to maintenance for new 
 
 For the live collaborator checklist covering local test setup, pre-distribution
 hardening, and variable/secret/API asset status, see
-[`docs/Operational_Readiness_Checklist.md`](/Users/benjamincox/Downloads/HINTO/docs/Operational_Readiness_Checklist.md).
+[`docs/Operational_Readiness_Checklist.md`](/docs/Operational_Readiness_Checklist.md).
 
 ## Account Strategy
 
@@ -86,7 +86,7 @@ The auth direction is platform-owned:
 - hashed refresh tokens stored in Postgres
 - explicit platform/app user mapping
 
-Minimum shared platform tables are defined in [001_platform_identity.sql](/Users/benjamincox/Downloads/HINTO/db/migrations/001_platform_identity.sql):
+Minimum shared platform tables are defined in [001_platform_identity.sql](/db/migrations/001_platform_identity.sql):
 
 - `platform_users`
 - `app_users`
